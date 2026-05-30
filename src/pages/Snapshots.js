@@ -3,12 +3,12 @@ import { db } from '../firebase/config';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 
 const s = {
-  page: { padding: '16px 16px 0', minHeight: '100vh' },
-  title: { fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: '#1a0a00', marginBottom: 4 },
-  sub: { fontSize: 13, color: '#c8956c', marginBottom: 16 },
+  page: { padding: '16px 16px 0', minHeight: '100vh', background: 'transparent' },
+  title: { fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: 'white', marginBottom: 4 },
+  sub: { fontSize: 13, color: 'rgba(255,255,255,0.6)', marginBottom: 16 },
   albumGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, paddingBottom: 80 },
-  albumCell: { background: 'white', borderRadius: 12, overflow: 'hidden', boxShadow: '0 1px 4px rgba(26,10,0,0.07)', cursor: 'pointer' },
-  tag: { display: 'inline-block', padding: '2px 8px', borderRadius: 20, fontSize: 10, background: '#fde8d0', color: '#854f0b', fontWeight: 600, marginBottom: 2 },
+  albumCell: { background: 'rgba(253,240,228,0.95)', borderRadius: 12, overflow: 'hidden', cursor: 'pointer' },
+  tag: { display: 'inline-block', padding: '2px 8px', borderRadius: 20, fontSize: 10, background: 'rgba(200,149,108,0.3)', color: '#6b3a1f', fontWeight: 600, marginBottom: 2 },
 };
 
 export default function Snapshots() {
@@ -16,8 +16,12 @@ export default function Snapshots() {
   const [selected, setSelected] = useState(null);
 
   useEffect(() => {
-    const q = query(collection(db, 'photoLogs'), orderBy('createdAt', 'desc'));
-    return onSnapshot(q, snap => setLogs(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const q = query(collection(db, 'photoLogs'));
+    return onSnapshot(q, snap => {
+      const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      docs.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+      setLogs(docs);
+    });
   }, []);
 
   return (
