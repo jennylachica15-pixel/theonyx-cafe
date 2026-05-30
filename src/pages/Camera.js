@@ -1,9 +1,13 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { db } from '../firebase/config';
 import { collection, addDoc, serverTimestamp, onSnapshot, query, orderBy } from 'firebase/firestore';
-import { useEffect } from 'react';
 
 const TAGS = ['Delivery', 'Stock Check', 'Equipment', 'Damaged Goods', 'Other'];
+
+// Google OAuth & Drive config
+const GOOGLE_CLIENT_ID = '596322682185-n5hm66hvol3nnqqllnuop995kcnefbgu.apps.googleusercontent.com';
+const DRIVE_FOLDER_ID = '1aEtFqN84f0jDG9SYb_hZhf2W-3TNDdkS';
+const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 
 const s = {
   page: { padding: '16px 16px 0', animation: 'fadeIn 0.3s ease' },
@@ -23,6 +27,7 @@ const s = {
     width: '100%', padding: '13px', borderRadius: 12,
     background: '#1a73e8', color: 'white', fontSize: 14, fontWeight: 600,
     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 10,
+    opacity: 1,
   },
   logBtn: {
     width: '100%', padding: '13px', borderRadius: 12,
@@ -40,10 +45,18 @@ const s = {
     display: 'inline-block', padding: '3px 10px', borderRadius: 20, fontSize: 11,
     background: 'var(--orange-bg)', color: 'var(--orange-warn)', fontWeight: 600, marginTop: 4,
   },
-  infoBox: {
-    background: '#e8f0fe', borderRadius: 12, padding: '14px 16px', marginBottom: 16,
-    fontSize: 13, color: '#1a73e8', lineHeight: 1.5,
+  connectedBadge: {
+    background: 'var(--green-bg)', color: 'var(--green-ok)', borderRadius: 10,
+    padding: '10px 14px', fontSize: 13, fontWeight: 500, marginBottom: 14,
+    display: 'flex', alignItems: 'center', gap: 8,
   },
+  progressBar: {
+    height: 6, borderRadius: 3, background: '#e8d8c8', marginBottom: 14, overflow: 'hidden',
+  },
+  progressFill: (pct) => ({
+    height: '100%', borderRadius: 3, background: '#1a73e8',
+    width: `${pct}%`, transition: 'width 0.3s ease',
+  }),
 };
 
 export default function Camera() {
@@ -54,7 +67,13 @@ export default function Camera() {
   const [logs, setLogs] = useState([]);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [accessToken, setAccessToken] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [driveFileUrl, setDriveFileUrl] = useState(null);
+  const [error, setError] = useState('');
   const fileRef = useRef();
+  const tokenClientRef = useRef(null);
 
   useEffect(() => {
     const q = query(collection(db, 'photoLogs'), orderBy('createdAt', 'desc'));
@@ -62,50 +81,140 @@ export default function Camera() {
     return unsub;
   }, []);
 
+  // Load Google Identity Services script
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    script.onload = () => initTokenClient();
+    document.body.appendChild(script);
+    return () => document.body.removeChild(script);
+  }, []);
+
+  const initTokenClient = () => {
+    if (!window.google) return;
+    tokenClientRef.current = window.google.accounts.oauth2.initTokenClient({
+      client_id: GOOGLE_CLIENT_ID,
+      scope: SCOPES,
+      callback: (response) => {
+        if (response.access_token) {
+          setAccessToken(response.access_token);
+        }
+      },
+    });
+  };
+
+  const connectDrive = () => {
+    if (tokenClientRef.current) {
+      tokenClientRef.current.requestAccessToken();
+    } else {
+      setError('Google Sign-In not loaded yet. Please wait a moment and try again.');
+    }
+  };
+
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
     setPhotoFile(file);
+    setDriveFileUrl(null);
     const reader = new FileReader();
     reader.onload = (ev) => setPhoto(ev.target.result);
     reader.readAsDataURL(file);
   };
 
-  const openDrive = () => {
-    window.open('https://drive.google.com/drive/my-drive', '_blank');
-  };
+  const uploadToDrive = async () => {
+    if (!photoFile || !accessToken) return;
+    setUploading(true);
+    setUploadProgress(10);
+    setError('');
 
-  const logPhoto = async () => {
-    if (!photoFile) return;
-    setSaving(true);
     try {
+      // Generate filename with date and tag
+      const date = new Date().toISOString().slice(0, 10);
+      const fileName = `${tag}_${date}_${photoFile.name}`;
+
+      // Step 1: Create file metadata with folder
+      const metadata = {
+        name: fileName,
+        parents: [DRIVE_FOLDER_ID],
+        mimeType: photoFile.type,
+      };
+
+      setUploadProgress(30);
+
+      // Step 2: Upload using multipart
+      const form = new FormData();
+      form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+      form.append('file', photoFile);
+
+      setUploadProgress(60);
+
+      const response = await fetch(
+        'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink,name',
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${accessToken}` },
+          body: form,
+        }
+      );
+
+      setUploadProgress(90);
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error?.message || 'Upload failed');
+      }
+
+      const file = await response.json();
+      setUploadProgress(100);
+      setDriveFileUrl(file.webViewLink);
+
+      // Log to Firestore
       await addDoc(collection(db, 'photoLogs'), {
-        fileName: photoFile.name,
+        fileName,
         tag,
         note,
         size: photoFile.size,
+        driveFileId: file.id,
+        driveFileUrl: file.webViewLink,
         createdAt: serverTimestamp(),
-        driveUploaded: false,
+        driveUploaded: true,
       });
+
       setSuccess(true);
       setPhoto(null);
       setPhotoFile(null);
       setNote('');
-      setTimeout(() => setSuccess(false), 3000);
-    } catch (e) {
-      console.error(e);
+      setTimeout(() => { setSuccess(false); setUploadProgress(0); }, 4000);
+    } catch (err) {
+      setError('Upload failed: ' + err.message);
+      setUploadProgress(0);
     }
-    setSaving(false);
+    setUploading(false);
   };
 
   return (
     <div style={s.page}>
       <div style={s.title}>Photos</div>
-      <div style={s.sub}>Take or upload photos and save to Google Drive</div>
+      <div style={s.sub}>Upload photos directly to your Google Drive folder</div>
 
-      <div style={s.infoBox}>
-        📁 <strong>How it works:</strong> Take or pick a photo below, then tap "Open Google Drive" to upload it manually. Log the photo here to keep a record.
-      </div>
+      {/* Connect Drive */}
+      {!accessToken ? (
+        <button style={s.driveBtn} onClick={connectDrive}>
+          <span>🔗</span> Connect Google Drive
+        </button>
+      ) : (
+        <div style={s.connectedBadge}>
+          ✅ Google Drive connected — photos will save to <strong>Theonyx Cafe Photos</strong>
+        </div>
+      )}
+
+      {error && (
+        <div style={{ background: 'var(--red-bg)', color: 'var(--red-crit)', borderRadius: 10, padding: '10px 14px', fontSize: 13, marginBottom: 14 }}>
+          ⚠️ {error}
+        </div>
+      )}
 
       {/* Photo Picker */}
       <div style={s.uploadBox} onClick={() => fileRef.current.click()}>
@@ -130,19 +239,32 @@ export default function Camera() {
           <label style={s.label}>Note (optional)</label>
           <input style={s.input} placeholder="e.g. Arabica delivery from supplier" value={note} onChange={e => setNote(e.target.value)} />
 
-          <button style={s.driveBtn} onClick={openDrive}>
-            <span>📂</span> Open Google Drive to Upload
+          {uploadProgress > 0 && uploadProgress < 100 && (
+            <div style={s.progressBar}>
+              <div style={s.progressFill(uploadProgress)} />
+            </div>
+          )}
+
+          <button
+            style={{ ...s.driveBtn, opacity: (!accessToken || uploading) ? 0.6 : 1 }}
+            onClick={uploadToDrive}
+            disabled={!accessToken || uploading}
+          >
+            {uploading ? `Uploading... ${uploadProgress}%` : '📤 Upload to Google Drive'}
           </button>
 
-          <button style={s.logBtn} onClick={logPhoto} disabled={saving}>
-            {saving ? 'Saving...' : '✅ Log this photo'}
-          </button>
+          {!accessToken && (
+            <p style={{ fontSize: 12, color: 'var(--red-crit)', textAlign: 'center', marginTop: -10, marginBottom: 14 }}>
+              Connect Google Drive first ↑
+            </p>
+          )}
         </>
       )}
 
       {success && (
         <div style={{ background: 'var(--green-bg)', color: 'var(--green-ok)', borderRadius: 10, padding: '12px 16px', marginBottom: 16, fontWeight: 500, fontSize: 14 }}>
-          ✅ Photo logged successfully!
+          ✅ Photo uploaded to your Drive folder!
+          {driveFileUrl && <a href={driveFileUrl} target="_blank" rel="noreferrer" style={{ display: 'block', fontSize: 12, marginTop: 4, color: 'var(--green-ok)' }}>View in Drive →</a>}
         </div>
       )}
 
@@ -151,16 +273,23 @@ export default function Camera() {
         Photo Log
       </div>
 
-      {logs.length === 0 && <div style={{ textAlign: 'center', color: 'var(--brown-light)', padding: '24px 0', fontSize: 13 }}>No photos logged yet.</div>}
+      {logs.length === 0 && <div style={{ textAlign: 'center', color: 'var(--brown-light)', padding: '24px 0', fontSize: 13 }}>No photos uploaded yet.</div>}
 
       {logs.map(log => (
         <div key={log.id} style={s.logCard}>
-          <div style={{ ...s.logThumb, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>📷</div>
-          <div>
+          <div style={{ ...s.logThumb, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>
+            {log.driveUploaded ? '☁️' : '📷'}
+          </div>
+          <div style={{ flex: 1 }}>
             <p style={s.logName}>{log.fileName || 'photo.jpg'}</p>
             <p style={s.logMeta}>{log.createdAt?.toDate ? log.createdAt.toDate().toLocaleDateString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Just now'}</p>
             <span style={s.tagChip}>{log.tag}</span>
             {log.note && <p style={{ fontSize: 12, color: 'var(--brown-light)', marginTop: 4 }}>{log.note}</p>}
+            {log.driveFileUrl && (
+              <a href={log.driveFileUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: '#1a73e8', display: 'block', marginTop: 4 }}>
+                View in Drive →
+              </a>
+            )}
           </div>
         </div>
       ))}
