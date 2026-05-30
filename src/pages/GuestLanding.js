@@ -122,7 +122,7 @@ const getPriceRange = (item) => {
 };
 
 const s = {
-  page: { minHeight: '100vh', background: 'var(--cream)', paddingBottom: 40 },
+  page: { minHeight: '100vh', background: 'transparent', paddingBottom: 40 },
   hero: { background: 'var(--brown-dark)', padding: '32px 20px 24px', textAlign: 'center' },
   logo: { width: 80, height: 80, borderRadius: '50%', objectFit: 'cover', border: '3px solid var(--gold)', marginBottom: 12 },
   heroTitle: { fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 700, color: 'var(--gold-light)', marginBottom: 4 },
@@ -130,20 +130,20 @@ const s = {
   socialRow: { display: 'flex', justifyContent: 'center', gap: 16, marginBottom: 4 },
   socialBtn: { width: 42, height: 42, borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.15)', textDecoration: 'none' },
   body: { padding: '20px 16px 0' },
-  welcome: { background: 'white', borderRadius: 14, padding: '16px', marginBottom: 16, boxShadow: '0 1px 6px rgba(26,10,0,0.07)' },
-  welcomeTitle: { fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700, color: 'var(--brown-dark)', marginBottom: 6 },
-  welcomeText: { fontSize: 13, color: 'var(--brown-mid)', lineHeight: 1.6, marginBottom: 0 },
-  sectionTitle: { fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 700, color: 'var(--brown-dark)', marginBottom: 12 },
-  catCard: { background: 'white', borderRadius: 14, marginBottom: 8, boxShadow: '0 1px 4px rgba(26,10,0,0.06)', overflow: 'hidden' },
+  welcome: { background: 'rgba(255,255,255,0.08)', borderRadius: 14, padding: '16px', marginBottom: 16, border: '1px solid rgba(255,255,255,0.1)' },
+  welcomeTitle: { fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700, color: '#f0d080', marginBottom: 6 },
+  welcomeText: { fontSize: 13, color: 'rgba(255,255,255,0.75)', lineHeight: 1.6, marginBottom: 0 },
+  sectionTitle: { fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 700, color: '#f0d080', marginBottom: 12 },
+  catCard: { background: 'rgba(253,240,228,0.95)', borderRadius: 14, marginBottom: 8, overflow: 'hidden' },
   catHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', cursor: 'pointer' },
   catLeft: { display: 'flex', alignItems: 'center', gap: 10 },
   catIcon: { fontSize: 22 },
-  catLabel: { fontSize: 15, fontWeight: 600, color: 'var(--brown-dark)' },
-  catCount: { fontSize: 11, color: 'var(--brown-light)', marginTop: 1 },
-  chevron: (open) => ({ fontSize: 14, color: 'var(--brown-light)', transition: 'transform 0.2s', transform: open ? 'rotate(180deg)' : 'rotate(0deg)' }),
-  itemRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 16px', borderTop: '1px solid #f5ede4' },
-  itemName: { fontSize: 13, fontWeight: 500, color: 'var(--brown-dark)' },
-  itemPrice: { fontSize: 12, color: 'var(--brown-mid)', fontWeight: 600 },
+  catLabel: { fontSize: 15, fontWeight: 600, color: '#1a0a00' },
+  catCount: { fontSize: 11, color: '#c8956c', marginTop: 1 },
+  chevron: (open) => ({ fontSize: 14, color: '#c8956c', transition: 'transform 0.2s', transform: open ? 'rotate(180deg)' : 'rotate(0deg)' }),
+  itemRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 16px', borderTop: '1px solid rgba(200,149,108,0.2)' },
+  itemName: { fontSize: 13, fontWeight: 500, color: '#1a0a00' },
+  itemPrice: { fontSize: 12, color: '#6b3a1f', fontWeight: 600 },
   photoBtn: { width: '100%', padding: '15px', borderRadius: 14, background: 'var(--brown-dark)', color: 'var(--gold-light)', fontSize: 15, fontWeight: 700, border: 'none', cursor: 'pointer', marginTop: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, fontFamily: 'var(--font-display)' },
 };
 
@@ -213,9 +213,7 @@ export default function GuestLanding({ onTakePhoto }) {
         ))}
 
         {/* Photo CTA */}
-        <button style={s.photoBtn} onClick={onTakePhoto}>
-          📷 Take a Photo at Theonyx
-        </button>
+
       </div>
     </div>
   );
