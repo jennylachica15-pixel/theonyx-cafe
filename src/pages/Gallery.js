@@ -39,22 +39,23 @@ const makeThumb = (file) => new Promise((resolve) => {
 });
 
 const s = {
-  page: { padding: '16px 16px 0', minHeight: '100vh' },
-  title: { fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: '#1a0a00', marginBottom: 4 },
-  sub: { fontSize: 13, color: '#c8956c', marginBottom: 16 },
-  uploadBox: { background: 'white', borderRadius: 16, padding: 24, textAlign: 'center', border: '2px dashed #e8d8c8', marginBottom: 14, cursor: 'pointer' },
+  page: { padding: '16px 16px 0', minHeight: '100vh', background: 'transparent' },
+  title: { fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: 'white', marginBottom: 4 },
+  sub: { fontSize: 13, color: 'rgba(255,255,255,0.6)', marginBottom: 16 },
+  uploadBox: { background: 'rgba(253,240,228,0.95)', borderRadius: 16, padding: 24, textAlign: 'center', border: '2px dashed rgba(200,149,108,0.5)', marginBottom: 14, cursor: 'pointer' },
   previewImg: { width: '100%', borderRadius: 12, maxHeight: 220, objectFit: 'cover', marginBottom: 14 },
   connectBtn: { width: '100%', padding: '13px', borderRadius: 12, background: '#1a73e8', color: 'white', fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 14, border: 'none', cursor: 'pointer' },
-  connectedBadge: { background: '#d8f3dc', color: '#2d6a4f', borderRadius: 10, padding: '10px 14px', fontSize: 13, fontWeight: 500, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 },
-  progressBar: { height: 6, borderRadius: 3, background: '#e8d8c8', marginBottom: 14, overflow: 'hidden' },
+  connectedBadge: { background: 'rgba(216,243,220,0.9)', color: '#2d6a4f', borderRadius: 10, padding: '10px 14px', fontSize: 13, fontWeight: 500, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 },
+  progressBar: { height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.2)', marginBottom: 14, overflow: 'hidden' },
   albumGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, paddingBottom: 80 },
-  albumCell: { background: 'white', borderRadius: 12, overflow: 'hidden', boxShadow: '0 1px 4px rgba(26,10,0,0.07)', cursor: 'pointer' },
+  albumCell: { background: 'rgba(253,240,228,0.95)', borderRadius: 12, overflow: 'hidden', cursor: 'pointer' },
   consentModal: { position: 'fixed', inset: 0, background: 'rgba(26,10,0,0.75)', zIndex: 300, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' },
   consentCard: { background: '#fdf6ee', borderRadius: '20px 20px 0 0', padding: '28px 24px 40px', width: '100%', maxWidth: 480, animation: 'slideUp 0.3s ease' },
   agreeBtn: { width: '100%', padding: '13px', borderRadius: 12, background: '#1a0a00', color: '#f0d080', fontSize: 14, fontWeight: 600, marginBottom: 8, border: 'none', cursor: 'pointer' },
   declineBtn: { width: '100%', padding: '12px', borderRadius: 12, background: '#fdf6ee', color: '#6b3a1f', fontSize: 14, border: '1.5px solid #e8d8c8', cursor: 'pointer', marginBottom: 8 },
   input: { width: '100%', padding: '11px 14px', borderRadius: 10, border: '1.5px solid #e8d8c8', fontSize: 14, background: 'white', color: '#1a0a00', marginBottom: 14, outline: 'none', boxSizing: 'border-box' },
   label: { display: 'block', fontSize: 12, fontWeight: 600, color: '#6b3a1f', marginBottom: 5, textTransform: 'uppercase', letterSpacing: 0.4 },
+  galleryTitle: { fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700, color: 'white', marginBottom: 10, marginTop: 4 },
 };
 
 export default function Gallery() {
@@ -72,8 +73,12 @@ export default function Gallery() {
   const tokenClientRef = useRef(null);
 
   useEffect(() => {
-    const q = query(collection(db, 'guestPhotos'), where('public', '==', true), orderBy('createdAt', 'desc'));
-    return onSnapshot(q, snap => setPhotos(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const q = query(collection(db, 'guestPhotos'), where('public', '==', true));
+    return onSnapshot(q, snap => {
+      const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      docs.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+      setPhotos(docs);
+    });
   }, []);
 
   useEffect(() => {
@@ -145,8 +150,8 @@ export default function Gallery() {
       {uploading && <div style={s.progressBar}><div style={{ height: '100%', borderRadius: 3, background: '#1a73e8', width: `${progress}%`, transition: 'width 0.3s' }} /></div>}
 
       {/* Public gallery grid */}
-      <div style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700, color: '#1a0a00', marginBottom: 10, marginTop: 4 }}>Public Gallery</div>
-      {photos.length === 0 && <div style={{ textAlign: 'center', color: '#c8956c', padding: '20px 0', fontSize: 13 }}>No public photos yet. Be the first!</div>}
+      <div style={s.galleryTitle}>Public Gallery</div>
+      {photos.length === 0 && <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.6)', padding: '20px 0', fontSize: 13 }}>No public photos yet. Be the first!</div>}
       <div style={s.albumGrid}>
         {photos.map(p => (
           <div key={p.id} style={s.albumCell} onClick={() => setSelected(selected?.id === p.id ? null : p)}>
