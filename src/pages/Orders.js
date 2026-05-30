@@ -339,6 +339,13 @@ export default function Orders({ userName }) {
             <button style={s.confirmBtn} onClick={saveOrder} disabled={saving}>
               {saving ? 'Saving...' : '✅ Confirm & Save'}
             </button>
+            <button style={{ ...s.confirmBtn, background: '#1a73e8', marginTop: 8 }} onClick={() => {
+              const w = window.open('', '_blank');
+              w.document.write(generateReceiptHTML());
+              w.document.close();
+              w.focus();
+              setTimeout(() => { w.print(); }, 500);
+            }}>🖨️ Print / Save as PDF</button>
             <button style={s.cancelBtn} onClick={() => setShowPreview(false)}>Back to Edit</button>
           </div>
         </div>
