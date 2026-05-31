@@ -26,8 +26,8 @@ export default function Snapshots() {
 
   return (
     <div style={s.page}>
-      <div style={s.title}>Snapshots</div>
-      <div style={s.sub}>Photos from Theonyx Cafe</div>
+      <div style={s.title}>Share Your Experience</div>
+      <div style={s.sub}>A glimpse of Theonyx Cafe moments</div>
 
       {logs.length === 0 && <div style={{ textAlign: 'center', color: '#c8956c', padding: '30px 0', fontSize: 13 }}>No snapshots yet.</div>}
 
