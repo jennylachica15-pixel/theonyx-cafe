@@ -659,60 +659,218 @@ function RacingGame({ playerName, onScore }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// GUESS THE WORD — Wordle-style UI
+// GUESS THE WORD — Wordle-style with animated barista characters
 // ═══════════════════════════════════════════════════════════════════════════════
 const WORD_LIST = [
-  { word:'LATTE',    hint:'Espresso + steamed milk' },
-  { word:'MOCHA',    hint:'Coffee with chocolate' },
-  { word:'FRAPPE',   hint:'Blended iced coffee' },
-  { word:'MATCHA',   hint:'Green tea powder' },
-  { word:'BROWNIE',  hint:'Dense chocolate square' },
-  { word:'WAFFLE',   hint:'Grid-patterned cake' },
-  { word:'BARISTA',  hint:'Coffee maker' },
-  { word:'ALMOND',   hint:'Nut milk source' },
-  { word:'MUFFIN',   hint:'Domed baked treat' },
-  { word:'CARAMEL',  hint:'Brown sugar sauce' },
-  { word:'VANILLA',  hint:'White flavoring pod' },
-  { word:'COCONUT',  hint:'Tropical white nut' },
-  { word:'CINNAMON', hint:'Bark spice for lattes' },
-  { word:'ESPRESSO', hint:'Strong short coffee' },
-  { word:'MACCHIATO',hint:'Stained espresso' },
-  { word:'TIRAMISU', hint:'Pick-me-up dessert' },
-  { word:'SMOOTHIE', hint:'Blended fruit drink' },
-  { word:'SANDWICH', hint:'Two slices of bread' },
-  { word:'PANCAKE',  hint:'Flat griddle cake' },
-  { word:'CHEESECAKE',hint:'Cream cheese dessert'},
-  { word:'CROISSANT',hint:'Crescent French pastry'},
-  { word:'AFFOGATO', hint:'Ice cream + espresso' },
-  { word:'AMERICANO',hint:'Diluted espresso' },
-  { word:'JOURNAL',  hint:'Café writing book' },
-  { word:'COASTER',  hint:'Cup protector mat' },
+  { word:'LATTE',     hint:'Espresso + steamed milk',           category:'Drinks' },
+  { word:'MOCHA',     hint:'Coffee with chocolate syrup',       category:'Drinks' },
+  { word:'FRAPPE',    hint:'Blended iced coffee drink',         category:'Drinks' },
+  { word:'MATCHA',    hint:'Finely ground green tea powder',    category:'Drinks' },
+  { word:'BARISTA',   hint:'The person who makes your coffee',  category:'Café' },
+  { word:'ALMOND',    hint:'Nut used for plant-based milk',     category:'Food' },
+  { word:'MUFFIN',    hint:'Domed cup-baked treat',             category:'Food' },
+  { word:'CARAMEL',   hint:'Sweet golden-brown sauce',          category:'Food' },
+  { word:'VANILLA',   hint:'Classic white flavoring pod',       category:'Food' },
+  { word:'COCONUT',   hint:'Tropical nut with white flesh',     category:'Food' },
+  { word:'CINNAMON',  hint:'Bark spice sprinkled on lattes',    category:'Food' },
+  { word:'ESPRESSO',  hint:'Strong short concentrated coffee',  category:'Drinks' },
+  { word:'TIRAMISU',  hint:'Italian pick-me-up dessert',        category:'Food' },
+  { word:'SMOOTHIE',  hint:'Blended fruit drink',               category:'Drinks' },
+  { word:'PANCAKE',   hint:'Flat round griddle cake',           category:'Food' },
+  { word:'BROWNIE',   hint:'Dense chocolate dessert square',    category:'Food' },
+  { word:'WAFFLE',    hint:'Grid-patterned baked cake',         category:'Food' },
+  { word:'AMERICANO', hint:'Espresso diluted with hot water',   category:'Drinks' },
+  { word:'AFFOGATO',  hint:'Ice cream drowned in espresso',     category:'Drinks' },
+  { word:'CROISSANT', hint:'Buttery crescent French pastry',    category:'Food' },
+  { word:'MACCHIATO', hint:'Espresso stained with milk',        category:'Drinks' },
+  { word:'COASTER',   hint:'Small mat placed under your cup',   category:'Café' },
+  { word:'JOURNAL',   hint:'Notebook café visitors write in',   category:'Café' },
+  { word:'CHEESECAKE',hint:'Creamy dessert on biscuit base',    category:'Food' },
+  { word:'SANDWICH',  hint:'Two bread slices with filling',     category:'Food' },
 ];
 
-// Pick words by length 4-8 for playability
-const PLAYABLE = WORD_LIST.filter(w => w.word.length >= 4 && w.word.length <= 8);
-
-const KEYBOARD_ROWS = ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'];
+const PLAYABLE = WORD_LIST.filter(w => w.word.length >= 4 && w.word.length <= 9);
+const KEYBOARD_ROWS = ['QWERTYUIOP','ASDFGHJKL','ZXCVBNM'];
 const MAX_GUESSES = 6;
+
+// ── Animated Barista SVG Characters ──────────────────────────────────────────
+function BaristaLeft({ state }) {
+  // state: 'wave' | 'cheer' | 'fight' | 'sad'
+  const armLAngle = state === 'wave' ? -60 : state === 'fight' ? -100 : state === 'cheer' ? -80 : -20;
+  const armRAngle = state === 'wave' ? -30 : state === 'fight' ? -80 : state === 'cheer' ? -80 : -20;
+  const eyeStyle = state === 'fight' ? 'angry' : state === 'sad' ? 'sad' : 'happy';
+
+  return (
+    <svg width="72" height="110" viewBox="0 0 72 110" style={{ overflow: 'visible' }}>
+      {/* Cap */}
+      <ellipse cx="36" cy="22" rx="18" ry="5" fill="#1a1a1a"/>
+      <rect x="20" y="16" width="32" height="8" rx="4" fill="#1a1a1a"/>
+      <text x="36" y="23" textAnchor="middle" fontSize="6" fill="#fff" fontWeight="bold">BARISTA</text>
+      {/* Head */}
+      <ellipse cx="36" cy="34" rx="14" ry="14" fill="#e8b89a"/>
+      {/* Eyes */}
+      {eyeStyle === 'happy' && <>
+        <ellipse cx="30" cy="32" rx="2.5" ry="2.5" fill="#3a2010"/>
+        <ellipse cx="42" cy="32" rx="2.5" ry="2.5" fill="#3a2010"/>
+      </>}
+      {eyeStyle === 'angry' && <>
+        <line x1="27" y1="29" x2="33" y2="31" stroke="#3a2010" strokeWidth="2"/>
+        <line x1="39" y1="31" x2="45" y2="29" stroke="#3a2010" strokeWidth="2"/>
+        <ellipse cx="30" cy="33" rx="2" ry="2" fill="#3a2010"/>
+        <ellipse cx="42" cy="33" rx="2" ry="2" fill="#3a2010"/>
+      </>}
+      {eyeStyle === 'sad' && <>
+        <line x1="27" y1="31" x2="33" y2="29" stroke="#3a2010" strokeWidth="1.5"/>
+        <line x1="39" y1="29" x2="45" y2="31" stroke="#3a2010" strokeWidth="1.5"/>
+        <ellipse cx="30" cy="33" rx="2" ry="2" fill="#3a2010"/>
+        <ellipse cx="42" cy="33" rx="2" ry="2" fill="#3a2010"/>
+      </>}
+      {/* Smile */}
+      {state !== 'sad' && <path d="M 30 39 Q 36 44 42 39" stroke="#a06040" strokeWidth="1.5" fill="none" strokeLinecap="round"/>}
+      {state === 'sad' && <path d="M 30 42 Q 36 38 42 42" stroke="#a06040" strokeWidth="1.5" fill="none" strokeLinecap="round"/>}
+      {/* Body — black shirt */}
+      <rect x="22" y="47" width="28" height="32" rx="6" fill="#1a1a1a"/>
+      {/* Apron */}
+      <path d="M 26 48 L 22 79 L 50 79 L 46 48 Z" fill="#c8943a" opacity="0.9"/>
+      <rect x="30" y="47" width="12" height="4" rx="2" fill="#c8943a"/>
+      {/* Left arm */}
+      <g transform={`rotate(${armLAngle}, 22, 52)`}>
+        <rect x="8" y="50" width="14" height="8" rx="4" fill="#1a1a1a"/>
+        <ellipse cx="8" cy="54" rx="5" ry="5" fill="#e8b89a"/>
+        {/* wave hand */}
+        {state === 'wave' && <>
+          <ellipse cx="4" cy="50" rx="3" ry="4" fill="#e8b89a"/>
+          <ellipse cx="1" cy="48" rx="2" ry="3" fill="#e8b89a"/>
+        </>}
+        {state === 'fight' && <>
+          <rect x="2" y="51" width="8" height="6" rx="3" fill="#e8b89a"/>
+        </>}
+      </g>
+      {/* Right arm */}
+      <g transform={`rotate(${-armRAngle}, 50, 52)`}>
+        <rect x="50" y="50" width="14" height="8" rx="4" fill="#1a1a1a"/>
+        <ellipse cx="64" cy="54" rx="5" ry="5" fill="#e8b89a"/>
+        {state === 'cheer' && <>
+          <text x="66" y="46" fontSize="12">☕</text>
+        </>}
+      </g>
+      {/* Legs */}
+      <rect x="26" y="78" width="8" height="20" rx="4" fill="#3a2010"/>
+      <rect x="38" y="78" width="8" height="20" rx="4" fill="#3a2010"/>
+      {/* Shoes */}
+      <ellipse cx="30" cy="98" rx="7" ry="4" fill="#1a1a1a"/>
+      <ellipse cx="42" cy="98" rx="7" ry="4" fill="#1a1a1a"/>
+
+      {/* Animations */}
+      {state === 'wave' && (
+        <animateTransform attributeName="transform" type="rotate" values="0 36 54;3 36 54;-3 36 54;0 36 54" dur="0.8s" repeatCount="indefinite"/>
+      )}
+      {state === 'cheer' && (
+        <animateTransform attributeName="transform" type="translate" values="0 0;0 -4;0 0" dur="0.5s" repeatCount="indefinite"/>
+      )}
+      {state === 'fight' && (
+        <animateTransform attributeName="transform" type="translate" values="0 0;3 0;0 0" dur="0.3s" repeatCount="indefinite"/>
+      )}
+      {state === 'sad' && (
+        <animateTransform attributeName="transform" type="translate" values="0 0;0 2;0 0" dur="1.2s" repeatCount="indefinite"/>
+      )}
+    </svg>
+  );
+}
+
+function BaristaRight({ state }) {
+  const armLAngle = state === 'wave' ? 60 : state === 'fight' ? 100 : state === 'cheer' ? 80 : 20;
+  const eyeStyle = state === 'fight' ? 'angry' : state === 'sad' ? 'sad' : 'happy';
+
+  return (
+    <svg width="72" height="110" viewBox="0 0 72 110" style={{ overflow: 'visible', transform: 'scaleX(-1)' }}>
+      {/* Cap */}
+      <ellipse cx="36" cy="22" rx="18" ry="5" fill="#1a1a1a"/>
+      <rect x="20" y="16" width="32" height="8" rx="4" fill="#1a1a1a"/>
+      <text x="36" y="23" textAnchor="middle" fontSize="6" fill="#fff" fontWeight="bold" transform="scale(-1,1) translate(-72,0)">BARISTA</text>
+      {/* Head */}
+      <ellipse cx="36" cy="34" rx="14" ry="14" fill="#d4a080"/>
+      {/* Eyes */}
+      {eyeStyle === 'happy' && <>
+        <ellipse cx="30" cy="32" rx="2.5" ry="2.5" fill="#3a2010"/>
+        <ellipse cx="42" cy="32" rx="2.5" ry="2.5" fill="#3a2010"/>
+      </>}
+      {eyeStyle === 'angry' && <>
+        <line x1="27" y1="29" x2="33" y2="31" stroke="#3a2010" strokeWidth="2"/>
+        <line x1="39" y1="31" x2="45" y2="29" stroke="#3a2010" strokeWidth="2"/>
+        <ellipse cx="30" cy="33" rx="2" ry="2" fill="#3a2010"/>
+        <ellipse cx="42" cy="33" rx="2" ry="2" fill="#3a2010"/>
+      </>}
+      {eyeStyle === 'sad' && <>
+        <line x1="27" y1="31" x2="33" y2="29" stroke="#3a2010" strokeWidth="1.5"/>
+        <line x1="39" y1="29" x2="45" y2="31" stroke="#3a2010" strokeWidth="1.5"/>
+        <ellipse cx="30" cy="33" rx="2" ry="2" fill="#3a2010"/>
+        <ellipse cx="42" cy="33" rx="2" ry="2" fill="#3a2010"/>
+      </>}
+      {state !== 'sad' && <path d="M 30 39 Q 36 44 42 39" stroke="#a06040" strokeWidth="1.5" fill="none" strokeLinecap="round"/>}
+      {state === 'sad' && <path d="M 30 42 Q 36 38 42 42" stroke="#a06040" strokeWidth="1.5" fill="none" strokeLinecap="round"/>}
+      {/* Body */}
+      <rect x="22" y="47" width="28" height="32" rx="6" fill="#1a1a1a"/>
+      <path d="M 26 48 L 22 79 L 50 79 L 46 48 Z" fill="#c8943a" opacity="0.9"/>
+      <rect x="30" y="47" width="12" height="4" rx="2" fill="#c8943a"/>
+      {/* Arms */}
+      <g transform={`rotate(${armLAngle}, 22, 52)`}>
+        <rect x="8" y="50" width="14" height="8" rx="4" fill="#1a1a1a"/>
+        <ellipse cx="8" cy="54" rx="5" ry="5" fill="#d4a080"/>
+        {state === 'wave' && <>
+          <ellipse cx="4" cy="50" rx="3" ry="4" fill="#d4a080"/>
+          <ellipse cx="1" cy="48" rx="2" ry="3" fill="#d4a080"/>
+        </>}
+        {state === 'fight' && <rect x="2" y="51" width="8" height="6" rx="3" fill="#d4a080"/>}
+      </g>
+      <g transform={`rotate(${-armLAngle*0.8}, 50, 52)`}>
+        <rect x="50" y="50" width="14" height="8" rx="4" fill="#1a1a1a"/>
+        <ellipse cx="64" cy="54" rx="5" ry="5" fill="#d4a080"/>
+      </g>
+      {/* Legs */}
+      <rect x="26" y="78" width="8" height="20" rx="4" fill="#3a2010"/>
+      <rect x="38" y="78" width="8" height="20" rx="4" fill="#3a2010"/>
+      <ellipse cx="30" cy="98" rx="7" ry="4" fill="#1a1a1a"/>
+      <ellipse cx="42" cy="98" rx="7" ry="4" fill="#1a1a1a"/>
+
+      {state === 'wave' && <animateTransform attributeName="transform" type="rotate" values="0 36 54;-3 36 54;3 36 54;0 36 54" dur="0.9s" repeatCount="indefinite"/>}
+      {state === 'cheer' && <animateTransform attributeName="transform" type="translate" values="0 0;0 -4;0 0" dur="0.6s" repeatCount="indefinite"/>}
+      {state === 'fight' && <animateTransform attributeName="transform" type="translate" values="0 0;-3 0;0 0" dur="0.3s" repeatCount="indefinite"/>}
+      {state === 'sad' && <animateTransform attributeName="transform" type="translate" values="0 0;0 2;0 0" dur="1.4s" repeatCount="indefinite"/>}
+    </svg>
+  );
+}
+
+function FightEffect({ show }) {
+  if (!show) return null;
+  return (
+    <div style={{ position: 'absolute', top: '30%', left: '50%', transform: 'translate(-50%,-50%)', fontSize: 28, animation: 'popEffect 0.4s ease', pointerEvents: 'none', zIndex: 10 }}>
+      💥
+    </div>
+  );
+}
 
 function GuessWordGame({ playerName, onScore }) {
   const [wordData, setWordData] = useState(null);
-  const [guesses, setGuesses] = useState([]); // array of strings
+  const [guesses, setGuesses] = useState([]);
   const [current, setCurrent] = useState('');
-  const [gameState, setGameState] = useState('playing'); // playing | won | lost
+  const [gameState, setGameState] = useState('playing');
   const [score, setScore] = useState(0);
   const [round, setRound] = useState(1);
   const [streak, setStreak] = useState(0);
   const [shake, setShake] = useState(false);
   const [usedWords, setUsedWords] = useState([]);
   const [showHint, setShowHint] = useState(false);
-  const inputRef = useRef(null);
+  const [baristaState, setBaristaState] = useState('wave');
+  const [showEffect, setShowEffect] = useState(false);
+  const [wrongFlash, setWrongFlash] = useState(false);
 
   const pickWord = useCallback((used = []) => {
     const avail = PLAYABLE.filter(w => !used.includes(w.word));
     const list = avail.length > 0 ? avail : PLAYABLE;
     setWordData(list[Math.floor(Math.random() * list.length)]);
-    setGuesses([]); setCurrent(''); setGameState('playing'); setShowHint(false);
+    setGuesses([]); setCurrent(''); setGameState('playing');
+    setShowHint(false); setBaristaState('wave');
   }, []);
 
   useEffect(() => { pickWord([]); }, []);
@@ -720,16 +878,14 @@ function GuessWordGame({ playerName, onScore }) {
   const word = wordData?.word || '';
   const WL = word.length;
 
-  // Get tile color for a letter at position in a guess
   const getTileState = (guess, pos) => {
     if (!guess || pos >= guess.length) return 'empty';
     const letter = guess[pos];
-    if (letter === word[pos]) return 'correct';       // green
-    if (word.includes(letter)) return 'present';      // yellow
-    return 'absent';                                   // gray
+    if (letter === word[pos]) return 'correct';
+    if (word.includes(letter)) return 'present';
+    return 'absent';
   };
 
-  // Keyboard letter state (best state across all guesses)
   const getKeyState = (letter) => {
     let best = 'unused';
     for (const g of guesses) {
@@ -745,16 +901,28 @@ function GuessWordGame({ playerName, onScore }) {
   };
 
   const submitGuess = () => {
-    if (current.length !== WL) { setShake(true); setTimeout(() => setShake(false), 500); return; }
+    if (current.length !== WL) {
+      setShake(true); setTimeout(() => setShake(false), 500); return;
+    }
     const newGuesses = [...guesses, current];
-    setGuesses(newGuesses);
-    setCurrent('');
+    setGuesses(newGuesses); setCurrent('');
+
+    // Check correct
     if (current === word) {
       const pts = (MAX_GUESSES - newGuesses.length + 1) * 50 + streak * 20 + (showHint ? 0 : 30);
-      const ns = score + pts;
-      setScore(ns); setStreak(s => s + 1); setGameState('won'); onScore(ns);
-    } else if (newGuesses.length >= MAX_GUESSES) {
-      setStreak(0); setGameState('lost'); onScore(score);
+      setScore(s => s + pts); setStreak(s => s + 1);
+      setGameState('won'); setBaristaState('cheer'); onScore(score + pts);
+    } else {
+      // Wrong guess — baristas fight!
+      const remaining = MAX_GUESSES - newGuesses.length;
+      setBaristaState('fight');
+      setShowEffect(true); setWrongFlash(true);
+      setTimeout(() => { setShowEffect(false); setWrongFlash(false); }, 600);
+      setTimeout(() => { setBaristaState(remaining <= 1 ? 'sad' : 'wave'); }, 800);
+
+      if (newGuesses.length >= MAX_GUESSES) {
+        setGameState('lost'); setBaristaState('sad'); setStreak(0); onScore(score);
+      }
     }
   };
 
@@ -770,11 +938,11 @@ function GuessWordGame({ playerName, onScore }) {
       if (gameState !== 'playing') return;
       if (e.key === 'Enter') { e.preventDefault(); submitGuess(); }
       else if (e.key === 'Backspace') setCurrent(c => c.slice(0, -1));
-      else if (/^[a-zA-Z]$/.test(e.key)) { if (current.length < WL) setCurrent(c => c + e.key.toUpperCase()); }
+      else if (/^[a-zA-Z]$/.test(e.key) && current.length < WL) setCurrent(c => c + e.key.toUpperCase());
     };
     window.addEventListener('keydown', k);
     return () => window.removeEventListener('keydown', k);
-  }, [current, gameState, word]);
+  }, [current, gameState, word, WL]);
 
   const nextRound = () => {
     const nu = [...usedWords, word];
@@ -785,8 +953,8 @@ function GuessWordGame({ playerName, onScore }) {
     correct: { bg: '#538d4e', border: '#538d4e', color: '#fff' },
     present: { bg: '#b59f3b', border: '#b59f3b', color: '#fff' },
     absent:  { bg: '#3a3a3c', border: '#3a3a3c', color: '#fff' },
-    empty:   { bg: '#1e1e1e', border: '#565656', color: '#fff' },
-    active:  { bg: '#1e1e1e', border: '#999',    color: '#fff' },
+    empty:   { bg: 'transparent', border: '#3a3a3c', color: '#fff' },
+    active:  { bg: 'transparent', border: '#999', color: '#fff' },
   };
 
   const keyColors = {
@@ -796,61 +964,98 @@ function GuessWordGame({ playerName, onScore }) {
     unused:  { bg: '#6b3a1f', color: '#d4a853' },
   };
 
-  const TILE_SIZE = Math.min(52, Math.floor((Math.min(window.innerWidth, 400) - 40) / WL));
+  const TILE_SIZE = Math.min(46, Math.floor((Math.min(typeof window !== 'undefined' ? window.innerWidth : 390, 400) - 48) / Math.max(WL, 5)));
 
-  if (!wordData) return <div style={{color:'#d4a853',textAlign:'center',padding:40}}>Loading...</div>;
+  if (!wordData) return <div style={{ color: '#d4a853', textAlign: 'center', padding: 40 }}>Loading...</div>;
+
+  const wrongCount = guesses.filter((g, i) => {
+    if (gameState === 'playing' && i === guesses.length - 1) return g !== word;
+    return g !== word;
+  }).length;
 
   return (
-    <div style={{height:'100%',background:'#121213',color:'#fff',display:'flex',flexDirection:'column',fontFamily:"'Arial',sans-serif",overflow:'hidden'}}>
+    <div style={{ height: '100%', background: '#121213', color: '#fff', display: 'flex', flexDirection: 'column', fontFamily: "'Arial',sans-serif", overflow: 'hidden' }}>
 
       {/* Top bar */}
-      <div style={{background:'#1a1a1b',borderBottom:'1px solid #3a3a3c',padding:'8px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0}}>
-        <div style={{fontSize:11,color:'#818384'}}>Round <b style={{color:'#d4a853'}}>{round}</b></div>
-        <div style={{fontSize:13,fontWeight:'bold',color:'#d4a853',letterSpacing:2}}>GUESS THE WORD</div>
-        <div style={{fontSize:11,color:'#818384'}}>⭐ <b style={{color:'#d4a853'}}>{score}</b> {streak>0&&<span>🔥{streak}</span>}</div>
+      <div style={{ background: '#1a1a1b', borderBottom: '1px solid #3a3a3c', padding: '7px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+        <div style={{ fontSize: 11, color: '#818384' }}>Round <b style={{ color: '#d4a853' }}>{round}</b></div>
+        <div style={{ fontSize: 13, fontWeight: 'bold', color: '#d4a853', letterSpacing: 2 }}>GUESS THE WORD</div>
+        <div style={{ fontSize: 11, color: '#818384' }}>⭐<b style={{ color: '#d4a853' }}>{score}</b> {streak > 0 && <span>🔥{streak}</span>}</div>
       </div>
 
-      {/* Hint */}
-      <div style={{textAlign:'center',padding:'6px 16px',flexShrink:0}}>
-        <div style={{fontSize:11,color:'#818384',marginBottom:3}}>{WL}-letter word · {wordData.hint}</div>
-        {!showHint
-          ? <button onClick={()=>setShowHint(true)} style={{background:'transparent',border:'1px solid #3a3a3c',borderRadius:6,padding:'3px 12px',color:'#818384',fontSize:11,cursor:'pointer'}}>💡 Reveal hint (−30 pts)</button>
-          : <div style={{fontSize:12,color:'#b59f3b',fontWeight:'bold'}}>💡 {wordData.hint}</div>
-        }
+      {/* Barista stage */}
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', padding: '0 12px', background: 'linear-gradient(180deg,#2c1400,#1a0800)', borderBottom: '2px solid #3d1f00', flexShrink: 0, height: 120, overflow: 'visible' }}>
+        {/* Left barista */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <BaristaLeft state={baristaState} />
+          <div style={{ fontSize: 9, color: '#d4a853', marginTop: 2, letterSpacing: 1 }}>KELLY</div>
+        </div>
+
+        {/* Center message */}
+        <div style={{ flex: 1, textAlign: 'center', paddingBottom: 14 }}>
+          {baristaState === 'wave' && (
+            <div style={{ fontSize: 11, color: '#d4a853', animation: 'fadeIn 0.3s' }}>
+              👋 Hi {playerName}! Guess the word!
+            </div>
+          )}
+          {baristaState === 'fight' && (
+            <div style={{ fontSize: 13, fontWeight: 'bold', color: '#ff4444', animation: 'popEffect 0.4s' }}>
+              💥 WRONG!<br/><span style={{ fontSize: 10 }}>They're fighting!</span>
+            </div>
+          )}
+          {baristaState === 'cheer' && (
+            <div style={{ fontSize: 13, fontWeight: 'bold', color: '#538d4e', animation: 'fadeIn 0.3s' }}>
+              🎉 CORRECT!<br/><span style={{ fontSize: 10, color: '#d4a853' }}>+{(MAX_GUESSES - guesses.length) * 50} pts!</span>
+            </div>
+          )}
+          {baristaState === 'sad' && (
+            <div style={{ fontSize: 11, color: '#818384' }}>
+              😢 Aww...<br/><span style={{ fontSize: 10 }}>It was <b style={{ color: '#d4a853' }}>{word}</b></span>
+            </div>
+          )}
+
+          {/* HP bar — lives left */}
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 4, marginTop: 6 }}>
+            {Array.from({ length: MAX_GUESSES }).map((_, i) => (
+              <div key={i} style={{ width: 10, height: 10, borderRadius: '50%', background: i < (MAX_GUESSES - guesses.filter(g => g !== word || gameState !== 'playing').length) ? '#538d4e' : '#3a3a3c', border: '1px solid #555', transition: 'background 0.3s' }}/>
+            ))}
+          </div>
+
+          {/* Category & hint */}
+          <div style={{ fontSize: 9, color: '#555', marginTop: 4 }}>{wordData.category} · {WL} letters</div>
+          {!showHint
+            ? <button onClick={() => setShowHint(true)} style={{ background: 'transparent', border: '1px solid #3a3a3c', borderRadius: 6, padding: '2px 8px', color: '#818384', fontSize: 9, cursor: 'pointer', marginTop: 3 }}>💡 Hint −30pts</button>
+            : <div style={{ fontSize: 10, color: '#b59f3b', marginTop: 3 }}>💡 {wordData.hint}</div>
+          }
+        </div>
+
+        {/* Right barista */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <BaristaRight state={baristaState} />
+          <div style={{ fontSize: 9, color: '#d4a853', marginTop: 2, letterSpacing: 1 }}>MARYZ</div>
+        </div>
+
+        <FightEffect show={showEffect} />
       </div>
 
       {/* Tile grid */}
-      <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'4px 0',gap:5,overflowY:'auto'}}>
-        {Array.from({length:MAX_GUESSES}).map((_,rowIdx) => {
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '6px 0', gap: 4, overflowY: 'auto', background: wrongFlash ? 'rgba(255,50,50,0.05)' : 'transparent', transition: 'background 0.3s' }}>
+        {Array.from({ length: MAX_GUESSES }).map((_, rowIdx) => {
           const guess = guesses[rowIdx];
           const isActive = rowIdx === guesses.length && gameState === 'playing';
           const displayWord = isActive ? current : (guess || '');
           const isShaking = isActive && shake;
 
           return (
-            <div key={rowIdx} style={{display:'flex',gap:5,animation:isShaking?'shake 0.4s ease':'none'}}>
-              {Array.from({length:WL}).map((_,colIdx) => {
+            <div key={rowIdx} style={{ display: 'flex', gap: 4, animation: isShaking ? 'shake 0.4s ease' : 'none' }}>
+              {Array.from({ length: WL }).map((_, colIdx) => {
                 const letter = displayWord[colIdx] || '';
                 let state = 'empty';
                 if (guess) state = getTileState(guess, colIdx);
                 else if (isActive && letter) state = 'active';
                 const c = tileColors[state];
-                const isFlipping = !!guess;
                 return (
-                  <div key={colIdx} style={{
-                    width: TILE_SIZE, height: TILE_SIZE,
-                    background: c.bg,
-                    border: `2px solid ${c.border}`,
-                    borderRadius: 4,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: Math.round(TILE_SIZE * 0.46),
-                    fontWeight: 'bold',
-                    color: c.color,
-                    transition: isFlipping ? `background 0.3s ${colIdx * 0.1}s` : 'border-color 0.1s',
-                    transform: isActive && letter && colIdx === current.length - 1 ? 'scale(1.08)' : 'scale(1)',
-                    textTransform: 'uppercase',
-                    userSelect: 'none',
-                  }}>
+                  <div key={colIdx} style={{ width: TILE_SIZE, height: TILE_SIZE, background: c.bg, border: `2px solid ${c.border}`, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: Math.round(TILE_SIZE * 0.46), fontWeight: 'bold', color: c.color, transition: guess ? `background 0.3s ${colIdx * 0.1}s, border-color 0.3s ${colIdx * 0.1}s` : 'border-color 0.1s', transform: isActive && letter && colIdx === current.length - 1 ? 'scale(1.1)' : 'scale(1)', userSelect: 'none', textTransform: 'uppercase' }}>
                     {letter}
                   </div>
                 );
@@ -862,38 +1067,38 @@ function GuessWordGame({ playerName, onScore }) {
 
       {/* Result banner */}
       {gameState !== 'playing' && (
-        <div style={{textAlign:'center',padding:'10px 16px',background:gameState==='won'?'#538d4e22':'#ff444422',borderTop:`1px solid ${gameState==='won'?'#538d4e':'#ff4444'}`,flexShrink:0}}>
-          <div style={{fontSize:gameState==='won'?18:15,fontWeight:'bold',color:gameState==='won'?'#538d4e':'#ff6b6b',marginBottom:4}}>
-            {gameState==='won' ? `🎉 ${guesses.length === 1 ? 'Genius!' : guesses.length <= 3 ? 'Great!' : 'Got it!'}` : `😔 The word was ${word}`}
+        <div style={{ textAlign: 'center', padding: '8px 14px', background: gameState === 'won' ? '#538d4e22' : '#ff444422', borderTop: `1px solid ${gameState === 'won' ? '#538d4e' : '#ff4444'}`, flexShrink: 0 }}>
+          <div style={{ fontSize: 15, fontWeight: 'bold', color: gameState === 'won' ? '#538d4e' : '#ff6b6b', marginBottom: 6 }}>
+            {gameState === 'won' ? `🎉 ${guesses.length <= 2 ? 'Genius!' : guesses.length <= 4 ? 'Great job!' : 'Got it!'}` : `😔 It was "${word}"`}
           </div>
-          <button onClick={nextRound} style={{background:'#d4a853',border:'none',borderRadius:8,padding:'8px 24px',color:'#1a0a00',fontWeight:'bold',fontSize:13,cursor:'pointer'}}>
+          <button onClick={nextRound} style={{ background: '#d4a853', border: 'none', borderRadius: 8, padding: '8px 28px', color: '#1a0a00', fontWeight: 'bold', fontSize: 13, cursor: 'pointer' }}>
             Next Word →
           </button>
         </div>
       )}
 
       {/* Keyboard */}
-      <div style={{background:'#1a1a1b',borderTop:'1px solid #3a3a3c',padding:'8px 6px 12px',flexShrink:0}}>
+      <div style={{ background: '#1a1a1b', borderTop: '1px solid #3a3a3c', padding: '6px 4px 10px', flexShrink: 0 }}>
         {KEYBOARD_ROWS.map((row, ri) => (
-          <div key={ri} style={{display:'flex',justifyContent:'center',gap:5,marginBottom:5}}>
+          <div key={ri} style={{ display: 'flex', justifyContent: 'center', gap: 4, marginBottom: 4 }}>
             {ri === 2 && (
-              <button onPointerDown={e=>{e.preventDefault();pressKey('ENTER');}}
-                style={{background:'#818384',border:'none',borderRadius:4,padding:'14px 8px',color:'#fff',fontSize:11,fontWeight:'bold',cursor:'pointer',minWidth:44,userSelect:'none'}}>
+              <button onPointerDown={e => { e.preventDefault(); pressKey('ENTER'); }}
+                style={{ background: '#818384', border: 'none', borderRadius: 4, padding: '12px 6px', color: '#fff', fontSize: 10, fontWeight: 'bold', cursor: 'pointer', minWidth: 40, userSelect: 'none' }}>
                 ENTER
               </button>
             )}
             {row.split('').map(l => {
               const ks = keyColors[getKeyState(l)];
               return (
-                <button key={l} onPointerDown={e=>{e.preventDefault();pressKey(l);}}
-                  style={{background:ks.bg,border:'none',borderRadius:4,padding:'14px 0',color:ks.color,fontSize:13,fontWeight:'bold',cursor:'pointer',width:30,userSelect:'none',transition:'background 0.2s'}}>
+                <button key={l} onPointerDown={e => { e.preventDefault(); pressKey(l); }}
+                  style={{ background: ks.bg, border: 'none', borderRadius: 4, padding: '12px 0', color: ks.color, fontSize: 13, fontWeight: 'bold', cursor: 'pointer', width: 28, userSelect: 'none', transition: 'background 0.2s' }}>
                   {l}
                 </button>
               );
             })}
             {ri === 2 && (
-              <button onPointerDown={e=>{e.preventDefault();pressKey('DEL');}}
-                style={{background:'#818384',border:'none',borderRadius:4,padding:'14px 8px',color:'#fff',fontSize:11,fontWeight:'bold',cursor:'pointer',minWidth:44,userSelect:'none'}}>
+              <button onPointerDown={e => { e.preventDefault(); pressKey('DEL'); }}
+                style={{ background: '#818384', border: 'none', borderRadius: 4, padding: '12px 6px', color: '#fff', fontSize: 11, fontWeight: 'bold', cursor: 'pointer', minWidth: 40, userSelect: 'none' }}>
                 ⌫
               </button>
             )}
@@ -902,17 +1107,14 @@ function GuessWordGame({ playerName, onScore }) {
       </div>
 
       <style>{`
-        @keyframes shake {
-          0%,100%{transform:translateX(0)}
-          20%{transform:translateX(-6px)}
-          40%{transform:translateX(6px)}
-          60%{transform:translateX(-4px)}
-          80%{transform:translateX(4px)}
-        }
+        @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} }
+        @keyframes popEffect { 0%{transform:translate(-50%,-50%) scale(0.5);opacity:0} 50%{transform:translate(-50%,-50%) scale(1.4);opacity:1} 100%{transform:translate(-50%,-50%) scale(1);opacity:0} }
+        @keyframes fadeIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:translateY(0)} }
       `}</style>
     </div>
   );
 }
+
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // MAIN GAMES PAGE
