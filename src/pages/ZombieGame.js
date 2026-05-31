@@ -263,14 +263,26 @@ function GameEngine({roomCode,myName,myAvatar,isHost,roomData,onGameOver,onBack}
   const spawnZombies=(st,d)=>{
     const m=mapRef.current;
     const count=Math.min(2+d*2,14);
-    const speed=ZOMBIE_SPEED+d*0.1;
+    const spd=ZOMBIE_SPEED+d*0.12;
     const hp2=2+Math.floor(d/2);
-    const pts=[[1,1],[m.cols-2,1],[1,m.rows-2],[m.cols-2,m.rows-2],[Math.floor(m.cols/2),1],[Math.floor(m.cols/2),m.rows-2],[1,Math.floor(m.rows/2)],[m.cols-2,Math.floor(m.rows/2)]];
-    st.zombies=Array.from({length:count},(_,i)=>{
+    // spawn far from player at map edges
+    const px=st.player.x,py=st.player.y;
+    const pts=[[1,1],[m.cols-2,1],[1,m.rows-2],[m.cols-2,m.rows-2],
+      [Math.floor(m.cols/2),1],[Math.floor(m.cols/2),m.rows-2],
+      [1,Math.floor(m.rows/2)],[m.cols-2,Math.floor(m.rows/2)]];
+    const newZombies=[];
+    for(let i=0;i<count;i++){
       const p=pts[i%pts.length];
-      return{id:i,x:p[0]*TILE+Math.random()*8,y:p[1]*TILE+Math.random()*8,hp:hp2,maxHp:hp2,speed,attackTimer:0};
-    });
-    setZombieCount(count);
+      newZombies.push({
+        id:Date.now()+i,
+        x:p[0]*TILE+Math.random()*6,
+        y:p[1]*TILE+Math.random()*6,
+        hp:hp2,maxHp:hp2,speed:spd,attackTimer:0
+      });
+    }
+    st.zombies=newZombies;
+    setZombieCount(newZombies.length);
+    console.log('Spawned zombies:',newZombies.length,'on day',d);
   };
 
   const removeModeRef=useRef(false);
@@ -320,20 +332,29 @@ function GameEngine({roomCode,myName,myAvatar,isHost,roomData,onGameOver,onBack}
       st.phase=phaseRef.current;st.day=dayRef.current;
     }
 
-    // movement
+    // movement — use smaller margin so barriers don't trap player
     const jv=keysRef.current.joystick||{x:0,y:0};
-    const speed=3+(hungerRef.current<20?-1:0); // slow if starving
-    const dx=jv.x*speed,dy=jv.y*speed;
-    const nx=st.player.x+dx,ny=st.player.y+dy;
-    const margin=TILE*0.45;
-    const corners=[[nx-margin,ny-margin],[nx+margin,ny-margin],[nx-margin,ny+margin],[nx+margin,ny+margin]];
-    const blocked=corners.some(([cx,cy])=>isSolid(m.map,st.barriers,Math.floor(cx/TILE),Math.floor(cy/TILE),m.cols,m.rows));
-    if(!blocked){st.player.x=Math.max(TILE,Math.min(m.w-TILE,nx));st.player.y=Math.max(TILE,Math.min(m.h-TILE,ny));}
-    else{
-      const ox=[[nx-margin,st.player.y-margin],[nx+margin,st.player.y+margin]];
-      if(!ox.some(([cx,cy])=>isSolid(m.map,st.barriers,Math.floor(cx/TILE),Math.floor(cy/TILE),m.cols,m.rows)))st.player.x=Math.max(TILE,Math.min(m.w-TILE,nx));
-      const oy=[[st.player.x-margin,ny-margin],[st.player.x+margin,ny+margin]];
-      if(!oy.some(([cx,cy])=>isSolid(m.map,st.barriers,Math.floor(cx/TILE),Math.floor(cy/TILE),m.cols,m.rows)))st.player.y=Math.max(TILE,Math.min(m.h-TILE,ny));
+    const spd=3+(hungerRef.current<20?-1:0);
+    const dx=jv.x*spd,dy=jv.y*spd;
+    if(Math.abs(dx)>0.01||Math.abs(dy)>0.01){
+      const nx=st.player.x+dx,ny=st.player.y+dy;
+      const margin=TILE*0.35; // tighter margin - less likely to get stuck
+      // try full move
+      const cFull=[[nx-margin,ny-margin],[nx+margin,ny-margin],[nx-margin,ny+margin],[nx+margin,ny+margin]];
+      const blockedFull=cFull.some(([cx,cy])=>isSolid(m.map,st.barriers,Math.floor(cx/TILE),Math.floor(cy/TILE),m.cols,m.rows));
+      if(!blockedFull){
+        st.player.x=Math.max(TILE,Math.min(m.w-TILE,nx));
+        st.player.y=Math.max(TILE,Math.min(m.h-TILE,ny));
+      } else {
+        // try x only
+        const cX=[[nx-margin,st.player.y-margin],[nx+margin,st.player.y-margin],[nx-margin,st.player.y+margin],[nx+margin,st.player.y+margin]];
+        if(!cX.some(([cx,cy])=>isSolid(m.map,st.barriers,Math.floor(cx/TILE),Math.floor(cy/TILE),m.cols,m.rows)))
+          st.player.x=Math.max(TILE,Math.min(m.w-TILE,nx));
+        // try y only
+        const cY=[[st.player.x-margin,ny-margin],[st.player.x+margin,ny-margin],[st.player.x-margin,ny+margin],[st.player.x+margin,ny+margin]];
+        if(!cY.some(([cx,cy])=>isSolid(m.map,st.barriers,Math.floor(cx/TILE),Math.floor(cy/TILE),m.cols,m.rows)))
+          st.player.y=Math.max(TILE,Math.min(m.h-TILE,ny));
+      }
     }
 
     // eat food
@@ -483,9 +504,11 @@ function GameEngine({roomCode,myName,myAvatar,isHost,roomData,onGameOver,onBack}
     const st=stateRef.current;if(!st)return;
     if(phaseRef.current==='night'){setLog('⚠️ Build during the day!');return;}
     const m=mapRef.current;
-    const tx=Math.floor(st.player.x/TILE),ty=Math.floor(st.player.y/TILE);
-    for(const[ox,oy]of[[0,-1],[1,0],[0,1],[-1,0],[1,-1],[-1,-1],[1,1],[-1,1]]){
-      const bx=tx+ox,by=ty+oy,key=`${bx},${by}`;
+    const ptx=Math.floor(st.player.x/TILE),pty=Math.floor(st.player.y/TILE);
+    // never place on tile player stands on — only adjacent tiles
+    for(const[ox,oy]of[[0,-1],[1,0],[0,1],[-1,0],[-1,-1],[1,-1],[1,1],[-1,1]]){
+      const bx=ptx+ox,by=pty+oy,key=`${bx},${by}`;
+      if(bx===ptx&&by===pty)continue; // skip own tile
       if(!isSolid(m.map,{},bx,by,m.cols,m.rows)&&!st.barriers[key]){
         st.barriers[key]=BARRIER_HP;setLog('🧱 Barrier placed!');return;
       }
