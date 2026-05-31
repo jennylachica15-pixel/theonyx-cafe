@@ -5,6 +5,7 @@ import {
   query, orderBy, limit, where, serverTimestamp
 } from 'firebase/firestore';
 import ZombieGame from './ZombieGame';
+import CafeGame from './CafeGame';
 
 // ─── THEME ───────────────────────────────────────────────────────────────────
 const S = {
@@ -317,7 +318,7 @@ function TetrisGame({ playerName, onScore }) {
   const [score, setScore] = useState(0);
   const [gameOver, setGameOver] = useState(false);
   const [started, setStarted] = useState(false);
-  const CELL=24,COLS=10,ROWS=20;
+  const CELL=16,COLS=14,ROWS=24;
   const PIECES=[
     {shape:[[1,1,1,1]],color:'#00bcd4'},
     {shape:[[1,1],[1,1]],color:'#d4a853'},
@@ -361,15 +362,15 @@ function TetrisGame({ playerName, onScore }) {
   const move=(dx)=>{const st=stateRef.current;if(!st)return;if(!collides(st.board,st.piece,dx,0))st.piece.x+=dx;};
   const drop=()=>{const st=stateRef.current;if(!st)return;while(!collides(st.board,st.piece,0,1))st.piece.y++;};
   const rot=()=>{const st=stateRef.current;if(!st)return;const r=rotate(st.piece.shape);const old=st.piece.shape;st.piece.shape=r;if(collides(st.board,st.piece))st.piece.shape=old;};
-  const btnStyle={background:'#3d1f00',border:'2px solid #6b3a1f',color:'#d4a853',padding:'14px 20px',borderRadius:12,fontSize:20,cursor:'pointer'};
+  const btnStyle={background:'#3d1f00',border:'2px solid #6b3a1f',color:'#d4a853',padding:'10px 16px',borderRadius:10,fontSize:16,cursor:'pointer'};
   return(
-    <div style={{display:'flex',flexDirection:'column',alignItems:'center',height:'100%',paddingTop:8}}>
-      <div style={{color:'#d4a853',fontSize:16,fontWeight:'bold',marginBottom:8}}>{playerName} | Score: {score}</div>
-      <canvas ref={canvasRef} width={COLS*CELL} height={ROWS*CELL} style={{border:'2px solid #6b3a1f',borderRadius:8,maxWidth:'100%'}}/>
-      {!started&&!gameOver&&<button style={{...S.btn(),marginTop:16,width:160}} onClick={startGame}>▶ Start</button>}
-      {gameOver&&<div style={{textAlign:'center',marginTop:12}}><div style={{color:'#ff6b6b',fontSize:18,fontWeight:'bold'}}>Game Over!</div><div style={{color:'#d4a853',marginBottom:8}}>Score: {score}</div><button style={{...S.btn(),width:160}} onClick={startGame}>▶ Again</button></div>}
+    <div style={{display:'flex',flexDirection:'column',alignItems:'center',height:'100%',paddingTop:4}}>
+      <div style={{color:'#d4a853',fontSize:14,fontWeight:'bold',marginBottom:4}}>{playerName} | Score: {score}</div>
+      <canvas ref={canvasRef} width={COLS*CELL} height={ROWS*CELL} style={{border:'2px solid #6b3a1f',borderRadius:8,width:'100%',maxWidth:COLS*CELL}}/>
+      {!started&&!gameOver&&<button style={{...S.btn(),marginTop:12,width:160}} onClick={startGame}>▶ Start</button>}
+      {gameOver&&<div style={{textAlign:'center',marginTop:8}}><div style={{color:'#ff6b6b',fontSize:16,fontWeight:'bold'}}>Game Over!</div><div style={{color:'#d4a853',marginBottom:6}}>Score: {score}</div><button style={{...S.btn(),width:160}} onClick={startGame}>▶ Again</button></div>}
       {started&&!gameOver&&(
-        <div style={{display:'flex',gap:12,marginTop:16}}>
+        <div style={{display:'flex',gap:8,marginTop:10}}>
           <button style={btnStyle} onClick={()=>move(-1)}>◀</button>
           <button style={btnStyle} onClick={rot}>↻</button>
           <button style={btnStyle} onClick={drop}>⬇</button>
@@ -734,14 +735,7 @@ function RacingGame({ playerName, onScore }) {
 // CAFÉ MYSTERY (social deduction - placeholder shell)
 // ═══════════════════════════════════════════════════════════════════════════════
 function CafeMysteryGame({ playerName, onBack }) {
-  return(
-    <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',height:'100%',padding:24,textAlign:'center'}}>
-      <div style={{fontSize:48,marginBottom:16}}>☕</div>
-      <div style={{fontSize:20,fontWeight:'bold',color:'#d4a853',marginBottom:8}}>Café Mystery</div>
-      <div style={{color:'#a07850',marginBottom:24}}>The social deduction game is loaded from CafeGame.js — make sure that file is in your src/pages/ folder!</div>
-      <button style={{...S.btn(),width:160}} onClick={onBack}>← Back</button>
-    </div>
-  );
+  return <CafeGame playerName={playerName} onBack={onBack}/>;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
