@@ -316,10 +316,12 @@ function TetrisGame({ playerName, onScore }) {
   const containerRef = useRef(null);
   const stateRef = useRef(null);
   const rafRef = useRef(null);
+  const cellRef = useRef(20); // dynamic cell size
   const [score, setScore] = useState(0);
   const [gameOver, setGameOver] = useState(false);
   const [started, setStarted] = useState(false);
-  const COLS=12,ROWS=30;
+  const COLS=10, ROWS=20;
+
   const PIECES=[
     {shape:[[1,1,1,1]],color:'#00bcd4'},
     {shape:[[1,1],[1,1]],color:'#d4a853'},
@@ -335,43 +337,112 @@ function TetrisGame({ playerName, onScore }) {
   const merge=(board,piece)=>{const b=board.map(r=>[...r]);piece.shape.forEach((row,y)=>row.forEach((v,x)=>{if(v)b[piece.y+y][piece.x+x]=piece.color;}));return b;};
   const clearLines=(board)=>{const b=board.filter(r=>r.some(v=>!v));const cleared=ROWS-b.length;const empty=Array.from({length:cleared},()=>Array(COLS).fill(0));return{board:[...empty,...b],cleared};};
   const initState=()=>({board:Array.from({length:ROWS},()=>Array(COLS).fill(0)),piece:newPiece(),next:newPiece(),score:0,lastTime:0,speed:600});
-  const drawGame=useCallback(()=>{
-    const canvas=canvasRef.current;if(!canvas)return;const ctx=canvas.getContext('2d');const st=stateRef.current;
-    ctx.fillStyle='#1a0a00';ctx.fillRect(0,0,canvas.width,canvas.height);
-    ctx.strokeStyle='rgba(61,31,0,0.4)';ctx.lineWidth=0.5;
+
+  const resizeCanvas = useCallback(() => {
+    const canvas = canvasRef.current;
+    const container = containerRef.current;
+    if (!canvas || !container) return;
+    const availH = container.clientHeight - 60; // leave room for buttons
+    const availW = container.clientWidth;
+    // fit COLS x ROWS in available space
+    const cellByW = Math.floor(availW / COLS);
+    const cellByH = Math.floor(availH / ROWS);
+    const cell = Math.max(14, Math.min(cellByW, cellByH));
+    cellRef.current = cell;
+    canvas.width = COLS * cell;
+    canvas.height = ROWS * cell;
+  }, []);
+
+  const drawGame = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const CELL = cellRef.current;
+    const ctx = canvas.getContext('2d');
+    const st = stateRef.current;
+    if (!st) return;
+    ctx.fillStyle = '#0a0500';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // grid
+    ctx.strokeStyle = 'rgba(61,31,0,0.35)';
+    ctx.lineWidth = 0.5;
     for(let x=0;x<=COLS;x++){ctx.beginPath();ctx.moveTo(x*CELL,0);ctx.lineTo(x*CELL,ROWS*CELL);ctx.stroke();}
     for(let y=0;y<=ROWS;y++){ctx.beginPath();ctx.moveTo(0,y*CELL);ctx.lineTo(COLS*CELL,y*CELL);ctx.stroke();}
-    st.board.forEach((row,y)=>row.forEach((v,x)=>{if(v){ctx.fillStyle=v;ctx.fillRect(x*CELL+1,y*CELL+1,CELL-2,CELL-2);}}));
-    st.piece.shape.forEach((row,y)=>row.forEach((v,x)=>{if(v){ctx.fillStyle=st.piece.color;ctx.fillRect((st.piece.x+x)*CELL+1,(st.piece.y+y)*CELL+1,CELL-2,CELL-2);}}));
-  },[]);
-  const gameLoop=useCallback((ts)=>{
-    const st=stateRef.current;if(!st)return;
-    if(ts-st.lastTime>st.speed){
-      st.lastTime=ts;
-      if(!collides(st.board,st.piece,0,1)){st.piece.y++;}
-      else{
-        const nb=merge(st.board,st.piece);const{board,cleared}=clearLines(nb);
-        st.board=board;st.score+=cleared*100*(cleared>1?cleared:1);st.speed=Math.max(100,600-st.score/5);
-        setScore(st.score);st.piece=st.next;st.next=newPiece();
-        if(collides(st.board,st.piece)){setGameOver(true);onScore(st.score);return;}
+    // ghost piece
+    let gy = st.piece.y;
+    while (!collides(st.board,{...st.piece,y:gy+1})) gy++;
+    st.piece.shape.forEach((row,y)=>row.forEach((v,x)=>{
+      if(v){ctx.fillStyle='rgba(255,255,255,0.08)';ctx.fillRect((st.piece.x+x)*CELL+1,(gy+y)*CELL+1,CELL-2,CELL-2);}
+    }));
+    // board
+    st.board.forEach((row,y)=>row.forEach((v,x)=>{
+      if(v){
+        ctx.fillStyle=v;
+        ctx.fillRect(x*CELL+1,y*CELL+1,CELL-2,CELL-2);
+        ctx.fillStyle='rgba(255,255,255,0.15)';
+        ctx.fillRect(x*CELL+1,y*CELL+1,CELL-2,3);
+        ctx.fillRect(x*CELL+1,y*CELL+1,3,CELL-2);
+      }
+    }));
+    // active piece
+    st.piece.shape.forEach((row,y)=>row.forEach((v,x)=>{
+      if(v){
+        ctx.fillStyle=st.piece.color;
+        ctx.fillRect((st.piece.x+x)*CELL+1,(st.piece.y+y)*CELL+1,CELL-2,CELL-2);
+        ctx.fillStyle='rgba(255,255,255,0.25)';
+        ctx.fillRect((st.piece.x+x)*CELL+1,(st.piece.y+y)*CELL+1,CELL-2,3);
+        ctx.fillRect((st.piece.x+x)*CELL+1,(st.piece.y+y)*CELL+1,3,CELL-2);
+      }
+    }));
+  }, []);
+
+  const gameLoop = useCallback((ts) => {
+    const st = stateRef.current; if (!st) return;
+    if (ts - st.lastTime > st.speed) {
+      st.lastTime = ts;
+      if (!collides(st.board,st.piece,0,1)) { st.piece.y++; }
+      else {
+        const nb = merge(st.board,st.piece);
+        const {board,cleared} = clearLines(nb);
+        st.board = board;
+        st.score += cleared * 100 * (cleared > 1 ? cleared : 1);
+        st.speed = Math.max(80, 600 - st.score / 5);
+        setScore(st.score);
+        st.piece = st.next; st.next = newPiece();
+        if (collides(st.board,st.piece)) { setGameOver(true); onScore(st.score); return; }
       }
     }
-    drawGame();rafRef.current=requestAnimationFrame(gameLoop);
-  },[drawGame,onScore]);
-  const startGame=()=>{stateRef.current=initState();setScore(0);setGameOver(false);setStarted(true);rafRef.current=requestAnimationFrame(gameLoop);};
-  useEffect(()=>()=>{if(rafRef.current)cancelAnimationFrame(rafRef.current);},[]);
-  const move=(dx)=>{const st=stateRef.current;if(!st)return;if(!collides(st.board,st.piece,dx,0))st.piece.x+=dx;};
-  const drop=()=>{const st=stateRef.current;if(!st)return;while(!collides(st.board,st.piece,0,1))st.piece.y++;};
-  const rot=()=>{const st=stateRef.current;if(!st)return;const r=rotate(st.piece.shape);const old=st.piece.shape;st.piece.shape=r;if(collides(st.board,st.piece))st.piece.shape=old;};
-  const btnStyle={background:'#3d1f00',border:'2px solid #6b3a1f',color:'#d4a853',padding:'14px 22px',borderRadius:10,fontSize:20,cursor:'pointer',userSelect:'none',WebkitUserSelect:'none'};
-  return(
-    <div ref={containerRef} style={{display:'flex',flexDirection:'column',height:'100%',background:'#1a0a00'}}>
-      <div style={{color:'#d4a853',fontSize:13,fontWeight:'bold',textAlign:'center',padding:'3px 0',flexShrink:0}}>{playerName} | Score: {score}</div>
-      <canvas ref={canvasRef} style={{width:'100%',flex:1,display:'block'}}/>
-      {!started&&!gameOver&&<div style={{textAlign:'center',padding:12}}><button style={{...S.btn(),width:160}} onClick={startGame}>▶ Start</button></div>}
-      {gameOver&&<div style={{textAlign:'center',padding:8,flexShrink:0}}><div style={{color:'#ff6b6b',fontSize:16,fontWeight:'bold'}}>Game Over!</div><div style={{color:'#d4a853',marginBottom:6}}>Score: {score}</div><button style={{...S.btn(),width:160}} onClick={startGame}>▶ Again</button></div>}
-      {started&&!gameOver&&(
-        <div style={{display:'flex',gap:8,padding:'6px 8px',justifyContent:'center',background:'#0a0500',flexShrink:0}}>
+    drawGame();
+    rafRef.current = requestAnimationFrame(gameLoop);
+  }, [drawGame, onScore]);
+
+  const startGame = () => {
+    resizeCanvas();
+    stateRef.current = initState();
+    setScore(0); setGameOver(false); setStarted(true);
+    rafRef.current = requestAnimationFrame(gameLoop);
+  };
+
+  useEffect(() => {
+    resizeCanvas();
+    const ro = new ResizeObserver(resizeCanvas);
+    if (containerRef.current) ro.observe(containerRef.current);
+    return () => { ro.disconnect(); if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+  }, [resizeCanvas]);
+
+  const move = (dx) => { const st=stateRef.current;if(!st)return;if(!collides(st.board,st.piece,dx,0))st.piece.x+=dx; };
+  const drop = () => { const st=stateRef.current;if(!st)return;while(!collides(st.board,st.piece,0,1))st.piece.y++; };
+  const rot  = () => { const st=stateRef.current;if(!st)return;const r=rotate(st.piece.shape);const old=st.piece.shape;st.piece.shape=r;if(collides(st.board,st.piece))st.piece.shape=old; };
+
+  const btnStyle = {background:'#3d1f00',border:'2px solid #6b3a1f',color:'#d4a853',padding:'12px 20px',borderRadius:10,fontSize:20,cursor:'pointer',userSelect:'none',WebkitUserSelect:'none',flexShrink:0};
+
+  return (
+    <div ref={containerRef} style={{display:'flex',flexDirection:'column',alignItems:'center',height:'100%',background:'#1a0a00',overflow:'hidden'}}>
+      <div style={{color:'#d4a853',fontSize:13,fontWeight:'bold',padding:'4px 0',flexShrink:0}}>{playerName} | Score: {score}</div>
+      <canvas ref={canvasRef} style={{display:'block',flexShrink:0}}/>
+      {!started && !gameOver && <div style={{padding:16}}><button style={{...S.btn(),width:160}} onClick={startGame}>▶ Start</button></div>}
+      {gameOver && <div style={{textAlign:'center',padding:8,flexShrink:0}}><div style={{color:'#ff6b6b',fontSize:16,fontWeight:'bold'}}>Game Over!</div><div style={{color:'#d4a853',marginBottom:6}}>Score: {score}</div><button style={{...S.btn(),width:160}} onClick={startGame}>▶ Again</button></div>}
+      {started && !gameOver && (
+        <div style={{display:'flex',gap:10,padding:'8px',justifyContent:'center',background:'#0a0500',width:'100%',boxSizing:'border-box',flexShrink:0}}>
           <button style={btnStyle} onPointerDown={e=>{e.preventDefault();move(-1);}}>◀</button>
           <button style={btnStyle} onPointerDown={e=>{e.preventDefault();rot();}}>↻</button>
           <button style={btnStyle} onPointerDown={e=>{e.preventDefault();drop();}}>⬇</button>
@@ -393,8 +464,21 @@ function RunnerGame({ playerName, onScore }) {
   const [lives, setLives] = useState(3);
   const [gameOver, setGameOver] = useState(false);
   const [started, setStarted] = useState(false);
-  const W=320, H=380;
-  const GY=300; // ground y
+  const [dims, setDims] = useState({W:320,H:380,GY:300});
+  const containerRunRef = useRef(null);
+  useEffect(()=>{
+    const update=()=>{
+      const isMobile = window.innerWidth < 768;
+      const W = isMobile ? Math.min(window.innerWidth, 420) : Math.min(window.innerWidth * 0.45, 480);
+      const H = isMobile ? Math.min(window.innerHeight * 0.55, 400) : Math.min(window.innerHeight * 0.65, 500);
+      const GY = H * 0.79;
+      setDims({W:Math.round(W),H:Math.round(H),GY:Math.round(GY)});
+    };
+    update();
+    window.addEventListener('resize',update);
+    return()=>window.removeEventListener('resize',update);
+  },[]);
+  const {W,H,GY} = dims;
 
   // Mario pixel art draw
   const drawMario = (ctx, x, y, frame) => {
@@ -492,7 +576,7 @@ function RunnerGame({ playerName, onScore }) {
 
   const initState=()=>({
     player:{x:70,y:GY,vy:0,onGround:true,frame:0},
-    obstacles:[],coins:[],score:0,speed:3.2,
+    obstacles:[],coins:[],score:0,speed:3.2,GY,
     lastTime:0,spawnTimer:0,coinTimer:0,
     level:0,dist:0,lives:3,cloudX:[40,140,240],
     bgX:0,
@@ -528,7 +612,6 @@ function RunnerGame({ playerName, onScore }) {
     // ground
     ctx.fillStyle=lv.ground;ctx.fillRect(0,GY+8,W,H-GY-8);
     ctx.fillStyle=lv.groundTop;ctx.fillRect(0,GY,W,14);
-    // ground bricks
     ctx.strokeStyle='rgba(0,0,0,0.2)';ctx.lineWidth=1;
     for(let i=0;i<W;i+=32)ctx.strokeRect(i,GY,32,14);
     for(let i=0;i<W;i+=32)ctx.strokeRect(i,GY+14,32,14);
@@ -536,10 +619,11 @@ function RunnerGame({ playerName, onScore }) {
     st.coins.forEach(c=>drawCoin(ctx,c.x,c.y,c.frame||0));
     // obstacles
     st.obstacles.forEach(o=>{
-      if(o.type==='pipe') drawPipe(ctx,o.x,GY,o.h);
+      if(o.type==='pipe') drawPipe(ctx,o.x,stGY||GY,o.h);
       else drawGoomba(ctx,o.x,o.y);
     });
     // mario
+    const stGY2=st.GY||GY;
     drawMario(ctx,st.player.x,st.player.y,st.player.frame);
     // HUD bar at top
     ctx.fillStyle='rgba(0,0,0,0.6)';ctx.fillRect(0,0,W,28);
@@ -560,7 +644,8 @@ function RunnerGame({ playerName, onScore }) {
     st.cloudX=st.cloudX.map(cx=>(cx-st.speed*0.4+W)%W);
     // gravity
     st.player.vy+=0.55;st.player.y+=st.player.vy;
-    if(st.player.y>=GY){st.player.y=GY;st.player.vy=0;st.player.onGround=true;}
+    const stGY=st.GY||GY;
+    if(st.player.y>=stGY){st.player.y=stGY;st.player.vy=0;st.player.onGround=true;}
     st.dist+=st.speed;st.score=Math.floor(st.dist/8)+st.coins.filter(c=>c.collected).length*50;
     st.level=Math.min(4,Math.floor(st.dist/1200));
     st.speed=3.2+st.dist/2000;
@@ -575,7 +660,7 @@ function RunnerGame({ playerName, onScore }) {
         const h=40+Math.floor(Math.random()*60);
         st.obstacles.push({type:'pipe',x:W+30,h,w:42});
       } else {
-        st.obstacles.push({type:'goomba',x:W+20,y:GY,w:28,h:28});
+        st.obstacles.push({type:'goomba',x:W+20,y:stGY,w:28,h:28});
       }
     }
     // spawn coins
@@ -594,7 +679,7 @@ function RunnerGame({ playerName, onScore }) {
     // collisions
     const px=st.player.x, py=st.player.y;
     const hit=st.obstacles.some(o=>{
-      if(o.type==='pipe') return Math.abs(o.x-px)<26&&py>GY-o.h-10&&py<=GY+5;
+      if(o.type==='pipe') return Math.abs(o.x-px)<26&&py>stGY-o.h-10&&py<=stGY+5;
       return Math.abs(o.x-px)<22&&Math.abs(o.y-py)<26;
     });
     if(hit){
@@ -613,8 +698,8 @@ function RunnerGame({ playerName, onScore }) {
   const jump=()=>{const st=stateRef.current;if(st&&st.player.onGround){st.player.vy=-13;st.player.onGround=false;}};
 
   return(
-    <div style={{display:'flex',flexDirection:'column',height:'100%',background:'#1a0a00',overflow:'hidden'}}>
-      <canvas ref={canvasRef} width={W} height={H} style={{width:'100%',flex:1,display:'block',imageRendering:'pixelated'}}/>
+    <div ref={containerRunRef} style={{display:'flex',flexDirection:'column',height:'100%',background:'#1a0a00',overflow:'hidden',alignItems:'center'}}>
+      <canvas ref={canvasRef} width={W} height={H} style={{width:'100%',maxWidth:W,display:'block',margin:'0 auto',imageRendering:'pixelated',flex:1}}/>
       {!started&&!gameOver&&(
         <div style={{position:'absolute',top:'40%',left:'50%',transform:'translate(-50%,-50%)',textAlign:'center'}}>
           <div style={{background:'rgba(0,0,0,0.8)',border:'4px solid #fff',borderRadius:8,padding:'20px 32px',fontFamily:"'Arial Black',Arial,sans-serif"}}>
