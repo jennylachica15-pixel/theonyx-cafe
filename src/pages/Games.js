@@ -558,7 +558,7 @@ function RacingGame({ playerName, onScore }) {
   const [score, setScore] = useState(0);
   const [gameOver, setGameOver] = useState(false);
   const [started, setStarted] = useState(false);
-  const W=300, H=440;
+  const W=320, H=480;
   const GRASS_W=30;
   const ROAD_X=GRASS_W, ROAD_W=W-GRASS_W*2;
   const LANES=4;
@@ -678,9 +678,9 @@ function RacingGame({ playerName, onScore }) {
     userSelect:'none',WebkitUserSelect:'none',boxShadow:'0 4px 0 #111',fontFamily:"'Arial Black',Arial,sans-serif"};
 
   return(
-    <div style={{display:'flex',flexDirection:'column',alignItems:'center',height:'100%',background:'#1a1a1a'}}>
-      <div style={{color:'#d4a853',fontSize:14,fontWeight:'bold',padding:'6px 0'}}>{playerName} — Score: {score}</div>
-      <canvas ref={canvasRef} width={W} height={H} style={{maxWidth:'100%',display:'block'}}/>
+    <div style={{display:'flex',flexDirection:'column',alignItems:'center',height:'100%',background:'#1a1a1a',overflow:'hidden'}}>
+      <div style={{color:'#d4a853',fontSize:14,fontWeight:'bold',padding:'4px 0'}}>{playerName} — Score: {score}</div>
+      <canvas ref={canvasRef} width={W} height={H} style={{maxWidth:'100%',display:'block',flex:1}}/>
       {!started&&!gameOver&&<button style={{...S.btn(),marginTop:16,width:160}} onClick={startGame}>▶ Start</button>}
       {gameOver&&(
         <div style={{textAlign:'center',marginTop:12}}>
