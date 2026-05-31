@@ -1387,8 +1387,6 @@ function GuessWordGame({ playerName, onScore }) {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // MAIN GAMES PAGE
-const GAME_LABELS = { snake: '🐍 Snake', mario: '🏃 Café Runner', tetris: '🟦 Tetris', spot: '🔍 Spot the Diff' };
-
 export default function GamesPage() {
   const [activeGame, setActiveGame] = useState(null);
   const [showLB, setShowLB] = useState(false);
