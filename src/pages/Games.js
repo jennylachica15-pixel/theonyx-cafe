@@ -600,7 +600,7 @@ function RacingGame({ playerName, onScore }) {
 
   const initState=()=>({
     car:{lane:1,x:laneX(1),y:H-70},
-    traffic:[],score:0,speed:3,lastTime:0,spawnTimer:0,
+    traffic:[],coffees:[],score:0,speed:3,lastTime:0,spawnTimer:0,coffeeTimer:0,
     lineOffset:0, targetX:laneX(1),
   });
 
@@ -635,6 +635,18 @@ function RacingGame({ playerName, onScore }) {
     ctx.beginPath();ctx.moveTo(ROAD_X+ROAD_W,0);ctx.lineTo(ROAD_X+ROAD_W,H);ctx.stroke();
     // traffic cars
     st.traffic.forEach(t=>drawCar(ctx,t.x,t.y,t.color));
+    // coffee collectibles — glowing
+    (st.coffees||[]).forEach(c=>{
+      const pulse=0.8+0.2*Math.sin(Date.now()/300+c.id);
+      ctx.save();
+      ctx.shadowColor='#ffcc00';ctx.shadowBlur=10*pulse;
+      ctx.font='18px serif';ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText('☕',c.x,c.y);
+      ctx.restore();
+      // sparkle ring
+      ctx.strokeStyle=`rgba(255,200,0,${0.4*pulse})`;ctx.lineWidth=2;
+      ctx.beginPath();ctx.arc(c.x,c.y,14*pulse,0,Math.PI*2);ctx.stroke();
+    });
     // player car (smooth x)
     st.car.x+=(st.targetX-st.car.x)*0.18;
     drawCar(ctx,st.car.x,st.car.y,'#ff3333',true);
@@ -645,12 +657,14 @@ function RacingGame({ playerName, onScore }) {
     ctx.fillText(`${spd}km/h`,ROAD_X+5,20);
   },[]);
 
+  const [collected,setCollected]=useState(0);
   const gameLoop=useCallback((ts)=>{
     const st=stateRef.current;if(!st)return;
     const dt=Math.min(ts-st.lastTime,50);st.lastTime=ts;
     st.lineOffset=(st.lineOffset+st.speed*1.5)%(25+18);
     st.score+=1;st.speed=3+st.score/600;
     setScore(st.score);
+    // spawn traffic
     st.spawnTimer+=dt;
     const interval=Math.max(350,1100-st.score*0.25);
     if(st.spawnTimer>interval){
@@ -659,9 +673,26 @@ function RacingGame({ playerName, onScore }) {
       const color=CAR_COLORS[Math.floor(Math.random()*CAR_COLORS.length)];
       st.traffic.push({x:laneX(lane),y:-40,lane,color});
     }
+    // spawn coffee
+    st.coffeeTimer=(st.coffeeTimer||0)+dt;
+    if(st.coffeeTimer>2200){
+      st.coffeeTimer=0;
+      const lane=Math.floor(Math.random()*LANES);
+      st.coffees=[...(st.coffees||[]),{x:laneX(lane),y:-30,id:Math.random()}];
+    }
     st.traffic=st.traffic.map(t=>({...t,y:t.y+st.speed*2.2})).filter(t=>t.y<H+60);
-    // collision
+    // move & collect coffee
     const c=st.car;
+    st.coffees=(st.coffees||[]).map(cf=>({...cf,y:cf.y+st.speed*2.2})).filter(cf=>{
+      if(cf.y>H+40)return false;
+      if(Math.abs(cf.x-c.x)<22&&Math.abs(cf.y-c.y)<22){
+        st.score+=50;setScore(st.score);
+        setCollected(n=>n+1);
+        return false;
+      }
+      return true;
+    });
+    // collision with traffic
     const hit=st.traffic.some(t=>Math.abs(t.x-c.x)<20&&Math.abs(t.y-c.y)<32);
     if(hit){setGameOver(true);onScore(st.score);return;}
     drawGame();rafRef.current=requestAnimationFrame(gameLoop);
@@ -679,7 +710,7 @@ function RacingGame({ playerName, onScore }) {
 
   return(
     <div style={{display:'flex',flexDirection:'column',alignItems:'center',height:'100%',background:'#1a1a1a',overflow:'hidden'}}>
-      <div style={{color:'#d4a853',fontSize:14,fontWeight:'bold',padding:'4px 0'}}>{playerName} — Score: {score}</div>
+      <div style={{color:'#d4a853',fontSize:14,fontWeight:'bold',padding:'4px 0'}}>{playerName} — Score: {score} ☕×{collected}</div>
       <canvas ref={canvasRef} width={W} height={H} style={{maxWidth:'100%',display:'block',flex:1}}/>
       {!started&&!gameOver&&<button style={{...S.btn(),marginTop:16,width:160}} onClick={startGame}>▶ Start</button>}
       {gameOver&&(
