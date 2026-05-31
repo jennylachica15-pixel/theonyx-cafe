@@ -691,7 +691,7 @@ const WORD_LIST = [
 
 const PLAYABLE = WORD_LIST.filter(w => w.word.length >= 4 && w.word.length <= 9);
 const KEYBOARD_ROWS = ['QWERTYUIOP','ASDFGHJKL','ZXCVBNM'];
-const MAX_GUESSES = 6;
+const MAX_GUESSES = 5;
 
 
 // ── Real-face Chibi Barista Characters ───────────────────────────────────────
@@ -729,7 +729,7 @@ function ChibiBarista({ faceImg, state, flip }) {
             width:'100%',
             height:'100%',
             objectFit:'cover',
-            objectPosition:'center center',
+            objectPosition:'50% 20%',
             display:'block',
             transform: flip ? 'scaleX(-1)' : 'none',
           }}
@@ -871,6 +871,7 @@ function GuessWordGame({ playerName, onScore }) {
 
   if (!wordData) return <div style={{color:'#d4a853',textAlign:'center',padding:40}}>Loading...</div>;
 
+
   return (
     <div style={{height:'100%',background:'#121213',color:'#fff',display:'flex',flexDirection:'column',fontFamily:"'Arial',sans-serif",overflow:'hidden'}}>
 
@@ -881,19 +882,20 @@ function GuessWordGame({ playerName, onScore }) {
         <div style={{fontSize:11,color:'#818384'}}>⭐<b style={{color:'#d4a853'}}>{score}</b>{streak>0&&<span style={{marginLeft:4}}>🔥{streak}</span>}</div>
       </div>
 
+      {/* Description — on top, prominent */}
+      <div style={{background:'linear-gradient(135deg,#2a1800,#3d2400)',borderBottom:'2px solid #6b3a1f',padding:'10px 16px',flexShrink:0}}>
+        <div style={{fontSize:10,color:'#a07850',textTransform:'uppercase',letterSpacing:2,marginBottom:4,fontWeight:'bold'}}>Description</div>
+        <div style={{fontSize:15,color:'#f5e6d0',lineHeight:1.5,fontStyle:'italic'}}>"{wordData.hint}"</div>
+        <div style={{fontSize:10,color:'#818384',marginTop:4}}>{wordData.category} · {WL} letters</div>
+      </div>
+
       {/* Barista stage */}
-      <div style={{position:'relative',display:'flex',alignItems:'flex-end',justifyContent:'center',gap:16,padding:'8px 10px 6px',background:'linear-gradient(180deg,#2c1400,#1a0800)',borderBottom:'2px solid #3d1f00',flexShrink:0}}>
+      <div style={{position:'relative',display:'flex',alignItems:'flex-end',justifyContent:'center',gap:16,padding:'6px 10px 4px',background:'linear-gradient(180deg,#2c1400,#1a0800)',borderBottom:'2px solid #3d1f00',flexShrink:0}}>
         <ChibiBarista faceImg={KELLY_FACE} state={baristaState} flip={false}/>
 
-        {/* Center info */}
-        <div style={{flex:0,textAlign:'center',padding:'0 12px',paddingBottom:4,minWidth:140}}>
-          {/* Word description — always shown */}
-          <div style={{fontSize:12,color:'#f0d9b5',lineHeight:1.5,marginBottom:6,fontStyle:'italic',background:'rgba(0,0,0,0.3)',borderRadius:8,padding:'6px 10px'}}>
-            "{wordData.hint}"
-          </div>
-
+        <div style={{flex:0,textAlign:'center',padding:'0 8px',paddingBottom:4,minWidth:130}}>
           {/* State message */}
-          <div style={{fontSize:12,fontWeight:'bold',minHeight:18,color:
+          <div style={{fontSize:13,fontWeight:'bold',minHeight:18,color:
             baristaState==='fight'?'#ff4444':
             baristaState==='cheer'?'#538d4e':
             baristaState==='sad'?'#818384':'#d4a853'}}>
@@ -901,7 +903,7 @@ function GuessWordGame({ playerName, onScore }) {
             {baristaState==='fight' && '💥 Wrong!'}
             {baristaState==='cheer' && '🎉 Correct!'}
             {baristaState==='sad'   && '😢 Aww...'}
-            {showEffect && <span style={{marginLeft:6,fontSize:16,animation:'popEffect 0.5s ease'}}>💢</span>}
+            {showEffect && <span style={{marginLeft:6,fontSize:16}}>💢</span>}
           </div>
 
           {/* Life dots */}
@@ -911,21 +913,17 @@ function GuessWordGame({ playerName, onScore }) {
             ))}
           </div>
 
-          {/* Category + letters count */}
-          <div style={{fontSize:10,color:'#818384'}}>{wordData.category} · {WL} letters</div>
-
-          {/* Hint toggle */}
-          {!showHint
-            ? <button onClick={()=>setShowHint(true)} style={{background:'transparent',border:'1px solid #3a3a3c',borderRadius:6,padding:'2px 10px',color:'#818384',fontSize:10,cursor:'pointer',marginTop:3}}>💡 Hint −30pts</button>
-            : <div style={{fontSize:10,color:'#b59f3b',marginTop:3,fontWeight:'bold'}}>💡 {wordData.hint}</div>
-          }
+          {/* Attempt summary */}
+          <div style={{fontSize:10,color:'#818384'}}>
+            Attempt {Math.min(guesses.length+1,MAX_GUESSES)} of {MAX_GUESSES}
+          </div>
         </div>
 
         <ChibiBarista faceImg={MARYZ_FACE} state={baristaState} flip={true}/>
       </div>
 
-      {/* Tile grid — exact word length */}
-      <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'8px 0',gap:5,overflowY:'auto'}}>
+      {/* Tile grid — 5 rows, exact word length */}
+      <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'6px 0',gap:5,overflowY:'auto'}}>
         {Array.from({length:MAX_GUESSES}).map((_,rowIdx)=>{
           const guess = guesses[rowIdx];
           const isActive = rowIdx === guesses.length && gameState === 'playing';
@@ -959,16 +957,31 @@ function GuessWordGame({ playerName, onScore }) {
         </div>
       )}
 
-      {/* Keyboard */}
-      <div style={{background:'#1a1a1b',borderTop:'1px solid #3a3a3c',padding:'6px 4px 10px',flexShrink:0}}>
+      {/* Keyboard — bigger keys */}
+      <div style={{background:'#1a1a1b',borderTop:'1px solid #3a3a3c',padding:'8px 4px 12px',flexShrink:0}}>
         {['QWERTYUIOP','ASDFGHJKL','ZXCVBNM'].map((row,ri)=>(
-          <div key={ri} style={{display:'flex',justifyContent:'center',gap:4,marginBottom:4}}>
-            {ri===2&&<button onPointerDown={e=>{e.preventDefault();pressKey('ENTER');}} style={{background:'#818384',border:'none',borderRadius:4,padding:'12px 6px',color:'#fff',fontSize:10,fontWeight:'bold',cursor:'pointer',minWidth:40,userSelect:'none'}}>ENTER</button>}
+          <div key={ri} style={{display:'flex',justifyContent:'center',gap:5,marginBottom:5}}>
+            {ri===2&&(
+              <button onPointerDown={e=>{e.preventDefault();pressKey('ENTER');}}
+                style={{background:'#818384',border:'none',borderRadius:6,padding:'16px 8px',color:'#fff',fontSize:11,fontWeight:'bold',cursor:'pointer',minWidth:44,userSelect:'none'}}>
+                ENTER
+              </button>
+            )}
             {row.split('').map(l=>{
               const ks=keyColors[getKeyState(l)];
-              return(<button key={l} onPointerDown={e=>{e.preventDefault();pressKey(l);}} style={{background:ks.bg,border:'none',borderRadius:4,padding:'12px 0',color:ks.color,fontSize:13,fontWeight:'bold',cursor:'pointer',width:28,userSelect:'none',transition:'background 0.2s'}}>{l}</button>);
+              return(
+                <button key={l} onPointerDown={e=>{e.preventDefault();pressKey(l);}}
+                  style={{background:ks.bg,border:'none',borderRadius:6,padding:'16px 0',color:ks.color,fontSize:15,fontWeight:'bold',cursor:'pointer',width:32,userSelect:'none',transition:'background 0.2s'}}>
+                  {l}
+                </button>
+              );
             })}
-            {ri===2&&<button onPointerDown={e=>{e.preventDefault();pressKey('DEL');}} style={{background:'#818384',border:'none',borderRadius:4,padding:'12px 6px',color:'#fff',fontSize:11,fontWeight:'bold',cursor:'pointer',minWidth:40,userSelect:'none'}}>⌫</button>}
+            {ri===2&&(
+              <button onPointerDown={e=>{e.preventDefault();pressKey('DEL');}}
+                style={{background:'#818384',border:'none',borderRadius:6,padding:'16px 8px',color:'#fff',fontSize:13,fontWeight:'bold',cursor:'pointer',minWidth:44,userSelect:'none'}}>
+                ⌫
+              </button>
+            )}
           </div>
         ))}
       </div>
@@ -980,7 +993,6 @@ function GuessWordGame({ playerName, onScore }) {
         @keyframes chibiJump{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
         @keyframes chibiShake{0%,100%{transform:translateX(0)}25%{transform:translateX(4px)}75%{transform:translateX(-4px)}}
         @keyframes chibiSad{0%,100%{transform:translateY(0) rotate(0deg)}50%{transform:translateY(2px) rotate(-2deg)}}
-        @keyframes fadeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
       `}</style>
     </div>
   );
