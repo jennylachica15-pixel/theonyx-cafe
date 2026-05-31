@@ -601,7 +601,7 @@ function RacingGame({ playerName, onScore }) {
 
   const initState=()=>({
     car:{lane:1,x:laneX(1),y:H-70},
-    traffic:[],coffees:[],score:0,speed:3,lastTime:0,spawnTimer:0,coffeeTimer:0,
+    traffic:[],coffees:[],score:0,speed:1.5,lastTime:0,spawnTimer:0,coffeeTimer:0,
     lineOffset:0, targetX:laneX(1),
   });
 
@@ -663,7 +663,7 @@ function RacingGame({ playerName, onScore }) {
     const st=stateRef.current;if(!st)return;
     const dt=Math.min(ts-st.lastTime,50);st.lastTime=ts;
     st.lineOffset=(st.lineOffset+st.speed*1.5)%(25+18);
-    st.score+=1;st.speed=3+st.score/600;
+    st.score+=1;st.speed=1.5+st.score/900;
     setScore(st.score);
     // spawn traffic
     st.spawnTimer+=dt;
