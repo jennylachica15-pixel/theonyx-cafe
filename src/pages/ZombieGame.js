@@ -226,7 +226,7 @@ function AvatarSelect({ playerName, onSelect }) {
                   {/* smile */}
                   <path d="M16 15 Q20 18 25 15" stroke="#cc8866" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
                   {/* selected checkmark */}
-                  {isSel && <circle cx="33" cy="6" r="6" fill="#44dd44"/><text x="33" y="10" textAnchor="middle" fill="#fff" fontSize="8" fontWeight="bold">✓</text>}
+                  {isSel && <><circle cx="33" cy="6" r="6" fill="#44dd44"/><text x="33" y="10" textAnchor="middle" fill="#fff" fontSize="8" fontWeight="bold">✓</text></>}
                 </svg>
                 <div style={{fontWeight:900, fontSize:12, color: isSel?av.color:'#aaa', textTransform:'uppercase'}}>{av.name}</div>
               </div>
