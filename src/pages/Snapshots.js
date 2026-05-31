@@ -32,13 +32,22 @@ const DRINK_ITEMS = [
   'Tea - Chamomile','Tea - Hibiscus',
 ];
 
-function StarRating({ value, onChange, label, color = '#d4a853' }) {
+// Soda & Tea — no bitterness or creaminess
+const SODA_TEA_ITEMS = [
+  'Soda - Passion','Soda - Strawberry','Soda - Blueberry','Soda - Mango',
+  'Tea - Chamomile','Tea - Hibiscus',
+];
+
+function StarRating({ value, onChange, label, color = '#d4a853', disabled = false }) {
   return (
-    <div style={{ marginBottom: 16 }}>
-      <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.75)', marginBottom: 6 }}>{label}</div>
+    <div style={{ marginBottom: 16, opacity: disabled ? 0.35 : 1 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.75)' }}>{label}</div>
+        {disabled && <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', background: 'rgba(255,255,255,0.08)', padding: '2px 8px', borderRadius: 10 }}>N/A for this drink</span>}
+      </div>
       <div style={{ display: 'flex', gap: 8 }}>
         {[1,2,3,4,5].map(star => (
-          <div key={star} onClick={() => onChange(star)} style={{ cursor: 'pointer', fontSize: 28, color: star <= value ? color : 'rgba(255,255,255,0.2)', transition: 'color 0.15s' }}>★</div>
+          <div key={star} onClick={() => !disabled && onChange(star)} style={{ cursor: disabled ? 'not-allowed' : 'pointer', fontSize: 28, color: star <= value ? color : 'rgba(255,255,255,0.2)', transition: 'color 0.15s' }}>★</div>
         ))}
       </div>
     </div>
@@ -84,6 +93,9 @@ export default function Snapshots() {
   const dateTimeStr = now.toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' }) + ' · ' + now.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' });
 
   const hasDrink = form.orders.some(o => DRINK_ITEMS.includes(o));
+  // Bitterness & creaminess disabled if ALL selected drinks are soda/tea
+  const selectedDrinks = form.orders.filter(o => DRINK_ITEMS.includes(o));
+  const isSodaTeaOnly = selectedDrinks.length > 0 && selectedDrinks.every(o => SODA_TEA_ITEMS.includes(o));
 
   useEffect(() => {
     const script = document.createElement('script');
@@ -174,7 +186,13 @@ export default function Snapshots() {
         </div>
       )}
 
-      {/* Customer Info */}
+      {/* Privacy notice */}
+      <div style={{ background: 'rgba(212,168,83,0.1)', border: '1px solid rgba(212,168,83,0.25)', borderRadius: 10, padding: '10px 14px', marginBottom: 14, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d4a853" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', lineHeight: 1.6 }}>
+          Your privacy is important to us. <strong style={{ color: '#d4a853' }}>No personal email addresses are collected or stored</strong> in this form. Only your name and feedback responses are recorded.
+        </div>
+      </div>
       <div style={s.section}>
         <div style={s.sectionTitle}>Customer Information</div>
         <label style={s.label}>Your Name</label>
@@ -200,8 +218,8 @@ export default function Snapshots() {
           <div style={s.sectionTitle}>Rate Your Drink</div>
           <StarRating label="Overall" value={form.drinkRatings.overall} onChange={v => setDrinkRating('overall', v)} />
           <StarRating label="Sweetness" value={form.drinkRatings.sweetness} onChange={v => setDrinkRating('sweetness', v)} color="#e07b39" />
-          <StarRating label="Bitterness" value={form.drinkRatings.bitterness} onChange={v => setDrinkRating('bitterness', v)} color="#6b3a1f" />
-          <StarRating label="Creaminess" value={form.drinkRatings.creaminess} onChange={v => setDrinkRating('creaminess', v)} color="#c8956c" />
+          <StarRating label="Bitterness" value={form.drinkRatings.bitterness} onChange={v => setDrinkRating('bitterness', v)} color="#6b3a1f" disabled={isSodaTeaOnly} />
+          <StarRating label="Creaminess" value={form.drinkRatings.creaminess} onChange={v => setDrinkRating('creaminess', v)} color="#c8956c" disabled={isSodaTeaOnly} />
           <label style={s.label}>Comment about your drink</label>
           <textarea style={s.textarea} placeholder="Tell us more about your drink..." value={form.drinkComment} onChange={e => setForm({ ...form, drinkComment: e.target.value })} />
         </div>
