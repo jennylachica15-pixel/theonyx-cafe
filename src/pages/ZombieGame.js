@@ -287,9 +287,11 @@ function GameEngine({roomCode,myName,myAvatar,isHost,roomData,onGameOver,onBack}
 
   const removeModeRef=useRef(false);
   const setRemoveModeSync=(v)=>{removeModeRef.current=v;setRemoveMode(v);};
+  const deadRef=useRef(false); // use ref so game loop always has current value
+  const transitionedRef=useRef(false); // prevent transition firing every frame
 
   const update=()=>{
-    const st=stateRef.current;if(!st||dead)return;
+    const st=stateRef.current;if(!st||deadRef.current)return;
     const m=mapRef.current;
     const elapsed=Date.now()-phaseStartRef.current;
     const dur=phaseRef.current==='day'?DAY_DURATION:NIGHT_DURATION;
@@ -307,14 +309,19 @@ function GameEngine({roomCode,myName,myAvatar,isHost,roomData,onGameOver,onBack}
         st.player.hp=hpRef.current;
         setHp(hpRef.current);
         setLog('😵 Starving! Find food!');
-        if(hpRef.current<=0){setDead(true);onGameOver(dayRef.current*50);return;}
+        if(hpRef.current<=0){deadRef.current=true;setDead(true);onGameOver(dayRef.current*50);return;}
       }
     }
 
-    // phase transition
-    if(elapsed>=dur){
+    // phase transition — guarded so it only fires ONCE per phase
+    if(elapsed>=dur&&!transitionedRef.current){
+      transitionedRef.current=true;
       const newPhase=phaseRef.current==='day'?'night':'day';
-      phaseRef.current=newPhase;phaseStartRef.current=Date.now();setPhase(newPhase);
+      phaseRef.current=newPhase;
+      phaseStartRef.current=Date.now();
+      setPhase(newPhase);
+      // reset guard after a short delay so next phase can transition too
+      setTimeout(()=>{transitionedRef.current=false;},500);
       if(newPhase==='night'){
         spawnZombies(st,dayRef.current);
         setLog(`🌙 Night ${dayRef.current} — ZOMBIES INCOMING!`);
@@ -323,9 +330,8 @@ function GameEngine({roomCode,myName,myAvatar,isHost,roomData,onGameOver,onBack}
         dayRef.current++;
         const newMap=buildMap(dayRef.current);
         mapRef.current=newMap;
-        // add new food on expanded map
-        const newFood=spawnFood(newMap.map,newMap.cols,newMap.rows,6+dayRef.current);
-        st.food=[...(st.food||[]),...newFood];
+        // spawn food ONCE at start of each new day
+        st.food=spawnFood(newMap.map,newMap.cols,newMap.rows,8+dayRef.current);
         setDay(dayRef.current);
         setLog(`☀️ Day ${dayRef.current} — Map expanded! Find food!`);
       }
@@ -371,10 +377,7 @@ function GameEngine({roomCode,myName,myAvatar,isHost,roomData,onGameOver,onBack}
       }
       return true;
     });
-    // respawn food if low
-    if((st.food||[]).length<3){
-      st.food=[...(st.food||[]),...spawnFood(m.map,m.cols,m.rows,4)];
-    }
+    // no continuous food respawn — food spawns once at start of each day
 
     // zombies
     if(phaseRef.current==='night'){
@@ -399,7 +402,7 @@ function GameEngine({roomCode,myName,myAvatar,isHost,roomData,onGameOver,onBack}
             z.attackTimer=0;
             hpRef.current=Math.max(0,hpRef.current-12);
             st.player.hp=hpRef.current;setHp(hpRef.current);
-            if(hpRef.current<=0){setDead(true);onGameOver(dayRef.current*50);}
+            if(hpRef.current<=0){deadRef.current=true;setDead(true);onGameOver(dayRef.current*50);}
           }
         }
       });
