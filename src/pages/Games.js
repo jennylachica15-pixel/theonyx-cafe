@@ -236,10 +236,69 @@ function SnakeGame({ playerName, onScore }) {
     const canvas = canvasRef.current; if (!canvas) return;
     const ctx = canvas.getContext('2d');
     const st = stateRef.current; if (!st) return;
-    ctx.fillStyle = '#0a0500'; ctx.fillRect(0,0,W,H);
-    // grid dots
-    ctx.fillStyle = 'rgba(61,31,0,0.3)';
-    for(let x=0;x<COLS;x++) for(let y=0;y<ROWS;y++) ctx.fillRect(x*CELL+CELL/2-1,y*CELL+CELL/2-1,2,2);
+    // === EPIC BACKGROUND ===
+    ctx.fillStyle='#050200'; ctx.fillRect(0,0,W,H);
+
+    // Animated aurora glows
+    const t = Date.now()*0.001;
+    for(let i=0;i<3;i++){
+      const ax=W/2+Math.sin(t*0.8+i*2.1)*W*0.4;
+      const ay=H/2+Math.cos(t*0.6+i*1.7)*H*0.3;
+      const ag=ctx.createRadialGradient(ax,ay,0,ax,ay,120+i*40);
+      const alphas=['0.12','0.08','0.06'];
+      ag.addColorStop(0,`rgba(180,80,0,${alphas[i]})`);
+      ag.addColorStop(1,'transparent');
+      ctx.fillStyle=ag; ctx.fillRect(0,0,W,H);
+    }
+
+    // Hex grid
+    const hexSize=28, hexH=hexSize*Math.sqrt(3);
+    ctx.strokeStyle='rgba(180,100,0,0.07)'; ctx.lineWidth=0.5;
+    for(let row=-1;row<H/hexH+2;row++){
+      for(let col=-1;col<W/(hexSize*1.5)+2;col++){
+        const hcx=col*hexSize*1.5, hcy=row*hexH+(col%2)*hexH/2;
+        ctx.beginPath();
+        for(let a=0;a<6;a++){
+          const ang=Math.PI/180*(60*a-30);
+          a===0?ctx.moveTo(hcx+hexSize*Math.cos(ang),hcy+hexSize*Math.sin(ang)):ctx.lineTo(hcx+hexSize*Math.cos(ang),hcy+hexSize*Math.sin(ang));
+        }
+        ctx.closePath(); ctx.stroke();
+      }
+    }
+
+    // Scan line
+    const scanY=((t*80)%(H+60))-30;
+    const sg=ctx.createLinearGradient(0,scanY-20,0,scanY+20);
+    sg.addColorStop(0,'transparent'); sg.addColorStop(0.5,'rgba(255,150,0,0.04)'); sg.addColorStop(1,'transparent');
+    ctx.fillStyle=sg; ctx.fillRect(0,scanY-20,W,40);
+
+    // Corner pulse accents
+    [[0,0],[W,0],[0,H],[W,H]].forEach(([cx,cy],i)=>{
+      const pulse=0.4+0.3*Math.sin(t*4+i*1.5);
+      const cg=ctx.createRadialGradient(cx,cy,0,cx,cy,80);
+      cg.addColorStop(0,`rgba(200,100,0,${pulse*0.15})`); cg.addColorStop(1,'transparent');
+      ctx.fillStyle=cg; ctx.fillRect(0,0,W,H);
+    });
+
+    // Floating ember particles
+    for(let i=0;i<12;i++){
+      const px=(i*97+t*30*(i%2?1:-0.5))%W;
+      const py=H-((t*50*(0.5+i*0.1))%(H+20));
+      const alpha=0.3+0.3*Math.sin(t*5+i);
+      ctx.fillStyle=`rgba(255,${120+i*10},0,${alpha})`;
+      ctx.shadowColor=`rgba(255,150,0,${alpha})`; ctx.shadowBlur=(1+i%3)*4;
+      ctx.beginPath(); ctx.arc(px,py,1+i%3,0,Math.PI*2); ctx.fill();
+      ctx.shadowBlur=0;
+    }
+
+    // Vignette
+    const vig=ctx.createRadialGradient(W/2,H/2,W*0.2,W/2,H/2,W*0.85);
+    vig.addColorStop(0,'transparent'); vig.addColorStop(1,'rgba(0,0,0,0.45)');
+    ctx.fillStyle=vig; ctx.fillRect(0,0,W,H);
+
+    // Grid dots on top
+    ctx.fillStyle='rgba(100,50,0,0.4)';
+    for(let x=0;x<COLS;x++) for(let y=0;y<ROWS;y++) ctx.fillRect(x*CELL+CELL/2-0.8,y*CELL+CELL/2-0.8,1.6,1.6);
     // food — coffee bean
     ctx.fillStyle='#d4a853';
     ctx.beginPath();ctx.arc(st.food.x*CELL+CELL/2,st.food.y*CELL+CELL/2,CELL/2-2,0,Math.PI*2);ctx.fill();
