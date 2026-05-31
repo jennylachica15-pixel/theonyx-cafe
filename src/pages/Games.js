@@ -41,7 +41,6 @@ const MENU_NAMES = ['Latte','Matcha','Americano','Espresso','Cappuccino','Frappe
 const GAME_LIST = [
   { id: 'snake',    emoji: '🐍', title: 'Snake',              sub: 'Collect coffee beans' },
   { id: 'tetris',   emoji: '🟦', title: 'Tetris',             sub: 'Classic stacking' },
-  { id: 'runner',   emoji: '🍄', title: 'Mario Runner',       sub: 'Jump like Mario!' },
   { id: 'racing',   emoji: '🏎️', title: 'Café Racer',         sub: 'Dodge the barriers' },
   { id: 'zombie',   emoji: '🧟', title: 'Zombie Barista',     sub: 'Multiplayer survival' },
   { id: 'guessword',   emoji: '🔤', title: 'Guess the Word',  sub: 'Clues & letters' },
@@ -342,12 +341,12 @@ function TetrisGame({ playerName, onScore }) {
     const canvas = canvasRef.current;
     const container = containerRef.current;
     if (!canvas || !container) return;
-    const availH = container.clientHeight - 60; // leave room for buttons
-    const availW = container.clientWidth;
-    // fit COLS x ROWS in available space
+    const availH = container.clientHeight - 70; // room for score + buttons
+    const availW = container.clientWidth - 8;   // small side padding
+    // cell must fit both width AND height
     const cellByW = Math.floor(availW / COLS);
     const cellByH = Math.floor(availH / ROWS);
-    const cell = Math.max(14, Math.min(cellByW, cellByH));
+    const cell = Math.max(8, Math.min(cellByW, cellByH, 28)); // cap at 28px max
     cellRef.current = cell;
     canvas.width = COLS * cell;
     canvas.height = ROWS * cell;
@@ -448,283 +447,6 @@ function TetrisGame({ playerName, onScore }) {
           <button style={btnStyle} onPointerDown={e=>{e.preventDefault();drop();}}>⬇</button>
           <button style={btnStyle} onPointerDown={e=>{e.preventDefault();move(1);}}>▶</button>
         </div>
-      )}
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// MARIO RUNNER
-// ═══════════════════════════════════════════════════════════════════════════════
-function RunnerGame({ playerName, onScore }) {
-  const canvasRef = useRef(null);
-  const stateRef = useRef(null);
-  const rafRef = useRef(null);
-  const [score, setScore] = useState(0);
-  const [lives, setLives] = useState(3);
-  const [gameOver, setGameOver] = useState(false);
-  const [started, setStarted] = useState(false);
-  const [dims, setDims] = useState({W:320,H:380,GY:300});
-  const containerRunRef = useRef(null);
-  useEffect(()=>{
-    const update=()=>{
-      const isMobile = window.innerWidth < 768;
-      const W = isMobile ? Math.min(window.innerWidth, 420) : Math.min(window.innerWidth * 0.45, 480);
-      const H = isMobile ? Math.min(window.innerHeight * 0.55, 400) : Math.min(window.innerHeight * 0.65, 500);
-      const GY = H * 0.79;
-      setDims({W:Math.round(W),H:Math.round(H),GY:Math.round(GY)});
-    };
-    update();
-    window.addEventListener('resize',update);
-    return()=>window.removeEventListener('resize',update);
-  },[]);
-  const {W,H,GY} = dims;
-
-  // Mario pixel art draw
-  const drawMario = (ctx, x, y, frame) => {
-    const s=18;
-    // shadow
-    ctx.fillStyle='rgba(0,0,0,0.2)';
-    ctx.beginPath();ctx.ellipse(x,y+2,s*0.6,4,0,0,Math.PI*2);ctx.fill();
-    // legs (animated)
-    const legOff = frame%2===0?3:-3;
-    ctx.fillStyle='#c84b00';
-    ctx.fillRect(x-s*0.35,y-s*0.5+legOff,s*0.28,s*0.5);
-    ctx.fillRect(x+s*0.07,y-s*0.5-legOff,s*0.28,s*0.5);
-    // shoes
-    ctx.fillStyle='#5a3010';
-    ctx.fillRect(x-s*0.42,y-s*0.05+legOff,s*0.38,s*0.18);
-    ctx.fillRect(x+s*0.04,y-s*0.05-legOff,s*0.38,s*0.18);
-    // body/overalls
-    ctx.fillStyle='#e52c00';
-    ctx.fillRect(x-s*0.42,y-s*1.1,s*0.84,s*0.6);
-    ctx.fillStyle='#0066cc';
-    ctx.fillRect(x-s*0.32,y-s*1.15,s*0.64,s*0.35);
-    // overall straps
-    ctx.fillStyle='#ffd700';
-    ctx.fillRect(x-s*0.28,y-s*1.1,s*0.12,s*0.05);
-    ctx.fillRect(x+s*0.16,y-s*1.1,s*0.12,s*0.05);
-    // arms
-    ctx.fillStyle='#e52c00';
-    ctx.fillRect(x-s*0.65,y-s*1.05,s*0.26,s*0.38);
-    ctx.fillRect(x+s*0.38,y-s*1.05,s*0.26,s*0.38);
-    // hands
-    ctx.fillStyle='#ffe0b0';
-    ctx.fillRect(x-s*0.65,y-s*0.7,s*0.26,s*0.22);
-    ctx.fillRect(x+s*0.38,y-s*0.7,s*0.26,s*0.22);
-    // head
-    ctx.fillStyle='#ffe0b0';
-    ctx.fillRect(x-s*0.38,y-s*1.8,s*0.76,s*0.65);
-    // hat
-    ctx.fillStyle='#e52c00';
-    ctx.fillRect(x-s*0.5,y-s*2.0,s,s*0.28);
-    ctx.fillRect(x-s*0.28,y-s*2.28,s*0.56,s*0.3);
-    // eyes
-    ctx.fillStyle='#333';
-    ctx.fillRect(x-s*0.2,y-s*1.55,s*0.14,s*0.16);
-    ctx.fillRect(x+s*0.06,y-s*1.55,s*0.14,s*0.16);
-    // mustache
-    ctx.fillStyle='#5a2d00';
-    ctx.fillRect(x-s*0.32,y-s*1.3,s*0.64,s*0.14);
-  };
-
-  const drawGoomba = (ctx, x, y) => {
-    const s=16;
-    ctx.fillStyle='rgba(0,0,0,0.2)';ctx.beginPath();ctx.ellipse(x,y+2,s*0.7,4,0,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle='#8b4513';
-    ctx.beginPath();ctx.ellipse(x,y-s*0.3,s*0.7,s*0.55,0,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle='#a0522d';
-    ctx.fillRect(x-s*0.6,y-s*0.35,s*0.3,s*0.55);
-    ctx.fillRect(x+s*0.3,y-s*0.35,s*0.3,s*0.55);
-    ctx.fillStyle='#ffe0b0';
-    ctx.beginPath();ctx.ellipse(x,y-s*0.8,s*0.6,s*0.55,0,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle='#333';
-    ctx.fillRect(x-s*0.3,y-s*0.95,s*0.2,s*0.22);
-    ctx.fillRect(x+s*0.1,y-s*0.95,s*0.2,s*0.22);
-    ctx.fillStyle='#fff';
-    ctx.fillRect(x-s*0.4,y-s*0.6,s*0.22,s*0.18);
-    ctx.fillRect(x+s*0.18,y-s*0.6,s*0.22,s*0.18);
-  };
-
-  const drawPipe = (ctx, x, y, h) => {
-    const w=42;
-    ctx.fillStyle='#1a8a1a';
-    ctx.fillRect(x-w/2,y-h,w,h);
-    ctx.fillStyle='#22aa22';
-    ctx.fillRect(x-w/2+3,y-h,w-6,h-4);
-    ctx.fillStyle='#0d6b0d';
-    ctx.fillRect(x-w/2-4,y-h-16,w+8,18);
-    ctx.fillStyle='#1a8a1a';
-    ctx.fillRect(x-w/2-4+3,y-h-14,w+8-6,14);
-  };
-
-  const drawCoin = (ctx, x, y, frame) => {
-    const pulse = Math.abs(Math.sin(frame*0.15));
-    ctx.fillStyle='#ffd700';
-    ctx.beginPath();ctx.ellipse(x,y,10*pulse+3,12,0,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle='#ffee88';
-    ctx.beginPath();ctx.ellipse(x,y,5*pulse+1,8,0,0,Math.PI*2);ctx.fill();
-  };
-
-  const LEVELS=[
-    {skyTop:'#5c94fc',skyBot:'#5c94fc',ground:'#c84b00',groundTop:'#6ab04c',pipes:true,name:'World 1-1'},
-    {skyTop:'#ff9a3c',skyBot:'#ff6622',ground:'#a04020',groundTop:'#8b6914',pipes:true,name:'World 1-2'},
-    {skyTop:'#1a1a3a',skyBot:'#0a0a2a',ground:'#4040aa',groundTop:'#8080ff',pipes:false,name:'World 1-3 Night'},
-    {skyTop:'#ff4444',skyBot:'#aa0000',ground:'#555',groundTop:'#888',pipes:true,name:'World 1-4 Castle'},
-    {skyTop:'#001133',skyBot:'#003366',ground:'#001a44',groundTop:'#4488ff',pipes:false,name:'World 2-1 Sky'},
-  ];
-
-  const initState=()=>({
-    player:{x:70,y:GY,vy:0,onGround:true,frame:0},
-    obstacles:[],coins:[],score:0,speed:3.2,GY,
-    lastTime:0,spawnTimer:0,coinTimer:0,
-    level:0,dist:0,lives:3,cloudX:[40,140,240],
-    bgX:0,
-  });
-
-  const drawGame=useCallback(()=>{
-    const canvas=canvasRef.current;if(!canvas)return;
-    const ctx=canvas.getContext('2d');
-    const st=stateRef.current;if(!st)return;
-    const lv=LEVELS[st.level];
-    // sky gradient
-    const grad=ctx.createLinearGradient(0,0,0,H);
-    grad.addColorStop(0,lv.skyTop);grad.addColorStop(1,lv.skyBot);
-    ctx.fillStyle=grad;ctx.fillRect(0,0,W,H);
-    // clouds (day levels)
-    if(st.level<2||st.level===4){
-      st.cloudX.forEach(cx=>{
-        ctx.fillStyle='rgba(255,255,255,0.9)';
-        ctx.beginPath();ctx.ellipse(cx,60,28,18,0,0,Math.PI*2);ctx.fill();
-        ctx.beginPath();ctx.ellipse(cx-20,68,18,14,0,0,Math.PI*2);ctx.fill();
-        ctx.beginPath();ctx.ellipse(cx+20,68,18,14,0,0,Math.PI*2);ctx.fill();
-      });
-    }
-    // stars (night level)
-    if(st.level===2){
-      ctx.fillStyle='#fff';
-      for(let i=0;i<20;i++){
-        const sx=(i*73+st.bgX*0.3)%W;
-        const sy=(i*37)%200;
-        ctx.fillRect(sx,sy,2,2);
-      }
-    }
-    // ground
-    ctx.fillStyle=lv.ground;ctx.fillRect(0,GY+8,W,H-GY-8);
-    ctx.fillStyle=lv.groundTop;ctx.fillRect(0,GY,W,14);
-    ctx.strokeStyle='rgba(0,0,0,0.2)';ctx.lineWidth=1;
-    for(let i=0;i<W;i+=32)ctx.strokeRect(i,GY,32,14);
-    for(let i=0;i<W;i+=32)ctx.strokeRect(i,GY+14,32,14);
-    // coins
-    st.coins.forEach(c=>drawCoin(ctx,c.x,c.y,c.frame||0));
-    // obstacles
-    st.obstacles.forEach(o=>{
-      if(o.type==='pipe') drawPipe(ctx,o.x,stGY||GY,o.h);
-      else drawGoomba(ctx,o.x,o.y);
-    });
-    // mario
-    const stGY2=st.GY||GY;
-    drawMario(ctx,st.player.x,st.player.y,st.player.frame);
-    // HUD bar at top
-    ctx.fillStyle='rgba(0,0,0,0.6)';ctx.fillRect(0,0,W,28);
-    ctx.fillStyle='#fff';ctx.font='bold 12px Arial';ctx.textAlign='left';
-    ctx.fillText(`MARIO`,8,18);
-    ctx.textAlign='center';
-    ctx.fillText(`⭐ ${st.score}`,W/2,18);
-    ctx.fillText(lv.name,W/2,H-8);
-    ctx.textAlign='right';
-    ctx.fillText(`❤️ ${'♥'.repeat(st.lives)}`,W-8,18);
-  },[]);
-
-  const gameLoop=useCallback((ts)=>{
-    const st=stateRef.current;if(!st)return;
-    const dt=Math.min(ts-st.lastTime,50);st.lastTime=ts;
-    st.player.frame++;
-    st.bgX+=st.speed;
-    st.cloudX=st.cloudX.map(cx=>(cx-st.speed*0.4+W)%W);
-    // gravity
-    st.player.vy+=0.55;st.player.y+=st.player.vy;
-    const stGY=st.GY||GY;
-    if(st.player.y>=stGY){st.player.y=stGY;st.player.vy=0;st.player.onGround=true;}
-    st.dist+=st.speed;st.score=Math.floor(st.dist/8)+st.coins.filter(c=>c.collected).length*50;
-    st.level=Math.min(4,Math.floor(st.dist/1200));
-    st.speed=3.2+st.dist/2000;
-    setScore(st.score);
-    // spawn obstacles
-    st.spawnTimer+=dt;
-    const interval=Math.max(800,2200-st.dist*0.15);
-    if(st.spawnTimer>interval){
-      st.spawnTimer=0;
-      const isPipe=LEVELS[st.level].pipes&&Math.random()<0.5;
-      if(isPipe){
-        const h=40+Math.floor(Math.random()*60);
-        st.obstacles.push({type:'pipe',x:W+30,h,w:42});
-      } else {
-        st.obstacles.push({type:'goomba',x:W+20,y:stGY,w:28,h:28});
-      }
-    }
-    // spawn coins
-    st.coinTimer+=dt;
-    if(st.coinTimer>1400){st.coinTimer=0;st.coins.push({x:W+10,y:GY-50-Math.random()*80,frame:0,collected:false});}
-    // move obstacles
-    st.obstacles=st.obstacles.map(o=>({...o,x:o.x-st.speed})).filter(o=>o.x>-60);
-    st.coins=st.coins.map(c=>({...c,x:c.x-st.speed,frame:c.frame+1})).filter(c=>c.x>-30);
-    // collect coins
-    st.coins.forEach(c=>{
-      if(!c.collected&&Math.abs(c.x-st.player.x)<20&&Math.abs(c.y-st.player.y)<28){
-        c.collected=true;st.score+=50;setScore(st.score);
-      }
-    });
-    st.coins=st.coins.filter(c=>!c.collected);
-    // collisions
-    const px=st.player.x, py=st.player.y;
-    const hit=st.obstacles.some(o=>{
-      if(o.type==='pipe') return Math.abs(o.x-px)<26&&py>stGY-o.h-10&&py<=stGY+5;
-      return Math.abs(o.x-px)<22&&Math.abs(o.y-py)<26;
-    });
-    if(hit){
-      st.lives--;
-      setLives(st.lives);
-      if(st.lives<=0){setGameOver(true);onScore(st.score);return;}
-      // respawn
-      st.player.x=70;st.player.y=GY;st.player.vy=0;
-      st.obstacles=[];
-    }
-    drawGame();rafRef.current=requestAnimationFrame(gameLoop);
-  },[drawGame,onScore]);
-
-  const startGame=()=>{stateRef.current=initState();setScore(0);setLives(3);setGameOver(false);setStarted(true);rafRef.current=requestAnimationFrame(gameLoop);};
-  useEffect(()=>()=>{if(rafRef.current)cancelAnimationFrame(rafRef.current);},[]);
-  const jump=()=>{const st=stateRef.current;if(st&&st.player.onGround){st.player.vy=-13;st.player.onGround=false;}};
-
-  return(
-    <div ref={containerRunRef} style={{display:'flex',flexDirection:'column',height:'100%',background:'#1a0a00',overflow:'hidden',alignItems:'center'}}>
-      <canvas ref={canvasRef} width={W} height={H} style={{width:'100%',maxWidth:W,display:'block',margin:'0 auto',imageRendering:'pixelated',flex:1}}/>
-      {!started&&!gameOver&&(
-        <div style={{position:'absolute',top:'40%',left:'50%',transform:'translate(-50%,-50%)',textAlign:'center'}}>
-          <div style={{background:'rgba(0,0,0,0.8)',border:'4px solid #fff',borderRadius:8,padding:'20px 32px',fontFamily:"'Arial Black',Arial,sans-serif"}}>
-            <div style={{fontSize:22,color:'#ffd700',fontWeight:900,marginBottom:4}}>MARIO RUNNER</div>
-            <div style={{fontSize:13,color:'#fff',marginBottom:16}}>Jump pipes & collect coins!</div>
-            <button onClick={startGame} style={{background:'linear-gradient(180deg,#44dd44,#22aa22)',border:'none',borderRadius:8,padding:'12px 28px',color:'#fff',fontSize:16,fontWeight:900,cursor:'pointer',boxShadow:'0 4px 0 #116611',textTransform:'uppercase'}}>▶ START</button>
-          </div>
-        </div>
-      )}
-      {gameOver&&(
-        <div style={{position:'absolute',top:'40%',left:'50%',transform:'translate(-50%,-50%)',textAlign:'center'}}>
-          <div style={{background:'rgba(0,0,0,0.88)',border:'4px solid #ff4444',borderRadius:8,padding:'20px 32px',fontFamily:"'Arial Black',Arial,sans-serif"}}>
-            <div style={{fontSize:22,color:'#ff4444',fontWeight:900,marginBottom:4}}>GAME OVER</div>
-            <div style={{fontSize:14,color:'#ffd700',marginBottom:16}}>Score: {score}</div>
-            <button onClick={startGame} style={{background:'linear-gradient(180deg,#ff4444,#cc0000)',border:'none',borderRadius:8,padding:'12px 28px',color:'#fff',fontSize:15,fontWeight:900,cursor:'pointer',boxShadow:'0 4px 0 #880000',textTransform:'uppercase'}}>▶ TRY AGAIN</button>
-          </div>
-        </div>
-      )}
-      {started&&!gameOver&&(
-        <button
-          onPointerDown={e=>{e.preventDefault();jump();}}
-          onTouchStart={e=>{e.preventDefault();jump();}}
-          style={{background:'linear-gradient(180deg,#e52c00,#aa1100)',border:'4px solid #ffd700',color:'#ffd700',padding:'18px',fontSize:22,fontWeight:900,cursor:'pointer',fontFamily:"'Arial Black',Arial,sans-serif",letterSpacing:1,boxShadow:'0 5px 0 #880000',flexShrink:0,touchAction:'none',userSelect:'none',WebkitUserSelect:'none'}}>
-          🍄 JUMP
-        </button>
       )}
     </div>
   );
@@ -1230,7 +952,6 @@ export default function GamesPage() {
         <div style={S.gameContent}>
           {activeGame.id === 'snake' && <SnakeGame playerName={playerName} onScore={s=>handleScore('snake',s)} />}
           {activeGame.id === 'tetris' && <TetrisGame playerName={playerName} onScore={s=>handleScore('tetris',s)} />}
-          {activeGame.id === 'runner' && <RunnerGame playerName={playerName} onScore={s=>handleScore('runner',s)} />}
           {activeGame.id === 'racing' && <RacingGame playerName={playerName} onScore={s=>handleScore('racing',s)} />}
           {activeGame.id === 'zombie' && <ZombieGame playerName={playerName} username={username} onScore={s=>handleScore('zombie',s)} onBack={()=>setActiveGame(null)} />}
           {activeGame.id === 'guessword' && <GuessWordGame playerName={playerName} onScore={s=>handleScore('guessword',s)} />}
