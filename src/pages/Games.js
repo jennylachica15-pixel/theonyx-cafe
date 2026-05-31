@@ -44,6 +44,7 @@ const GAME_LIST = [
   { id: 'runner',   emoji: '🍄', title: 'Mario Runner',       sub: 'Jump like Mario!' },
   { id: 'racing',   emoji: '🏎️', title: 'Café Racer',         sub: 'Dodge the barriers' },
   { id: 'zombie',   emoji: '🧟', title: 'Zombie Barista',     sub: 'Multiplayer survival' },
+  { id: 'guessword',   emoji: '🔤', title: 'Guess the Word',  sub: 'Clues & letters' },
   { id: 'cafemystery', emoji: '☕', title: 'Café Mystery',    sub: 'Social deduction' },
 ];
 
@@ -830,6 +831,248 @@ function RacingGame({ playerName, onScore }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 // CAFÉ MYSTERY (social deduction - placeholder shell)
 // ═══════════════════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// GUESS THE WORD
+// ═══════════════════════════════════════════════════════════════════════════════
+const WORD_LIST = [
+  { word:'ESPRESSO', desc:'A strong concentrated coffee shot brewed under pressure', clue:'Type of coffee ☕', category:'Drinks' },
+  { word:'LATTE',    desc:'A coffee drink made with steamed milk and a shot of espresso', clue:'Has the word "milk" in Italian', category:'Drinks' },
+  { word:'CAPPUCCINO',desc:'An espresso-based drink with equal parts espresso, steamed milk, and foam', clue:'Named after Italian friars 🇮🇹', category:'Drinks' },
+  { word:'MATCHA',   desc:'A finely ground powder of specially grown green tea leaves', clue:'Bright green color 🍵', category:'Drinks' },
+  { word:'FRAPPE',   desc:'A blended iced coffee drink topped with whipped cream', clue:'Cold and blended with ice 🧊', category:'Drinks' },
+  { word:'MACCHIATO',desc:'An espresso coffee drink with a small amount of milk', clue:'Means "stained" in Italian', category:'Drinks' },
+  { word:'MOCHA',    desc:'A chocolate-flavored variant of a latte', clue:'Has chocolate in it 🍫', category:'Drinks' },
+  { word:'CROISSANT',desc:'A buttery, flaky viennoiserie pastry shaped like a crescent', clue:'French pastry, crescent shaped 🥐', category:'Food' },
+  { word:'TIRAMISU', desc:'An Italian dessert made of ladyfingers dipped in coffee', clue:'Italian dessert, means "pick me up"', category:'Food' },
+  { word:'BARISTA',  desc:'A person who makes and serves coffee in a café', clue:'The person who makes your coffee ☕', category:'Café' },
+  { word:'AFFOGATO', desc:'A coffee-based dessert: a scoop of ice cream drowned in hot espresso', clue:'Ice cream + espresso 🍨', category:'Drinks' },
+  { word:'AMERICANO',desc:'A style of coffee prepared by diluting an espresso with hot water', clue:'Named after Americans in WWII 🇺🇸', category:'Drinks' },
+  { word:'MUFFIN',   desc:'A small domed spongy cake baked in a cup-shaped pan', clue:'Common café baked treat 🧁', category:'Food' },
+  { word:'WAFFLE',   desc:'A batter-based food cooked in a waffle iron with a grid pattern', clue:'Has a grid pattern, often with syrup 🧇', category:'Food' },
+  { word:'CHEESECAKE',desc:'A sweet dessert with a smooth creamy filling on a biscuit base', clue:'A dessert with cream cheese 🍰', category:'Food' },
+  { word:'BROWNIE',  desc:'A flat baked chocolate dessert square, denser than cake', clue:'Chocolate square dessert 🍫', category:'Food' },
+  { word:'SMOOTHIE', desc:'A thick blended drink made from fresh fruits and vegetables', clue:'Blended fruits in a cup 🍓', category:'Drinks' },
+  { word:'PANCAKE',  desc:'A flat round cake made from batter and cooked on a griddle', clue:'Flat, round, served with syrup 🥞', category:'Food' },
+  { word:'SANDWICH', desc:'Two slices of bread with a filling between them', clue:'Bread with something in the middle 🥪', category:'Food' },
+  { word:'PLAYLIST', desc:'A curated list of songs that play in sequence', clue:'Café background music 🎵', category:'Café' },
+  { word:'COASTER',  desc:'A small mat placed under a cup or glass to protect the table', clue:'Goes under your cup ☕', category:'Café' },
+  { word:'MENU',     desc:'A list of food and drinks available at a restaurant or café', clue:'You read this to order 📋', category:'Café' },
+  { word:'RECEIPT',  desc:'A document you get after paying that shows what you bought', clue:'Proof of purchase 🧾', category:'Café' },
+  { word:'WIFI',     desc:'A wireless networking technology that allows internet connection', clue:'Free in most cafés 📶', category:'Café' },
+  { word:'JOURNAL',  desc:'A book used for writing personal entries or notes daily', clue:'Many café visitors write in one 📓', category:'Café' },
+  { word:'CINNAMON', desc:'A spice made from the inner bark of trees, used in baking', clue:'Common spice sprinkled on lattes 🌿', category:'Food' },
+  { word:'VANILLA',  desc:'A flavoring derived from orchid plants, used in many desserts', clue:'Popular ice cream flavor 🍦', category:'Food' },
+  { word:'CARAMEL',  desc:'A confection made by heating sugar until it browns', clue:'Sweet brown sauce drizzled on drinks 🍯', category:'Food' },
+  { word:'ALMOND',   desc:'A tree nut used to make plant-based milk alternative for coffee', clue:'Nut used in non-dairy milk 🌰', category:'Food' },
+  { word:'COCONUT',  desc:'A tropical fruit used to make a sweet creamy milk', clue:'Tropical nut with white flesh 🥥', category:'Food' },
+];
+
+function GuessWordGame({ playerName, onScore }) {
+  const [wordData, setWordData] = useState(null);
+  const [guessed, setGuessed] = useState([]);
+  const [wrong, setWrong] = useState([]);
+  const [showClue, setShowClue] = useState(false);
+  const [result, setResult] = useState(null); // 'win' | 'lose'
+  const [score, setScore] = useState(0);
+  const [streak, setStreak] = useState(0);
+  const [round, setRound] = useState(1);
+  const [usedWords, setUsedWords] = useState([]);
+  const MAX_WRONG = 6;
+
+  const pickWord = useCallback((used=[]) => {
+    const available = WORD_LIST.filter(w => !used.includes(w.word));
+    if (available.length === 0) {
+      setUsedWords([]); // reset
+      const w = WORD_LIST[Math.floor(Math.random()*WORD_LIST.length)];
+      setWordData(w);
+    } else {
+      const w = available[Math.floor(Math.random()*available.length)];
+      setWordData(w);
+    }
+    setGuessed([]);
+    setWrong([]);
+    setShowClue(false);
+    setResult(null);
+  }, []);
+
+  useEffect(() => { pickWord([]); }, []);
+
+  const guess = (letter) => {
+    if (!wordData || result) return;
+    if (guessed.includes(letter) || wrong.includes(letter)) return;
+    if (wordData.word.includes(letter)) {
+      const ng = [...guessed, letter];
+      setGuessed(ng);
+      const won = wordData.word.split('').every(l => ng.includes(l));
+      if (won) {
+        const pts = (MAX_WRONG - wrong.length) * 20 + (showClue ? 0 : 30) + streak * 10;
+        const ns = score + pts;
+        setScore(ns);
+        setStreak(s => s + 1);
+        setResult('win');
+        onScore(ns);
+      }
+    } else {
+      const nw = [...wrong, letter];
+      setWrong(nw);
+      if (nw.length >= MAX_WRONG) {
+        setStreak(0);
+        setResult('lose');
+        onScore(score);
+      }
+    }
+  };
+
+  const next = () => {
+    const nu = [...usedWords, wordData?.word];
+    setUsedWords(nu);
+    setRound(r => r + 1);
+    pickWord(nu);
+  };
+
+  if (!wordData) return <div style={{color:'#d4a853',textAlign:'center',padding:40}}>Loading...</div>;
+
+  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+  const word = wordData.word;
+  const hpPct = ((MAX_WRONG - wrong.length) / MAX_WRONG) * 100;
+  const hpColor = hpPct > 60 ? '#44dd44' : hpPct > 30 ? '#ffcc00' : '#ff4444';
+
+  // hangman drawing
+  const HangmanSVG = ({ wrong }) => (
+    <svg width="120" height="110" viewBox="0 0 120 110">
+      {/* gallows */}
+      <line x1="10" y1="105" x2="80" y2="105" stroke="#8b5a2b" strokeWidth="3" strokeLinecap="round"/>
+      <line x1="30" y1="105" x2="30" y2="10" stroke="#8b5a2b" strokeWidth="3" strokeLinecap="round"/>
+      <line x1="30" y1="10" x2="70" y2="10" stroke="#8b5a2b" strokeWidth="3" strokeLinecap="round"/>
+      <line x1="70" y1="10" x2="70" y2="22" stroke="#8b5a2b" strokeWidth="2" strokeLinecap="round"/>
+      {/* head */}
+      {wrong>=1 && <circle cx="70" cy="32" r="10" stroke={wrong>=6?"#ff4444":"#d4a853"} strokeWidth="2.5" fill="none"/>}
+      {/* eyes when dead */}
+      {wrong>=6 && <><line x1="65" y1="28" x2="68" y2="31" stroke="#ff4444" strokeWidth="2"/><line x1="68" y1="28" x2="65" y2="31" stroke="#ff4444" strokeWidth="2"/><line x1="72" y1="28" x2="75" y2="31" stroke="#ff4444" strokeWidth="2"/><line x1="75" y1="28" x2="72" y2="31" stroke="#ff4444" strokeWidth="2"/></>}
+      {/* body */}
+      {wrong>=2 && <line x1="70" y1="42" x2="70" y2="72" stroke="#d4a853" strokeWidth="2.5" strokeLinecap="round"/>}
+      {/* left arm */}
+      {wrong>=3 && <line x1="70" y1="50" x2="52" y2="62" stroke="#d4a853" strokeWidth="2.5" strokeLinecap="round"/>}
+      {/* right arm */}
+      {wrong>=4 && <line x1="70" y1="50" x2="88" y2="62" stroke="#d4a853" strokeWidth="2.5" strokeLinecap="round"/>}
+      {/* left leg */}
+      {wrong>=5 && <line x1="70" y1="72" x2="54" y2="90" stroke="#d4a853" strokeWidth="2.5" strokeLinecap="round"/>}
+      {/* right leg */}
+      {wrong>=6 && <line x1="70" y1="72" x2="86" y2="90" stroke="#d4a853" strokeWidth="2.5" strokeLinecap="round"/>}
+    </svg>
+  );
+
+  return (
+    <div style={{height:'100%',background:'#1a0a00',color:'#f5e6d0',display:'flex',flexDirection:'column',fontFamily:"'Georgia',serif",overflowY:'auto'}}>
+
+      {/* top info bar */}
+      <div style={{background:'#2a1000',borderBottom:'2px solid #6b3a1f',padding:'8px 14px',display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0}}>
+        <div style={{fontSize:12,color:'#a07850'}}>Round <b style={{color:'#d4a853'}}>{round}</b></div>
+        <div style={{fontSize:12,color:'#a07850'}}>⭐ <b style={{color:'#d4a853'}}>{score}</b></div>
+        <div style={{fontSize:12,color:'#a07850'}}>🔥 <b style={{color:'#ff8800'}}>{streak}</b> streak</div>
+        <div style={{fontSize:11,color:'#6b3a1f',background:'#3d1f00',borderRadius:6,padding:'2px 8px'}}>{wordData.category}</div>
+      </div>
+
+      <div style={{flex:1,padding:'12px 16px',display:'flex',flexDirection:'column',gap:12}}>
+
+        {/* hangman + lives */}
+        <div style={{display:'flex',alignItems:'center',gap:12,background:'#2a1000',borderRadius:14,padding:'10px 14px',border:'1px solid #3d1f00'}}>
+          <HangmanSVG wrong={wrong.length}/>
+          <div style={{flex:1}}>
+            <div style={{fontSize:12,color:'#a07850',marginBottom:4}}>Lives remaining</div>
+            <div style={{height:10,background:'#3d1f00',borderRadius:5,overflow:'hidden',marginBottom:6,border:'1px solid #5a2d00'}}>
+              <div style={{width:`${hpPct}%`,height:'100%',background:hpColor,transition:'width 0.4s',borderRadius:5}}/>
+            </div>
+            <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
+              {wrong.map(l=>(
+                <span key={l} style={{background:'#5a0000',color:'#ff8888',borderRadius:6,padding:'2px 7px',fontSize:13,fontWeight:'bold'}}>{l}</span>
+              ))}
+              {wrong.length===0&&<span style={{color:'#6b3a1f',fontSize:12}}>No wrong guesses yet!</span>}
+            </div>
+          </div>
+        </div>
+
+        {/* description */}
+        <div style={{background:'linear-gradient(135deg,#2a1800,#3d2400)',border:'1px solid #6b3a1f',borderRadius:12,padding:'12px 14px'}}>
+          <div style={{fontSize:11,color:'#a07850',marginBottom:4,textTransform:'uppercase',letterSpacing:1}}>Description</div>
+          <div style={{fontSize:14,color:'#f5e6d0',lineHeight:1.6}}>{wordData.desc}</div>
+        </div>
+
+        {/* clue toggle */}
+        {!showClue ? (
+          <button onClick={()=>setShowClue(true)} style={{background:'transparent',border:'1px dashed #6b3a1f',borderRadius:10,padding:'8px',color:'#a07850',fontSize:13,cursor:'pointer'}}>
+            💡 Show Clue (costs 30 pts bonus)
+          </button>
+        ) : (
+          <div style={{background:'rgba(212,168,83,0.1)',border:'1px solid #d4a853',borderRadius:10,padding:'8px 14px',fontSize:13,color:'#d4a853',textAlign:'center'}}>
+            💡 <b>Clue:</b> {wordData.clue}
+          </div>
+        )}
+
+        {/* word blanks */}
+        <div style={{textAlign:'center',padding:'8px 0'}}>
+          <div style={{display:'flex',justifyContent:'center',flexWrap:'wrap',gap:6}}>
+            {word.split('').map((l,i)=>(
+              <div key={i} style={{
+                width:30,height:38,display:'flex',alignItems:'center',justifyContent:'center',
+                borderBottom:`3px solid ${guessed.includes(l)?'#d4a853':'#6b3a1f'}`,
+                fontSize:20,fontWeight:'bold',
+                color: result==='lose' && !guessed.includes(l) ? '#ff6b6b' : '#d4a853',
+              }}>
+                {guessed.includes(l) ? l : result==='lose' ? l : ''}
+              </div>
+            ))}
+          </div>
+          <div style={{fontSize:12,color:'#6b3a1f',marginTop:6}}>{word.length} letters</div>
+        </div>
+
+        {/* result overlay */}
+        {result && (
+          <div style={{background: result==='win'?'rgba(68,220,68,0.12)':'rgba(255,68,68,0.12)', border:`2px solid ${result==='win'?'#44dd44':'#ff4444'}`, borderRadius:14, padding:'16px', textAlign:'center'}}>
+            <div style={{fontSize:28,marginBottom:4}}>{result==='win'?'🎉':'💀'}</div>
+            <div style={{fontSize:18,fontWeight:'bold',color:result==='win'?'#44dd44':'#ff4444',marginBottom:4}}>
+              {result==='win'?'Correct!':'Game Over!'}
+            </div>
+            {result==='win'&&<div style={{fontSize:13,color:'#d4a853',marginBottom:8}}>+{(MAX_WRONG-wrong.length)*20+(showClue?0:30)+streak*10} points!</div>}
+            {result==='lose'&&<div style={{fontSize:13,color:'#f5e6d0',marginBottom:8}}>The word was <b style={{color:'#d4a853'}}>{word}</b></div>}
+            <button onClick={next} style={{background:'#d4a853',border:'none',borderRadius:10,padding:'10px 24px',color:'#1a0a00',fontWeight:'bold',fontSize:14,cursor:'pointer'}}>
+              Next Word →
+            </button>
+          </div>
+        )}
+
+        {/* keyboard */}
+        {!result && (
+          <div style={{paddingBottom:8}}>
+            {['QWERTYUIOP','ASDFGHJKL','ZXCVBNM'].map((row,ri)=>(
+              <div key={ri} style={{display:'flex',justifyContent:'center',gap:4,marginBottom:4}}>
+                {row.split('').map(l=>{
+                  const isGuessed=guessed.includes(l);
+                  const isWrong=wrong.includes(l);
+                  return(
+                    <button key={l} onClick={()=>guess(l)} disabled={isGuessed||isWrong}
+                      style={{
+                        width:32,height:38,borderRadius:7,border:'none',fontSize:13,fontWeight:'bold',cursor:isGuessed||isWrong?'default':'pointer',
+                        background: isGuessed?'#44aa22': isWrong?'#5a0000':'#3d1f00',
+                        color: isGuessed?'#8bc34a': isWrong?'#ff6666':'#d4a853',
+                        opacity: isGuessed||isWrong?0.7:1,
+                        transition:'all 0.15s',
+                        boxShadow: isGuessed||isWrong?'none':'0 2px 0 #1a0800',
+                      }}>
+                      {l}
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function CafeMysteryGame({ playerName, onBack }) {
   return <CafeGame playerName={playerName} onBack={onBack}/>;
 }
@@ -905,6 +1148,7 @@ export default function GamesPage() {
           {activeGame.id === 'runner' && <RunnerGame playerName={playerName} onScore={s=>handleScore('runner',s)} />}
           {activeGame.id === 'racing' && <RacingGame playerName={playerName} onScore={s=>handleScore('racing',s)} />}
           {activeGame.id === 'zombie' && <ZombieGame playerName={playerName} username={username} onScore={s=>handleScore('zombie',s)} onBack={()=>setActiveGame(null)} />}
+          {activeGame.id === 'guessword' && <GuessWordGame playerName={playerName} onScore={s=>handleScore('guessword',s)} />}
           {activeGame.id === 'cafemystery' && <CafeMysteryGame playerName={playerName} onBack={()=>setActiveGame(null)} />}
         </div>
       </div>
