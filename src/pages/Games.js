@@ -13,16 +13,24 @@ const S = {
   header: { background: 'linear-gradient(135deg, #3d1f00 0%, #6b3a1f 100%)', padding: '20px 16px 12px', textAlign: 'center', borderBottom: '2px solid #8b5a2b' },
   logo: { fontSize: 28, fontWeight: 'bold', color: '#d4a853', letterSpacing: 2 },
   sub: { fontSize: 12, color: '#a07850', marginTop: 2 },
-  tabs: { display: 'flex', borderBottom: '2px solid #3d1f00', background: '#2a1000' },
-  tab: (a) => ({ flex: 1, padding: '12px 4px', border: 'none', background: a ? '#6b3a1f' : 'transparent', color: a ? '#d4a853' : '#a07850', fontSize: 13, fontWeight: a ? 'bold' : 'normal', cursor: 'pointer' }),
   grid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, padding: 16 },
-  card: { background: 'linear-gradient(145deg, #2a1000, #3d1f00)', border: '1px solid #6b3a1f', borderRadius: 16, padding: 16, textAlign: 'center', cursor: 'pointer', transition: 'all 0.2s' },
-  cardIcon: { fontSize: 40, marginBottom: 8 },
-  cardTitle: { fontSize: 14, fontWeight: 'bold', color: '#d4a853' },
-  cardSub: { fontSize: 11, color: '#a07850', marginTop: 4 },
-  cardBest: { fontSize: 11, color: '#8bc34a', marginTop: 6, background: 'rgba(139,195,74,0.1)', borderRadius: 8, padding: '2px 8px' },
+  // Clean brown card — no emoji icon
+  card: {
+    background: 'linear-gradient(160deg, #2c1600, #1e0e00)',
+    border: '1px solid #6b3a1f',
+    borderTop: '3px solid #d4a85366',
+    borderRadius: 16,
+    padding: '22px 14px 16px',
+    textAlign: 'center',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+  },
+  cardTitle: { fontSize: 14, fontWeight: 'bold', color: '#d4a853', textTransform: 'uppercase', letterSpacing: 1 },
+  cardSub: { fontSize: 11, color: '#a07850', marginTop: 6 },
+  cardBest: { fontSize: 11, color: '#8bc34a', marginTop: 8, background: 'rgba(139,195,74,0.1)', borderRadius: 8, padding: '2px 8px' },
+  // Fullscreen game
   fullscreen: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: '#1a0a00', zIndex: 9999, display: 'flex', flexDirection: 'column' },
-  gameBar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', background: '#2a1000', borderBottom: '2px solid #6b3a1f', minHeight: 50 },
+  gameBar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', background: '#2a1000', borderBottom: '2px solid #6b3a1f', minHeight: 50, flexShrink: 0 },
   backBtn: { background: '#6b3a1f', border: 'none', color: '#d4a853', padding: '8px 16px', borderRadius: 20, fontSize: 14, cursor: 'pointer', fontWeight: 'bold' },
   gameTitle: { color: '#d4a853', fontWeight: 'bold', fontSize: 16 },
   lbBtn: { background: '#d4a853', border: 'none', color: '#1a0a00', padding: '8px 16px', borderRadius: 20, fontSize: 14, cursor: 'pointer', fontWeight: 'bold' },
@@ -39,15 +47,15 @@ const S = {
 const MENU_NAMES = ['Latte','Matcha','Americano','Espresso','Cappuccino','Frappe','Mocha','Macchiato','Cortado','Affogato'];
 
 const GAME_LIST = [
-  { id: 'snake',    emoji: '🐍', title: 'Snake',              sub: 'Collect coffee beans' },
-  { id: 'tetris',   emoji: '🟦', title: 'Tetris',             sub: 'Classic stacking' },
-  { id: 'racing',   emoji: '🏎️', title: 'Café Racer',         sub: 'Dodge the barriers' },
-  { id: 'zombie',   emoji: '🧟', title: 'Zombie Barista',     sub: 'Multiplayer survival' },
-  { id: 'guessword',   emoji: '🔤', title: 'Guess the Word',  sub: 'Clues & letters' },
-  { id: 'cafemystery', emoji: '☕', title: 'Café Mystery',    sub: 'Social deduction' },
+  { id: 'snake',       title: 'Snake',           sub: 'Collect coffee beans' },
+  { id: 'tetris',      title: 'Tetris',           sub: 'Classic stacking' },
+  { id: 'racing',      title: 'Café Racer',       sub: 'Dodge the barriers' },
+  { id: 'zombie',      title: 'Zombie Barista',   sub: 'Multiplayer survival' },
+  { id: 'guessword',   title: 'Guess the Word',   sub: 'Clues & letters' },
+  { id: 'cafemystery', title: 'Café Mystery',     sub: 'Social deduction' },
 ];
 
-// ─── FIREBASE AUTH (username/password stored in Firestore) ────────────────────
+// ─── FIREBASE AUTH ────────────────────────────────────────────────────────────
 async function registerUser(username, password) {
   const ref = doc(db, 'gameUsers', username.toLowerCase());
   const snap = await getDoc(ref);
@@ -109,20 +117,14 @@ function AuthModal({ onAuth, onClose }) {
         <div style={{fontSize:12,color:'#a07850',marginBottom:20}}>
           {mode === 'login' ? 'Sign in to track your scores' : 'Create a unique café name'}
         </div>
-        <input style={S.input} placeholder="Username (e.g. Latte)" value={username}
-          onChange={e=>setUsername(e.target.value)} autoCapitalize="none" />
-        <input style={S.input} placeholder="Password" type="password" value={password}
-          onChange={e=>setPassword(e.target.value)} />
+        <input style={S.input} placeholder="Username (e.g. Latte)" value={username} onChange={e=>setUsername(e.target.value)} autoCapitalize="none" />
+        <input style={S.input} placeholder="Password" type="password" value={password} onChange={e=>setPassword(e.target.value)} />
         {error && <div style={{color:'#ff6b6b',fontSize:13,marginBottom:8}}>{error}</div>}
-        <button style={S.btn()} onClick={handle} disabled={loading}>
-          {loading ? '...' : mode === 'login' ? 'Sign In' : 'Create Account'}
-        </button>
+        <button style={S.btn()} onClick={handle} disabled={loading}>{loading ? '...' : mode === 'login' ? 'Sign In' : 'Create Account'}</button>
         <button style={S.btn('#6b3a1f')} onClick={()=>{setMode(mode==='login'?'register':'login');setError('');}}>
           {mode === 'login' ? 'New? Create Account' : 'Already have one? Sign In'}
         </button>
-        <button style={{background:'none',border:'none',color:'#a07850',cursor:'pointer',fontSize:13}} onClick={onClose}>
-          Play as Guest
-        </button>
+        <button style={{background:'none',border:'none',color:'#a07850',cursor:'pointer',fontSize:13}} onClick={onClose}>Play as Guest</button>
       </div>
     </div>
   );
@@ -150,7 +152,7 @@ function NameModal({ gameTitle, username, onStart, onClose }) {
   );
 }
 
-// ─── LEADERBOARD MODAL ───────────────────────────────────────────────────────
+// ─── LEADERBOARD MODAL ────────────────────────────────────────────────────────
 function LeaderboardModal({ onClose, username }) {
   const [tab, setTab] = useState(GAME_LIST[0].id);
   const [rows, setRows] = useState([]);
@@ -171,7 +173,7 @@ function LeaderboardModal({ onClose, username }) {
             <button key={g.id} onClick={()=>setTab(g.id)}
               style={{background: tab===g.id ? '#d4a853':'#3d1f00', color: tab===g.id ? '#1a0a00':'#d4a853',
                 border:'1px solid #6b3a1f', borderRadius:20, padding:'6px 12px', fontSize:12, cursor:'pointer'}}>
-              {g.emoji} {g.title}
+              {g.title}
             </button>
           ))}
         </div>
@@ -193,52 +195,71 @@ function LeaderboardModal({ onClose, username }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// SNAKE GAME
+// SNAKE — bigger canvas, fills screen, starts slow
 // ═══════════════════════════════════════════════════════════════════════════════
 function SnakeGame({ playerName, onScore }) {
   const canvasRef = useRef(null);
+  const containerRef = useRef(null);
   const stateRef = useRef(null);
   const rafRef = useRef(null);
   const [score, setScore] = useState(0);
   const [gameOver, setGameOver] = useState(false);
   const [started, setStarted] = useState(false);
+  const [canvasSize, setCanvasSize] = useState({ w: 320, h: 460, cell: 20 });
 
-  const CELL = 20, COLS = 16, ROWS = 22;
+  // Fit canvas to container
+  useEffect(() => {
+    const update = () => {
+      if (!containerRef.current) return;
+      const availW = containerRef.current.clientWidth - 8;
+      const availH = containerRef.current.clientHeight - 100; // room for controls
+      const cell = Math.max(16, Math.min(24, Math.floor(Math.min(availW / 16, availH / 22))));
+      setCanvasSize({ w: cell * 16, h: cell * 22, cell });
+    };
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+
+  const { w: W, h: H, cell: CELL } = canvasSize;
+  const COLS = Math.floor(W / CELL);
+  const ROWS = Math.floor(H / CELL);
 
   const initState = () => ({
-    snake: [{x:8,y:11},{x:7,y:11},{x:6,y:11}],
+    snake: [{x:Math.floor(COLS/2),y:Math.floor(ROWS/2)},{x:Math.floor(COLS/2)-1,y:Math.floor(ROWS/2)},{x:Math.floor(COLS/2)-2,y:Math.floor(ROWS/2)}],
     dir: {x:1,y:0}, nextDir: {x:1,y:0},
-    food: {x:12,y:8}, score: 0,
-    lastTime: 0, speed: 250,
+    food: {x:Math.floor(COLS/2)+4, y:Math.floor(ROWS/2)},
+    score: 0, lastTime: 0, speed: 260, // starts slow!
   });
 
   const drawGame = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    const canvas = canvasRef.current; if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    const st = stateRef.current;
-    ctx.fillStyle = '#1a0a00';
-    ctx.fillRect(0,0,canvas.width,canvas.height);
-    // grid
-    ctx.strokeStyle = 'rgba(61,31,0,0.4)';
-    ctx.lineWidth = 0.5;
-    for(let x=0;x<=COLS;x++){ctx.beginPath();ctx.moveTo(x*CELL,0);ctx.lineTo(x*CELL,ROWS*CELL);ctx.stroke();}
-    for(let y=0;y<=ROWS;y++){ctx.beginPath();ctx.moveTo(0,y*CELL);ctx.lineTo(COLS*CELL,y*CELL);ctx.stroke();}
-    // food
+    const st = stateRef.current; if (!st) return;
+    ctx.fillStyle = '#0a0500'; ctx.fillRect(0,0,W,H);
+    // grid dots
+    ctx.fillStyle = 'rgba(61,31,0,0.3)';
+    for(let x=0;x<COLS;x++) for(let y=0;y<ROWS;y++) ctx.fillRect(x*CELL+CELL/2-1,y*CELL+CELL/2-1,2,2);
+    // food — coffee bean
     ctx.fillStyle='#d4a853';
     ctx.beginPath();ctx.arc(st.food.x*CELL+CELL/2,st.food.y*CELL+CELL/2,CELL/2-2,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle='#1a0a00';ctx.font='11px serif';ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillText('☕',st.food.x*CELL+CELL/2,st.food.y*CELL+CELL/2);
+    ctx.fillStyle='#1a0a00';ctx.font=`${CELL-4}px serif`;ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText('☕',st.food.x*CELL+CELL/2,st.food.y*CELL+CELL/2+1);
     // snake
     st.snake.forEach((seg,i)=>{
-      ctx.fillStyle = i===0 ? '#8bc34a' : `rgba(139,195,74,${0.9-i*0.03})`;
-      ctx.beginPath();ctx.roundRect(seg.x*CELL+1,seg.y*CELL+1,CELL-2,CELL-2,4);ctx.fill();
+      ctx.fillStyle = i===0 ? '#8bc34a' : `rgba(139,195,74,${Math.max(0.2,0.95-i*0.04)})`;
+      ctx.beginPath();ctx.roundRect(seg.x*CELL+1,seg.y*CELL+1,CELL-2,CELL-2,5);ctx.fill();
+      if(i===0){
+        // eyes
+        ctx.fillStyle='#1a0a00';
+        ctx.beginPath();ctx.arc(seg.x*CELL+CELL*0.3,seg.y*CELL+CELL*0.35,2,0,Math.PI*2);ctx.fill();
+        ctx.beginPath();ctx.arc(seg.x*CELL+CELL*0.7,seg.y*CELL+CELL*0.35,2,0,Math.PI*2);ctx.fill();
+      }
     });
-  }, []);
+  }, [W,H,CELL,COLS,ROWS]);
 
   const gameLoop = useCallback((ts) => {
-    const st = stateRef.current;
-    if (!st) return;
+    const st = stateRef.current; if (!st) return;
     if (ts - st.lastTime > st.speed) {
       st.lastTime = ts;
       st.dir = st.nextDir;
@@ -248,17 +269,17 @@ function SnakeGame({ playerName, onScore }) {
       }
       st.snake.unshift(head);
       if (head.x===st.food.x&&head.y===st.food.y) {
-        st.score += 10; st.speed = Math.max(80, st.speed-3);
-        setScore(st.score);
+        st.score+=10; st.speed=Math.max(90,st.speed-4); setScore(st.score);
         do { st.food={x:Math.floor(Math.random()*COLS),y:Math.floor(Math.random()*ROWS)};
         } while(st.snake.some(s=>s.x===st.food.x&&s.y===st.food.y));
       } else st.snake.pop();
     }
     drawGame();
     rafRef.current = requestAnimationFrame(gameLoop);
-  }, [drawGame, onScore]);
+  }, [drawGame, onScore, COLS, ROWS]);
 
   const startGame = () => {
+    if(rafRef.current) cancelAnimationFrame(rafRef.current);
     stateRef.current = initState();
     setScore(0); setGameOver(false); setStarted(true);
     rafRef.current = requestAnimationFrame(gameLoop);
@@ -267,35 +288,36 @@ function SnakeGame({ playerName, onScore }) {
   useEffect(()=>()=>{if(rafRef.current) cancelAnimationFrame(rafRef.current);},[]);
 
   const dir = (dx,dy) => {
-    const st = stateRef.current;
-    if (!st) return;
+    const st = stateRef.current; if (!st) return;
     if (dx!==0&&st.dir.x!==0) return;
     if (dy!==0&&st.dir.y!==0) return;
     st.nextDir={x:dx,y:dy};
   };
 
+  useEffect(()=>{
+    const k=(e)=>{const m={ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0]};if(m[e.key]){e.preventDefault();dir(...m[e.key]);}};
+    window.addEventListener('keydown',k); return()=>window.removeEventListener('keydown',k);
+  },[]);
+
   const btnStyle = {background:'#3d1f00',border:'2px solid #6b3a1f',color:'#d4a853',
-    width:64,height:64,borderRadius:12,fontSize:24,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'};
+    width:60,height:60,borderRadius:12,fontSize:22,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',userSelect:'none'};
 
   return (
-    <div style={{display:'flex',flexDirection:'column',alignItems:'center',height:'100%',paddingTop:8}}>
-      <div style={{color:'#d4a853',fontSize:18,fontWeight:'bold',marginBottom:8}}>
-        {playerName} | Score: {score}
-      </div>
-      <canvas ref={canvasRef} width={COLS*CELL} height={ROWS*CELL}
-        style={{border:'2px solid #6b3a1f',borderRadius:8,maxWidth:'100%'}} />
-      {!started && !gameOver && (
-        <button style={{...S.btn(),marginTop:16,width:160}} onClick={startGame}>▶ Start</button>
+    <div ref={containerRef} style={{display:'flex',flexDirection:'column',alignItems:'center',height:'100%',padding:'8px 4px 0',overflow:'hidden'}}>
+      <div style={{color:'#d4a853',fontSize:15,fontWeight:'bold',marginBottom:6}}>{playerName} | ☕ {score}</div>
+      <canvas ref={canvasRef} width={W} height={H} style={{border:'2px solid #6b3a1f',borderRadius:8,maxWidth:'100%',flex:'0 0 auto'}} />
+      {!started&&!gameOver&&(
+        <button style={{...S.btn(),marginTop:12,width:160}} onClick={startGame}>▶ Start</button>
       )}
-      {gameOver && (
-        <div style={{textAlign:'center',marginTop:12}}>
+      {gameOver&&(
+        <div style={{textAlign:'center',marginTop:10}}>
           <div style={{color:'#ff6b6b',fontSize:18,fontWeight:'bold'}}>Game Over!</div>
-          <div style={{color:'#d4a853',fontSize:16,marginBottom:8}}>Score: {score}</div>
+          <div style={{color:'#d4a853',fontSize:15,marginBottom:8}}>Score: {score}</div>
           <button style={{...S.btn(),width:160}} onClick={startGame}>▶ Play Again</button>
         </div>
       )}
-      {started && !gameOver && (
-        <div style={{marginTop:16,display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,width:200}}>
+      {started&&!gameOver&&(
+        <div style={{marginTop:10,display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:6,width:190,flexShrink:0}}>
           <div/><button style={btnStyle} onClick={()=>dir(0,-1)}>↑</button><div/>
           <button style={btnStyle} onClick={()=>dir(-1,0)}>←</button>
           <div/>
@@ -308,7 +330,7 @@ function SnakeGame({ playerName, onScore }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// TETRIS GAME
+// TETRIS — fills full screen width dynamically
 // ═══════════════════════════════════════════════════════════════════════════════
 function TetrisGame({ playerName, onScore }) {
   const canvasRef   = useRef(null);
@@ -316,7 +338,7 @@ function TetrisGame({ playerName, onScore }) {
   const containerRef= useRef(null);
   const stateRef    = useRef(null);
   const rafRef      = useRef(null);
-  const cellRef     = useRef(18);
+  const cellRef     = useRef(24);
   const COLS=10, ROWS=20;
   const [score,  setScore]   = useState(0);
   const [level,  setLevel]   = useState(1);
@@ -342,26 +364,19 @@ function TetrisGame({ playerName, onScore }) {
   const initState=()=>({board:Array.from({length:ROWS},()=>Array(COLS).fill(0)),piece:newPiece(),next:newPiece(),score:0,lines:0,level:1,lastTime:0,speed:600});
 
   const calcCell=useCallback(()=>{
-    const c=containerRef.current; if(!c)return 18;
-    // board takes ~65% of width, rest is sidebar
+    const c=containerRef.current; if(!c)return 24;
     const bw=Math.floor(c.clientWidth*0.62);
-    const bh=c.clientHeight-110; // buttons take ~100px
+    const bh=c.clientHeight-110;
     const byW=Math.floor(bw/COLS);
     const byH=Math.floor(bh/ROWS);
-    return Math.max(8,Math.min(byW,byH,26));
+    return Math.max(10,Math.min(byW,byH,30));
   },[]);
 
   const drawBlock=(ctx,x,y,color,cell,alpha=1)=>{
     ctx.globalAlpha=alpha;
-    ctx.fillStyle=color;
-    ctx.fillRect(x*cell+1,y*cell+1,cell-2,cell-2);
-    // top-left shine
-    ctx.fillStyle='rgba(255,255,255,0.3)';
-    ctx.fillRect(x*cell+1,y*cell+1,cell-2,Math.max(2,cell*0.18));
-    ctx.fillRect(x*cell+1,y*cell+1,Math.max(2,cell*0.18),cell-2);
-    // bottom-right shadow
-    ctx.fillStyle='rgba(0,0,0,0.35)';
-    ctx.fillRect(x*cell+1,y*cell+cell-Math.max(2,cell*0.18)-1,cell-2,Math.max(2,cell*0.18));
+    ctx.fillStyle=color; ctx.fillRect(x*cell+1,y*cell+1,cell-2,cell-2);
+    ctx.fillStyle='rgba(255,255,255,0.3)'; ctx.fillRect(x*cell+1,y*cell+1,cell-2,Math.max(2,cell*0.18)); ctx.fillRect(x*cell+1,y*cell+1,Math.max(2,cell*0.18),cell-2);
+    ctx.fillStyle='rgba(0,0,0,0.35)'; ctx.fillRect(x*cell+1,y*cell+cell-Math.max(2,cell*0.18)-1,cell-2,Math.max(2,cell*0.18));
     ctx.globalAlpha=1;
   };
 
@@ -371,43 +386,35 @@ function TetrisGame({ playerName, onScore }) {
     const CELL=cellRef.current;
     const ctx=canvas.getContext('2d');
     const W=COLS*CELL, H=ROWS*CELL;
-    // dark background with subtle grid
     ctx.fillStyle='#080c14'; ctx.fillRect(0,0,W,H);
     for(let x=0;x<=COLS;x++){ctx.strokeStyle='rgba(255,255,255,0.04)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x*CELL,0);ctx.lineTo(x*CELL,H);ctx.stroke();}
     for(let y=0;y<=ROWS;y++){ctx.beginPath();ctx.moveTo(0,y*CELL);ctx.lineTo(W,y*CELL);ctx.stroke();}
-    // border glow
     ctx.strokeStyle=st.piece?.glow||'#00e5ff';ctx.lineWidth=2;ctx.strokeRect(0,0,W,H);
-    // ghost
     let gy=st.piece.y;
     while(!collides(st.board,{...st.piece,y:gy+1}))gy++;
-    st.piece.shape.forEach((row,y)=>row.forEach((v,x)=>{
-      if(v)drawBlock(ctx,st.piece.x+x,gy+y,st.piece.color,CELL,0.15);
-    }));
-    // board
-    st.board.forEach((row,y)=>row.forEach((v,x)=>{ if(v)drawBlock(ctx,x,y,v,CELL); }));
-    // active piece with glow
-    ctx.shadowColor=st.piece.glow; ctx.shadowBlur=CELL*0.8;
-    st.piece.shape.forEach((row,y)=>row.forEach((v,x)=>{ if(v)drawBlock(ctx,st.piece.x+x,st.piece.y+y,st.piece.color,CELL); }));
+    st.piece.shape.forEach((row,y)=>row.forEach((v,x)=>{if(v)drawBlock(ctx,st.piece.x+x,gy+y,st.piece.color,CELL,0.15);}));
+    st.board.forEach((row,y)=>row.forEach((v,x)=>{if(v)drawBlock(ctx,x,y,v,CELL);}));
+    ctx.shadowColor=st.piece.glow;ctx.shadowBlur=CELL*0.8;
+    st.piece.shape.forEach((row,y)=>row.forEach((v,x)=>{if(v)drawBlock(ctx,st.piece.x+x,st.piece.y+y,st.piece.color,CELL);}));
     ctx.shadowBlur=0;
   },[]);
 
   const drawNext=useCallback(()=>{
-    const canvas=nextCanvRef.current; if(!canvas)return;
-    const st=stateRef.current; if(!st)return;
-    const NC=16; const W=4*NC, H=4*NC;
-    canvas.width=W; canvas.height=H;
+    const canvas=nextCanvRef.current;if(!canvas)return;
+    const st=stateRef.current;if(!st)return;
+    const NC=16;const W=4*NC,H=4*NC;
+    canvas.width=W;canvas.height=H;
     const ctx=canvas.getContext('2d');
-    ctx.fillStyle='#080c14'; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='#080c14';ctx.fillRect(0,0,W,H);
     const p=st.next;
-    const ox=Math.floor((4-p.shape[0].length)/2);
-    const oy=Math.floor((4-p.shape.length)/2);
-    ctx.shadowColor=p.glow; ctx.shadowBlur=NC*0.8;
-    p.shape.forEach((row,y)=>row.forEach((v,x)=>{ if(v)drawBlock(ctx,ox+x,oy+y,p.color,NC); }));
+    const ox=Math.floor((4-p.shape[0].length)/2),oy=Math.floor((4-p.shape.length)/2);
+    ctx.shadowColor=p.glow;ctx.shadowBlur=NC*0.8;
+    p.shape.forEach((row,y)=>row.forEach((v,x)=>{if(v)drawBlock(ctx,ox+x,oy+y,p.color,NC);}));
     ctx.shadowBlur=0;
   },[]);
 
   const gameLoop=useCallback((ts)=>{
-    const st=stateRef.current; if(!st)return;
+    const st=stateRef.current;if(!st)return;
     if(ts-st.lastTime>st.speed){
       st.lastTime=ts;
       if(!collides(st.board,st.piece,0,1)){st.piece.y++;}
@@ -417,20 +424,18 @@ function TetrisGame({ playerName, onScore }) {
         st.board=board;
         const pts=[0,100,300,500,800][cleared]||0;
         st.score+=pts*(st.level||1);
-        st.lines+=cleared;
-        st.level=Math.floor(st.lines/10)+1;
-        st.speed=Math.max(60,600-st.level*50);
-        setScore(st.score); setLines(st.lines); setLevel(st.level);
-        st.piece=st.next; st.next=newPiece();
+        st.lines+=cleared;st.level=Math.floor(st.lines/10)+1;st.speed=Math.max(60,600-st.level*50);
+        setScore(st.score);setLines(st.lines);setLevel(st.level);
+        st.piece=st.next;st.next=newPiece();
         if(collides(st.board,st.piece)){setGameOver(true);onScore(st.score);return;}
       }
     }
-    drawBoard(); drawNext();
+    drawBoard();drawNext();
     rafRef.current=requestAnimationFrame(gameLoop);
   },[drawBoard,drawNext,onScore]);
 
   const startGame=()=>{
-    const cell=calcCell(); cellRef.current=cell;
+    const cell=calcCell();cellRef.current=cell;
     const canvas=canvasRef.current;
     if(canvas){canvas.width=COLS*cell;canvas.height=ROWS*cell;}
     stateRef.current=initState();
@@ -440,7 +445,7 @@ function TetrisGame({ playerName, onScore }) {
 
   useEffect(()=>{
     const ro=new ResizeObserver(()=>{
-      const cell=calcCell(); cellRef.current=cell;
+      const cell=calcCell();cellRef.current=cell;
       const canvas=canvasRef.current;
       if(canvas){canvas.width=COLS*cell;canvas.height=ROWS*cell;}
     });
@@ -452,37 +457,34 @@ function TetrisGame({ playerName, onScore }) {
   const drop=()=>{const st=stateRef.current;if(!st)return;while(!collides(st.board,st.piece,0,1))st.piece.y++;};
   const rot=()=>{const st=stateRef.current;if(!st)return;const r=rotate(st.piece.shape);const old=st.piece.shape;st.piece.shape=r;if(collides(st.board,st.piece))st.piece.shape=old;};
 
-  const btn=(label,action,color='#1a1a2e')=>({
-    background:color, border:`2px solid ${color==='#1a1a2e'?'#3a3a5e':'#00e5ff'}`,
-    color:'#fff', borderRadius:12, padding:'14px 0', fontSize:22, cursor:'pointer',
-    userSelect:'none', WebkitUserSelect:'none', flex:1,
-    boxShadow:`0 4px 0 rgba(0,0,0,0.4)`, fontWeight:'bold',
-  });
+  useEffect(()=>{
+    if(!started)return;
+    const k=(e)=>{
+      if(e.key==='ArrowLeft'){e.preventDefault();move(-1);}
+      if(e.key==='ArrowRight'){e.preventDefault();move(1);}
+      if(e.key==='ArrowDown'){e.preventDefault();drop();}
+      if(e.key==='ArrowUp'){e.preventDefault();rot();}
+    };
+    window.addEventListener('keydown',k);return()=>window.removeEventListener('keydown',k);
+  },[started]);
+
+  const ctrlBtn={background:'#1a1a2e',border:'2px solid #3a3a5e',color:'#fff',borderRadius:12,padding:'14px 0',fontSize:22,cursor:'pointer',userSelect:'none',WebkitUserSelect:'none',flex:1,boxShadow:'0 4px 0 rgba(0,0,0,0.4)',fontWeight:'bold'};
 
   return(
     <div ref={containerRef} style={{display:'flex',flexDirection:'column',height:'100%',background:'#050810',overflow:'hidden',fontFamily:"'Arial Black',Arial,sans-serif"}}>
-
-      {/* main area: board + sidebar */}
       <div style={{flex:1,display:'flex',gap:0,overflow:'hidden',minHeight:0}}>
-
-        {/* board */}
         <div style={{display:'flex',alignItems:'center',justifyContent:'center',flex:'0 0 auto',padding:'8px 4px 4px 8px'}}>
           <canvas ref={canvasRef} style={{display:'block',imageRendering:'pixelated'}}/>
         </div>
-
-        {/* sidebar */}
         <div style={{flex:1,display:'flex',flexDirection:'column',justifyContent:'flex-start',padding:'10px 8px 4px 4px',gap:10,minWidth:0}}>
-          {/* player */}
           <div style={{background:'#0d1120',border:'1px solid #1e2a4a',borderRadius:10,padding:'6px 8px'}}>
             <div style={{fontSize:9,color:'#4a6a9a',textTransform:'uppercase',letterSpacing:1}}>Player</div>
             <div style={{fontSize:12,color:'#e0e8ff',fontWeight:'bold',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{playerName}</div>
           </div>
-          {/* score */}
           <div style={{background:'#0d1120',border:'1px solid #1e2a4a',borderRadius:10,padding:'6px 8px'}}>
             <div style={{fontSize:9,color:'#4a6a9a',textTransform:'uppercase',letterSpacing:1}}>Score</div>
             <div style={{fontSize:18,color:'#ffd600',fontWeight:900,textShadow:'0 0 8px #ffd600'}}>{score.toLocaleString()}</div>
           </div>
-          {/* level + lines */}
           <div style={{display:'flex',gap:6}}>
             <div style={{flex:1,background:'#0d1120',border:'1px solid #1e2a4a',borderRadius:10,padding:'6px 8px'}}>
               <div style={{fontSize:9,color:'#4a6a9a',textTransform:'uppercase',letterSpacing:1}}>Lv</div>
@@ -493,7 +495,6 @@ function TetrisGame({ playerName, onScore }) {
               <div style={{fontSize:16,color:'#00e676',fontWeight:900,textShadow:'0 0 8px #00e676'}}>{lines}</div>
             </div>
           </div>
-          {/* next piece */}
           <div style={{background:'#0d1120',border:'1px solid #1e2a4a',borderRadius:10,padding:'6px 8px'}}>
             <div style={{fontSize:9,color:'#4a6a9a',textTransform:'uppercase',letterSpacing:1,marginBottom:6}}>Next</div>
             <canvas ref={nextCanvRef} width={64} height={64} style={{display:'block',imageRendering:'pixelated',margin:'0 auto'}}/>
@@ -501,211 +502,154 @@ function TetrisGame({ playerName, onScore }) {
         </div>
       </div>
 
-      {/* game over */}
       {gameOver&&(
         <div style={{position:'absolute',inset:0,background:'rgba(5,8,16,0.92)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',zIndex:20}}>
           <div style={{fontSize:28,fontWeight:900,color:'#ff1744',textShadow:'0 0 20px #ff1744',marginBottom:4}}>GAME OVER</div>
           <div style={{fontSize:18,color:'#ffd600',marginBottom:20,textShadow:'0 0 10px #ffd600'}}>{score.toLocaleString()} pts</div>
-          <button onClick={startGame} style={{background:'linear-gradient(180deg,#00e5ff,#0077aa)',border:'none',borderRadius:12,padding:'12px 32px',color:'#fff',fontSize:16,fontWeight:900,cursor:'pointer',boxShadow:'0 0 20px #00e5ff44'}}>▶ PLAY AGAIN</button>
+          <button onClick={startGame} style={{background:'linear-gradient(180deg,#00e5ff,#0077aa)',border:'none',borderRadius:12,padding:'12px 32px',color:'#fff',fontSize:16,fontWeight:900,cursor:'pointer'}}>▶ PLAY AGAIN</button>
         </div>
       )}
-
-      {/* start screen */}
       {!started&&!gameOver&&(
         <div style={{position:'absolute',inset:0,background:'rgba(5,8,16,0.92)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',zIndex:20}}>
           <div style={{fontSize:32,fontWeight:900,color:'#00e5ff',textShadow:'0 0 20px #00e5ff',marginBottom:8,letterSpacing:3}}>TETRIS</div>
           <div style={{fontSize:13,color:'#4a6a9a',marginBottom:24}}>by {playerName}</div>
-          <button onClick={startGame} style={{background:'linear-gradient(180deg,#00e5ff,#0077aa)',border:'none',borderRadius:12,padding:'14px 40px',color:'#fff',fontSize:18,fontWeight:900,cursor:'pointer',boxShadow:'0 0 24px #00e5ff66',letterSpacing:1}}>▶ START</button>
+          <button onClick={startGame} style={{background:'linear-gradient(180deg,#00e5ff,#0077aa)',border:'none',borderRadius:12,padding:'14px 40px',color:'#fff',fontSize:18,fontWeight:900,cursor:'pointer',letterSpacing:1}}>▶ START</button>
         </div>
       )}
 
-      {/* controls */}
       <div style={{display:'flex',gap:8,padding:'8px',background:'#08101e',borderTop:'1px solid #1e2a4a',flexShrink:0}}>
-        <button style={btn('◀','',)} onPointerDown={e=>{e.preventDefault();move(-1);}}>◀</button>
-        <button style={btn('↻','',)} onPointerDown={e=>{e.preventDefault();rot();}}>↻</button>
-        <button style={{...btn('⬇','',)}} onPointerDown={e=>{e.preventDefault();drop();}}>⬇</button>
-        <button style={btn('▶','',)} onPointerDown={e=>{e.preventDefault();move(1);}}>▶</button>
+        <button style={ctrlBtn} onPointerDown={e=>{e.preventDefault();move(-1);}}>◀</button>
+        <button style={ctrlBtn} onPointerDown={e=>{e.preventDefault();rot();}}>↻</button>
+        <button style={ctrlBtn} onPointerDown={e=>{e.preventDefault();drop();}}>⬇</button>
+        <button style={ctrlBtn} onPointerDown={e=>{e.preventDefault();move(1);}}>▶</button>
       </div>
-
     </div>
   );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// CAFÉ RACER
+// CAFÉ RACER — bigger canvas
 // ═══════════════════════════════════════════════════════════════════════════════
 function RacingGame({ playerName, onScore }) {
   const canvasRef = useRef(null);
+  const containerRef = useRef(null);
   const stateRef = useRef(null);
   const rafRef = useRef(null);
   const [score, setScore] = useState(0);
   const [gameOver, setGameOver] = useState(false);
   const [started, setStarted] = useState(false);
-  const W=320, H=480;
-  const GRASS_W=30;
-  const ROAD_X=GRASS_W, ROAD_W=W-GRASS_W*2;
-  const LANES=4;
-  const LANE_W=ROAD_W/LANES;
-  const laneX=(l)=>ROAD_X+l*LANE_W+LANE_W/2;
+  const [collected, setCollected] = useState(0);
+  const [canvasSize, setCanvasSize] = useState({ w: 320, h: 480 });
+
+  useEffect(() => {
+    const update = () => {
+      if (!containerRef.current) return;
+      const w = Math.min(containerRef.current.clientWidth, 380);
+      const h = Math.min(containerRef.current.clientHeight - 80, 560);
+      setCanvasSize({ w, h });
+    };
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+
+  const { w: W, h: H } = canvasSize;
+  const GRASS_W = Math.round(W * 0.09);
+  const ROAD_X = GRASS_W, ROAD_W = W - GRASS_W * 2;
+  const LANES = 4, LANE_W = ROAD_W / LANES;
+  const laneX = (l) => ROAD_X + l * LANE_W + LANE_W / 2;
 
   const CAR_COLORS=['#ff3333','#3399ff','#ffcc00','#44cc44','#cc44ff','#ff8800','#00cccc','#ff66aa'];
+
   const drawCar=(ctx,x,y,color,isPlayer=false)=>{
-    const w=22,h=34;
-    // shadow
-    ctx.fillStyle='rgba(0,0,0,0.3)';
-    ctx.beginPath();ctx.ellipse(x,y+h*0.4,w*0.45,h*0.12,0,0,Math.PI*2);ctx.fill();
-    // body
-    ctx.fillStyle=color;
-    ctx.beginPath();ctx.roundRect(x-w/2,y-h/2,w,h,5);ctx.fill();
-    // windshield
-    ctx.fillStyle='rgba(200,240,255,0.85)';
-    ctx.beginPath();ctx.roundRect(x-w*0.35,y-h*0.38,w*0.7,h*0.22,3);ctx.fill();
-    // rear window
-    ctx.fillStyle='rgba(200,240,255,0.7)';
-    ctx.beginPath();ctx.roundRect(x-w*0.32,y+h*0.12,w*0.64,h*0.18,3);ctx.fill();
-    // wheels
+    const w=Math.round(W*0.07), h=Math.round(H*0.075);
+    ctx.fillStyle='rgba(0,0,0,0.3)';ctx.beginPath();ctx.ellipse(x,y+h*0.4,w*0.45,h*0.12,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle=color;ctx.beginPath();ctx.roundRect(x-w/2,y-h/2,w,h,5);ctx.fill();
+    ctx.fillStyle='rgba(200,240,255,0.85)';ctx.beginPath();ctx.roundRect(x-w*0.35,y-h*0.38,w*0.7,h*0.22,3);ctx.fill();
+    ctx.fillStyle='rgba(200,240,255,0.7)';ctx.beginPath();ctx.roundRect(x-w*0.32,y+h*0.12,w*0.64,h*0.18,3);ctx.fill();
     ctx.fillStyle='#222';
     [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([sx,sy])=>{
       ctx.beginPath();ctx.roundRect(x+sx*(w*0.42)-4,y+sy*(h*0.3)-5,8,10,2);ctx.fill();
       ctx.fillStyle='#555';ctx.beginPath();ctx.roundRect(x+sx*(w*0.42)-2.5,y+sy*(h*0.3)-3.5,5,7,1);ctx.fill();
       ctx.fillStyle='#222';
     });
-    // headlights (player only)
-    if(isPlayer){
-      ctx.fillStyle='#ffffaa';
-      ctx.beginPath();ctx.ellipse(x-w*0.28,y-h*0.46,3,2,0,0,Math.PI*2);ctx.fill();
-      ctx.beginPath();ctx.ellipse(x+w*0.28,y-h*0.46,3,2,0,0,Math.PI*2);ctx.fill();
-    }
-    // roof stripe
-    ctx.fillStyle='rgba(255,255,255,0.25)';
-    ctx.beginPath();ctx.roundRect(x-w*0.15,y-h*0.35,w*0.3,h*0.6,3);ctx.fill();
+    if(isPlayer){ctx.fillStyle='#ffffaa';ctx.beginPath();ctx.ellipse(x-w*0.28,y-h*0.46,3,2,0,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.ellipse(x+w*0.28,y-h*0.46,3,2,0,0,Math.PI*2);ctx.fill();}
   };
 
-  const initState=()=>({
-    car:{lane:1,x:laneX(1),y:H-70},
-    traffic:[],coffees:[],score:0,speed:1.5,lastTime:0,spawnTimer:0,coffeeTimer:0,
-    lineOffset:0, targetX:laneX(1),
-  });
+  const initState=()=>({car:{lane:1,x:laneX(1),y:H-Math.round(H*0.15)},traffic:[],coffees:[],score:0,speed:1.5,lastTime:0,spawnTimer:0,coffeeTimer:0,lineOffset:0,targetX:laneX(1)});
 
   const drawGame=useCallback(()=>{
     const canvas=canvasRef.current;if(!canvas)return;
     const ctx=canvas.getContext('2d');const st=stateRef.current;
-    // grass
     ctx.fillStyle='#2d7a2d';ctx.fillRect(0,0,W,H);
-    // grass texture
-    ctx.fillStyle='#267026';
-    for(let i=0;i<H;i+=12){ctx.fillRect(0,i,GRASS_W,6);ctx.fillRect(W-GRASS_W,i,GRASS_W,6);}
-    // grass edge decoration
-    ctx.fillStyle='#1a5c1a';
-    ctx.fillRect(GRASS_W-4,0,4,H);ctx.fillRect(W-GRASS_W,0,4,H);
-    // road base
+    ctx.fillStyle='#267026';for(let i=0;i<H;i+=12){ctx.fillRect(0,i,GRASS_W,6);ctx.fillRect(W-GRASS_W,i,GRASS_W,6);}
+    ctx.fillStyle='#1a5c1a';ctx.fillRect(GRASS_W-4,0,4,H);ctx.fillRect(W-GRASS_W,0,4,H);
     ctx.fillStyle='#404040';ctx.fillRect(ROAD_X,0,ROAD_W,H);
-    // road texture
-    ctx.fillStyle='#383838';
-    for(let i=0;i<H;i+=20){ctx.fillRect(ROAD_X,i,ROAD_W,10);}
-    // lane dividers (dashed, scrolling)
-    ctx.strokeStyle='#ffffff';ctx.lineWidth=2;ctx.setLineDash([25,18]);
-    ctx.lineDashOffset=-st.lineOffset;
-    for(let l=1;l<LANES;l++){
-      ctx.strokeStyle= l===LANES/2 ? '#ffff00':'#ffffff';
-      ctx.lineWidth= l===LANES/2 ? 3:1.5;
-      ctx.beginPath();ctx.moveTo(ROAD_X+l*LANE_W,0);ctx.lineTo(ROAD_X+l*LANE_W,H);ctx.stroke();
-    }
-    ctx.setLineDash([]);
-    // road edges white line
-    ctx.strokeStyle='#ffffff';ctx.lineWidth=3;ctx.setLineDash([]);
+    ctx.fillStyle='#383838';for(let i=0;i<H;i+=20){ctx.fillRect(ROAD_X,i,ROAD_W,10);}
+    ctx.strokeStyle='#ffffff';ctx.lineWidth=2;ctx.setLineDash([25,18]);ctx.lineDashOffset=-st.lineOffset;
+    for(let l=1;l<LANES;l++){ctx.strokeStyle=l===LANES/2?'#ffff00':'#ffffff';ctx.lineWidth=l===LANES/2?3:1.5;ctx.beginPath();ctx.moveTo(ROAD_X+l*LANE_W,0);ctx.lineTo(ROAD_X+l*LANE_W,H);ctx.stroke();}
+    ctx.setLineDash([]);ctx.strokeStyle='#ffffff';ctx.lineWidth=3;
     ctx.beginPath();ctx.moveTo(ROAD_X,0);ctx.lineTo(ROAD_X,H);ctx.stroke();
     ctx.beginPath();ctx.moveTo(ROAD_X+ROAD_W,0);ctx.lineTo(ROAD_X+ROAD_W,H);ctx.stroke();
-    // traffic cars
     st.traffic.forEach(t=>drawCar(ctx,t.x,t.y,t.color));
-    // coffee collectibles — glowing
     (st.coffees||[]).forEach(c=>{
       const pulse=0.8+0.2*Math.sin(Date.now()/300+c.id);
-      ctx.save();
-      ctx.shadowColor='#ffcc00';ctx.shadowBlur=10*pulse;
-      ctx.font='18px serif';ctx.textAlign='center';ctx.textBaseline='middle';
-      ctx.fillText('☕',c.x,c.y);
-      ctx.restore();
-      // sparkle ring
-      ctx.strokeStyle=`rgba(255,200,0,${0.4*pulse})`;ctx.lineWidth=2;
-      ctx.beginPath();ctx.arc(c.x,c.y,14*pulse,0,Math.PI*2);ctx.stroke();
+      ctx.save();ctx.shadowColor='#ffcc00';ctx.shadowBlur=10*pulse;
+      ctx.font='18px serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('☕',c.x,c.y);ctx.restore();
+      ctx.strokeStyle=`rgba(255,200,0,${0.4*pulse})`;ctx.lineWidth=2;ctx.beginPath();ctx.arc(c.x,c.y,14*pulse,0,Math.PI*2);ctx.stroke();
     });
-    // player car (smooth x)
     st.car.x+=(st.targetX-st.car.x)*0.18;
     drawCar(ctx,st.car.x,st.car.y,'#ff3333',true);
-    // speed overlay
-    ctx.fillStyle='rgba(0,0,0,0.45)';ctx.fillRect(ROAD_X,0,60,32);
-    ctx.fillStyle='#ffff00';ctx.font='bold 12px Arial';ctx.textAlign='left';
-    const spd=Math.floor(80+st.speed*20);
-    ctx.fillText(`${spd}km/h`,ROAD_X+5,20);
-  },[]);
+    ctx.fillStyle='rgba(0,0,0,0.45)';ctx.fillRect(ROAD_X,0,70,36);
+    ctx.fillStyle='#ffff00';ctx.font='bold 13px Arial';ctx.textAlign='left';
+    ctx.fillText(`${Math.floor(80+st.speed*20)}km/h`,ROAD_X+6,22);
+  },[W,H,GRASS_W,ROAD_X,ROAD_W,LANES,LANE_W]);
 
-  const [collected,setCollected]=useState(0);
   const gameLoop=useCallback((ts)=>{
     const st=stateRef.current;if(!st)return;
     const dt=Math.min(ts-st.lastTime,50);st.lastTime=ts;
-    st.lineOffset=(st.lineOffset+st.speed*1.5)%(25+18);
-    st.score+=1;st.speed=1.5+st.score/900;
-    setScore(st.score);
-    // spawn traffic
-    st.spawnTimer+=dt;
-    const interval=Math.max(350,1100-st.score*0.25);
-    if(st.spawnTimer>interval){
-      st.spawnTimer=0;
-      const lane=Math.floor(Math.random()*LANES);
-      const color=CAR_COLORS[Math.floor(Math.random()*CAR_COLORS.length)];
-      st.traffic.push({x:laneX(lane),y:-40,lane,color});
-    }
-    // spawn coffee
+    st.lineOffset=(st.lineOffset+st.speed*1.5)%(43);
+    st.score+=1;st.speed=1.5+st.score/900;setScore(st.score);
+    st.spawnTimer+=dt;const interval=Math.max(350,1100-st.score*0.25);
+    if(st.spawnTimer>interval){st.spawnTimer=0;const lane=Math.floor(Math.random()*LANES);st.traffic.push({x:laneX(lane),y:-40,lane,color:CAR_COLORS[Math.floor(Math.random()*CAR_COLORS.length)]});}
     st.coffeeTimer=(st.coffeeTimer||0)+dt;
-    if(st.coffeeTimer>2200){
-      st.coffeeTimer=0;
-      const lane=Math.floor(Math.random()*LANES);
-      st.coffees=[...(st.coffees||[]),{x:laneX(lane),y:-30,id:Math.random()}];
-    }
+    if(st.coffeeTimer>2200){st.coffeeTimer=0;const lane=Math.floor(Math.random()*LANES);st.coffees=[...(st.coffees||[]),{x:laneX(lane),y:-30,id:Math.random()}];}
     st.traffic=st.traffic.map(t=>({...t,y:t.y+st.speed*2.2})).filter(t=>t.y<H+60);
-    // move & collect coffee
     const c=st.car;
     st.coffees=(st.coffees||[]).map(cf=>({...cf,y:cf.y+st.speed*2.2})).filter(cf=>{
       if(cf.y>H+40)return false;
-      if(Math.abs(cf.x-c.x)<22&&Math.abs(cf.y-c.y)<22){
-        st.score+=50;setScore(st.score);
-        setCollected(n=>n+1);
-        return false;
-      }
+      if(Math.abs(cf.x-c.x)<22&&Math.abs(cf.y-c.y)<22){st.score+=50;setScore(st.score);setCollected(n=>n+1);return false;}
       return true;
     });
-    // collision with traffic
-    const hit=st.traffic.some(t=>Math.abs(t.x-c.x)<20&&Math.abs(t.y-c.y)<32);
+    const cw=Math.round(W*0.07), ch=Math.round(H*0.075);
+    const hit=st.traffic.some(t=>Math.abs(t.x-c.x)<cw*0.9&&Math.abs(t.y-c.y)<ch*0.9);
     if(hit){setGameOver(true);onScore(st.score);return;}
     drawGame();rafRef.current=requestAnimationFrame(gameLoop);
-  },[drawGame,onScore]);
+  },[drawGame,onScore,H,W,LANES,laneX]);
 
-  const startGame=()=>{stateRef.current=initState();setScore(0);setGameOver(false);setStarted(true);rafRef.current=requestAnimationFrame(gameLoop);};
+  const startGame=()=>{stateRef.current=initState();setScore(0);setCollected(0);setGameOver(false);setStarted(true);rafRef.current=requestAnimationFrame(gameLoop);};
   useEffect(()=>()=>{if(rafRef.current)cancelAnimationFrame(rafRef.current);},[]);
 
   const lastMoveRef=useRef(0);
   const moveLeft=()=>{const now=Date.now();if(now-lastMoveRef.current<220)return;lastMoveRef.current=now;const st=stateRef.current;if(!st)return;const nl=Math.max(0,st.car.lane-1);st.car.lane=nl;st.targetX=laneX(nl);};
   const moveRight=()=>{const now=Date.now();if(now-lastMoveRef.current<220)return;lastMoveRef.current=now;const st=stateRef.current;if(!st)return;const nl=Math.min(LANES-1,st.car.lane+1);st.car.lane=nl;st.targetX=laneX(nl);};
 
-  const btnStyle={background:'linear-gradient(180deg,#555,#333)',border:'2px solid #888',color:'#fff',
-    padding:'18px 36px',borderRadius:14,fontSize:26,cursor:'pointer',
-    userSelect:'none',WebkitUserSelect:'none',boxShadow:'0 4px 0 #111',fontFamily:"'Arial Black',Arial,sans-serif"};
+  const btnStyle={background:'linear-gradient(180deg,#555,#333)',border:'2px solid #888',color:'#fff',padding:'18px 36px',borderRadius:14,fontSize:26,cursor:'pointer',userSelect:'none',WebkitUserSelect:'none',boxShadow:'0 4px 0 #111'};
 
   return(
-    <div style={{display:'flex',flexDirection:'column',alignItems:'center',height:'100%',background:'#1a1a1a',overflow:'hidden'}}>
-      <div style={{color:'#d4a853',fontSize:14,fontWeight:'bold',padding:'4px 0'}}>{playerName} — Score: {score} ☕×{collected}</div>
-      <canvas ref={canvasRef} width={W} height={H} style={{maxWidth:'100%',display:'block',flex:1}}/>
-      {!started&&!gameOver&&<button style={{...S.btn(),marginTop:16,width:160}} onClick={startGame}>▶ Start</button>}
+    <div ref={containerRef} style={{display:'flex',flexDirection:'column',alignItems:'center',height:'100%',background:'#1a1a1a',overflow:'hidden'}}>
+      <div style={{color:'#d4a853',fontSize:14,fontWeight:'bold',padding:'4px 0',flexShrink:0}}>{playerName} — Score: {score} ☕×{collected}</div>
+      <canvas ref={canvasRef} width={W} height={H} style={{display:'block',flex:1,maxWidth:'100%'}}/>
+      {!started&&!gameOver&&<button style={{...S.btn(),width:160,flexShrink:0}} onClick={startGame}>▶ Start</button>}
       {gameOver&&(
-        <div style={{textAlign:'center',marginTop:12}}>
+        <div style={{textAlign:'center',flexShrink:0}}>
           <div style={{color:'#ff6b6b',fontSize:20,fontWeight:'bold'}}>CRASH! 💥</div>
           <div style={{color:'#d4a853',marginBottom:8}}>Score: {score}</div>
           <button style={{...S.btn(),width:160}} onClick={startGame}>▶ Again</button>
         </div>
       )}
       {started&&!gameOver&&(
-        <div style={{display:'flex',gap:20,padding:'10px 0'}}>
+        <div style={{display:'flex',gap:20,padding:'8px 0',flexShrink:0}}>
           <button style={btnStyle} onPointerDown={e=>{e.preventDefault();moveLeft();}} onTouchStart={e=>{e.preventDefault();moveLeft();}}>◀</button>
           <button style={btnStyle} onPointerDown={e=>{e.preventDefault();moveRight();}} onTouchStart={e=>{e.preventDefault();moveRight();}}>▶</button>
         </div>
@@ -715,11 +659,7 @@ function RacingGame({ playerName, onScore }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// CAFÉ MYSTERY (social deduction - placeholder shell)
-// ═══════════════════════════════════════════════════════════════════════════════
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// GUESS THE WORD
+// GUESS THE WORD (unchanged from your version)
 // ═══════════════════════════════════════════════════════════════════════════════
 const WORD_LIST = [
   { word:'ESPRESSO', desc:'A strong concentrated coffee shot brewed under pressure', clue:'Type of coffee ☕', category:'Drinks' },
@@ -741,17 +681,15 @@ const WORD_LIST = [
   { word:'SMOOTHIE', desc:'A thick blended drink made from fresh fruits and vegetables', clue:'Blended fruits in a cup 🍓', category:'Drinks' },
   { word:'PANCAKE',  desc:'A flat round cake made from batter and cooked on a griddle', clue:'Flat, round, served with syrup 🥞', category:'Food' },
   { word:'SANDWICH', desc:'Two slices of bread with a filling between them', clue:'Bread with something in the middle 🥪', category:'Food' },
-  { word:'PLAYLIST', desc:'A curated list of songs that play in sequence', clue:'Café background music 🎵', category:'Café' },
-  { word:'COASTER',  desc:'A small mat placed under a cup or glass to protect the table', clue:'Goes under your cup ☕', category:'Café' },
-  { word:'MENU',     desc:'A list of food and drinks available at a restaurant or café', clue:'You read this to order 📋', category:'Café' },
-  { word:'RECEIPT',  desc:'A document you get after paying that shows what you bought', clue:'Proof of purchase 🧾', category:'Café' },
-  { word:'WIFI',     desc:'A wireless networking technology that allows internet connection', clue:'Free in most cafés 📶', category:'Café' },
-  { word:'JOURNAL',  desc:'A book used for writing personal entries or notes daily', clue:'Many café visitors write in one 📓', category:'Café' },
   { word:'CINNAMON', desc:'A spice made from the inner bark of trees, used in baking', clue:'Common spice sprinkled on lattes 🌿', category:'Food' },
   { word:'VANILLA',  desc:'A flavoring derived from orchid plants, used in many desserts', clue:'Popular ice cream flavor 🍦', category:'Food' },
   { word:'CARAMEL',  desc:'A confection made by heating sugar until it browns', clue:'Sweet brown sauce drizzled on drinks 🍯', category:'Food' },
   { word:'ALMOND',   desc:'A tree nut used to make plant-based milk alternative for coffee', clue:'Nut used in non-dairy milk 🌰', category:'Food' },
   { word:'COCONUT',  desc:'A tropical fruit used to make a sweet creamy milk', clue:'Tropical nut with white flesh 🥥', category:'Food' },
+  { word:'WIFI',     desc:'A wireless networking technology that allows internet connection', clue:'Free in most cafés 📶', category:'Café' },
+  { word:'MENU',     desc:'A list of food and drinks available at a restaurant or café', clue:'You read this to order 📋', category:'Café' },
+  { word:'COASTER',  desc:'A small mat placed under a cup or glass to protect the table', clue:'Goes under your cup ☕', category:'Café' },
+  { word:'JOURNAL',  desc:'A book used for writing personal entries or notes daily', clue:'Many café visitors write in one 📓', category:'Café' },
 ];
 
 function GuessWordGame({ playerName, onScore }) {
@@ -759,7 +697,7 @@ function GuessWordGame({ playerName, onScore }) {
   const [guessed, setGuessed] = useState([]);
   const [wrong, setWrong] = useState([]);
   const [showClue, setShowClue] = useState(false);
-  const [result, setResult] = useState(null); // 'win' | 'lose'
+  const [result, setResult] = useState(null);
   const [score, setScore] = useState(0);
   const [streak, setStreak] = useState(0);
   const [round, setRound] = useState(1);
@@ -768,18 +706,9 @@ function GuessWordGame({ playerName, onScore }) {
 
   const pickWord = useCallback((used=[]) => {
     const available = WORD_LIST.filter(w => !used.includes(w.word));
-    if (available.length === 0) {
-      setUsedWords([]); // reset
-      const w = WORD_LIST[Math.floor(Math.random()*WORD_LIST.length)];
-      setWordData(w);
-    } else {
-      const w = available[Math.floor(Math.random()*available.length)];
-      setWordData(w);
-    }
-    setGuessed([]);
-    setWrong([]);
-    setShowClue(false);
-    setResult(null);
+    const list = available.length > 0 ? available : WORD_LIST;
+    const w = list[Math.floor(Math.random()*list.length)];
+    setWordData(w); setGuessed([]); setWrong([]); setShowClue(false); setResult(null);
   }, []);
 
   useEffect(() => { pickWord([]); }, []);
@@ -788,167 +717,99 @@ function GuessWordGame({ playerName, onScore }) {
     if (!wordData || result) return;
     if (guessed.includes(letter) || wrong.includes(letter)) return;
     if (wordData.word.includes(letter)) {
-      const ng = [...guessed, letter];
-      setGuessed(ng);
+      const ng = [...guessed, letter]; setGuessed(ng);
       const won = wordData.word.split('').every(l => ng.includes(l));
       if (won) {
         const pts = (MAX_WRONG - wrong.length) * 20 + (showClue ? 0 : 30) + streak * 10;
-        const ns = score + pts;
-        setScore(ns);
-        setStreak(s => s + 1);
-        setResult('win');
-        onScore(ns);
+        const ns = score + pts; setScore(ns); setStreak(s => s + 1); setResult('win'); onScore(ns);
       }
     } else {
-      const nw = [...wrong, letter];
-      setWrong(nw);
-      if (nw.length >= MAX_WRONG) {
-        setStreak(0);
-        setResult('lose');
-        onScore(score);
-      }
+      const nw = [...wrong, letter]; setWrong(nw);
+      if (nw.length >= MAX_WRONG) { setStreak(0); setResult('lose'); onScore(score); }
     }
   };
 
   const next = () => {
-    const nu = [...usedWords, wordData?.word];
-    setUsedWords(nu);
-    setRound(r => r + 1);
-    pickWord(nu);
+    const nu = [...usedWords, wordData?.word]; setUsedWords(nu); setRound(r => r + 1); pickWord(nu);
   };
 
   if (!wordData) return <div style={{color:'#d4a853',textAlign:'center',padding:40}}>Loading...</div>;
 
-  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
   const word = wordData.word;
   const hpPct = ((MAX_WRONG - wrong.length) / MAX_WRONG) * 100;
   const hpColor = hpPct > 60 ? '#44dd44' : hpPct > 30 ? '#ffcc00' : '#ff4444';
 
-  // hangman drawing
   const HangmanSVG = ({ wrong }) => (
-    <svg width="120" height="110" viewBox="0 0 120 110">
-      {/* gallows */}
+    <svg width="110" height="100" viewBox="0 0 120 110">
       <line x1="10" y1="105" x2="80" y2="105" stroke="#8b5a2b" strokeWidth="3" strokeLinecap="round"/>
       <line x1="30" y1="105" x2="30" y2="10" stroke="#8b5a2b" strokeWidth="3" strokeLinecap="round"/>
       <line x1="30" y1="10" x2="70" y2="10" stroke="#8b5a2b" strokeWidth="3" strokeLinecap="round"/>
       <line x1="70" y1="10" x2="70" y2="22" stroke="#8b5a2b" strokeWidth="2" strokeLinecap="round"/>
-      {/* head */}
-      {wrong>=1 && <circle cx="70" cy="32" r="10" stroke={wrong>=6?"#ff4444":"#d4a853"} strokeWidth="2.5" fill="none"/>}
-      {/* eyes when dead */}
-      {wrong>=6 && <><line x1="65" y1="28" x2="68" y2="31" stroke="#ff4444" strokeWidth="2"/><line x1="68" y1="28" x2="65" y2="31" stroke="#ff4444" strokeWidth="2"/><line x1="72" y1="28" x2="75" y2="31" stroke="#ff4444" strokeWidth="2"/><line x1="75" y1="28" x2="72" y2="31" stroke="#ff4444" strokeWidth="2"/></>}
-      {/* body */}
-      {wrong>=2 && <line x1="70" y1="42" x2="70" y2="72" stroke="#d4a853" strokeWidth="2.5" strokeLinecap="round"/>}
-      {/* left arm */}
-      {wrong>=3 && <line x1="70" y1="50" x2="52" y2="62" stroke="#d4a853" strokeWidth="2.5" strokeLinecap="round"/>}
-      {/* right arm */}
-      {wrong>=4 && <line x1="70" y1="50" x2="88" y2="62" stroke="#d4a853" strokeWidth="2.5" strokeLinecap="round"/>}
-      {/* left leg */}
-      {wrong>=5 && <line x1="70" y1="72" x2="54" y2="90" stroke="#d4a853" strokeWidth="2.5" strokeLinecap="round"/>}
-      {/* right leg */}
-      {wrong>=6 && <line x1="70" y1="72" x2="86" y2="90" stroke="#d4a853" strokeWidth="2.5" strokeLinecap="round"/>}
+      {wrong>=1&&<circle cx="70" cy="32" r="10" stroke={wrong>=6?"#ff4444":"#d4a853"} strokeWidth="2.5" fill="none"/>}
+      {wrong>=6&&<><line x1="65" y1="28" x2="68" y2="31" stroke="#ff4444" strokeWidth="2"/><line x1="68" y1="28" x2="65" y2="31" stroke="#ff4444" strokeWidth="2"/><line x1="72" y1="28" x2="75" y2="31" stroke="#ff4444" strokeWidth="2"/><line x1="75" y1="28" x2="72" y2="31" stroke="#ff4444" strokeWidth="2"/></>}
+      {wrong>=2&&<line x1="70" y1="42" x2="70" y2="72" stroke="#d4a853" strokeWidth="2.5" strokeLinecap="round"/>}
+      {wrong>=3&&<line x1="70" y1="50" x2="52" y2="62" stroke="#d4a853" strokeWidth="2.5" strokeLinecap="round"/>}
+      {wrong>=4&&<line x1="70" y1="50" x2="88" y2="62" stroke="#d4a853" strokeWidth="2.5" strokeLinecap="round"/>}
+      {wrong>=5&&<line x1="70" y1="72" x2="54" y2="90" stroke="#d4a853" strokeWidth="2.5" strokeLinecap="round"/>}
+      {wrong>=6&&<line x1="70" y1="72" x2="86" y2="90" stroke="#d4a853" strokeWidth="2.5" strokeLinecap="round"/>}
     </svg>
   );
 
   return (
     <div style={{height:'100%',background:'#1a0a00',color:'#f5e6d0',display:'flex',flexDirection:'column',fontFamily:"'Georgia',serif",overflowY:'auto'}}>
-
-      {/* top info bar */}
       <div style={{background:'#2a1000',borderBottom:'2px solid #6b3a1f',padding:'8px 14px',display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0}}>
         <div style={{fontSize:12,color:'#a07850'}}>Round <b style={{color:'#d4a853'}}>{round}</b></div>
         <div style={{fontSize:12,color:'#a07850'}}>⭐ <b style={{color:'#d4a853'}}>{score}</b></div>
-        <div style={{fontSize:12,color:'#a07850'}}>🔥 <b style={{color:'#ff8800'}}>{streak}</b> streak</div>
+        <div style={{fontSize:12,color:'#a07850'}}>🔥 <b style={{color:'#ff8800'}}>{streak}</b></div>
         <div style={{fontSize:11,color:'#6b3a1f',background:'#3d1f00',borderRadius:6,padding:'2px 8px'}}>{wordData.category}</div>
       </div>
-
-      <div style={{flex:1,padding:'12px 16px',display:'flex',flexDirection:'column',gap:12}}>
-
-        {/* hangman + lives */}
+      <div style={{flex:1,padding:'12px 16px',display:'flex',flexDirection:'column',gap:10}}>
         <div style={{display:'flex',alignItems:'center',gap:12,background:'#2a1000',borderRadius:14,padding:'10px 14px',border:'1px solid #3d1f00'}}>
           <HangmanSVG wrong={wrong.length}/>
           <div style={{flex:1}}>
             <div style={{fontSize:12,color:'#a07850',marginBottom:4}}>Lives remaining</div>
-            <div style={{height:10,background:'#3d1f00',borderRadius:5,overflow:'hidden',marginBottom:6,border:'1px solid #5a2d00'}}>
+            <div style={{height:10,background:'#3d1f00',borderRadius:5,overflow:'hidden',marginBottom:6}}>
               <div style={{width:`${hpPct}%`,height:'100%',background:hpColor,transition:'width 0.4s',borderRadius:5}}/>
             </div>
             <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
-              {wrong.map(l=>(
-                <span key={l} style={{background:'#5a0000',color:'#ff8888',borderRadius:6,padding:'2px 7px',fontSize:13,fontWeight:'bold'}}>{l}</span>
-              ))}
+              {wrong.map(l=><span key={l} style={{background:'#5a0000',color:'#ff8888',borderRadius:6,padding:'2px 7px',fontSize:13,fontWeight:'bold'}}>{l}</span>)}
               {wrong.length===0&&<span style={{color:'#6b3a1f',fontSize:12}}>No wrong guesses yet!</span>}
             </div>
           </div>
         </div>
-
-        {/* description */}
         <div style={{background:'linear-gradient(135deg,#2a1800,#3d2400)',border:'1px solid #6b3a1f',borderRadius:12,padding:'12px 14px'}}>
           <div style={{fontSize:11,color:'#a07850',marginBottom:4,textTransform:'uppercase',letterSpacing:1}}>Description</div>
           <div style={{fontSize:14,color:'#f5e6d0',lineHeight:1.6}}>{wordData.desc}</div>
         </div>
-
-        {/* clue toggle */}
-        {!showClue ? (
-          <button onClick={()=>setShowClue(true)} style={{background:'transparent',border:'1px dashed #6b3a1f',borderRadius:10,padding:'8px',color:'#a07850',fontSize:13,cursor:'pointer'}}>
-            💡 Show Clue (costs 30 pts bonus)
-          </button>
-        ) : (
-          <div style={{background:'rgba(212,168,83,0.1)',border:'1px solid #d4a853',borderRadius:10,padding:'8px 14px',fontSize:13,color:'#d4a853',textAlign:'center'}}>
-            💡 <b>Clue:</b> {wordData.clue}
-          </div>
-        )}
-
-        {/* word blanks */}
-        <div style={{textAlign:'center',padding:'8px 0'}}>
+        {!showClue
+          ? <button onClick={()=>setShowClue(true)} style={{background:'transparent',border:'1px dashed #6b3a1f',borderRadius:10,padding:'8px',color:'#a07850',fontSize:13,cursor:'pointer'}}>💡 Show Clue (costs 30 pts bonus)</button>
+          : <div style={{background:'rgba(212,168,83,0.1)',border:'1px solid #d4a853',borderRadius:10,padding:'8px 14px',fontSize:13,color:'#d4a853',textAlign:'center'}}>💡 <b>Clue:</b> {wordData.clue}</div>
+        }
+        <div style={{textAlign:'center',padding:'4px 0'}}>
           <div style={{display:'flex',justifyContent:'center',flexWrap:'wrap',gap:6}}>
             {word.split('').map((l,i)=>(
-              <div key={i} style={{
-                width:30,height:38,display:'flex',alignItems:'center',justifyContent:'center',
-                borderBottom:`3px solid ${guessed.includes(l)?'#d4a853':'#6b3a1f'}`,
-                fontSize:20,fontWeight:'bold',
-                color: result==='lose' && !guessed.includes(l) ? '#ff6b6b' : '#d4a853',
-              }}>
-                {guessed.includes(l) ? l : result==='lose' ? l : ''}
+              <div key={i} style={{width:28,height:36,display:'flex',alignItems:'center',justifyContent:'center',borderBottom:`3px solid ${guessed.includes(l)?'#d4a853':'#6b3a1f'}`,fontSize:19,fontWeight:'bold',color:result==='lose'&&!guessed.includes(l)?'#ff6b6b':'#d4a853'}}>
+                {guessed.includes(l)?l:result==='lose'?l:''}
               </div>
             ))}
           </div>
-          <div style={{fontSize:12,color:'#6b3a1f',marginTop:6}}>{word.length} letters</div>
+          <div style={{fontSize:12,color:'#6b3a1f',marginTop:4}}>{word.length} letters</div>
         </div>
-
-        {/* result overlay */}
-        {result && (
-          <div style={{background: result==='win'?'rgba(68,220,68,0.12)':'rgba(255,68,68,0.12)', border:`2px solid ${result==='win'?'#44dd44':'#ff4444'}`, borderRadius:14, padding:'16px', textAlign:'center'}}>
-            <div style={{fontSize:28,marginBottom:4}}>{result==='win'?'🎉':'💀'}</div>
-            <div style={{fontSize:18,fontWeight:'bold',color:result==='win'?'#44dd44':'#ff4444',marginBottom:4}}>
-              {result==='win'?'Correct!':'Game Over!'}
-            </div>
-            {result==='win'&&<div style={{fontSize:13,color:'#d4a853',marginBottom:8}}>+{(MAX_WRONG-wrong.length)*20+(showClue?0:30)+streak*10} points!</div>}
+        {result&&(
+          <div style={{background:result==='win'?'rgba(68,220,68,0.12)':'rgba(255,68,68,0.12)',border:`2px solid ${result==='win'?'#44dd44':'#ff4444'}`,borderRadius:14,padding:'14px',textAlign:'center'}}>
+            <div style={{fontSize:26,marginBottom:4}}>{result==='win'?'🎉':'💀'}</div>
+            <div style={{fontSize:17,fontWeight:'bold',color:result==='win'?'#44dd44':'#ff4444',marginBottom:4}}>{result==='win'?'Correct!':'Game Over!'}</div>
             {result==='lose'&&<div style={{fontSize:13,color:'#f5e6d0',marginBottom:8}}>The word was <b style={{color:'#d4a853'}}>{word}</b></div>}
-            <button onClick={next} style={{background:'#d4a853',border:'none',borderRadius:10,padding:'10px 24px',color:'#1a0a00',fontWeight:'bold',fontSize:14,cursor:'pointer'}}>
-              Next Word →
-            </button>
+            <button onClick={next} style={{background:'#d4a853',border:'none',borderRadius:10,padding:'10px 24px',color:'#1a0a00',fontWeight:'bold',fontSize:14,cursor:'pointer'}}>Next Word →</button>
           </div>
         )}
-
-        {/* keyboard */}
-        {!result && (
+        {!result&&(
           <div style={{paddingBottom:8}}>
             {['QWERTYUIOP','ASDFGHJKL','ZXCVBNM'].map((row,ri)=>(
               <div key={ri} style={{display:'flex',justifyContent:'center',gap:4,marginBottom:4}}>
                 {row.split('').map(l=>{
-                  const isGuessed=guessed.includes(l);
-                  const isWrong=wrong.includes(l);
-                  return(
-                    <button key={l} onClick={()=>guess(l)} disabled={isGuessed||isWrong}
-                      style={{
-                        width:32,height:38,borderRadius:7,border:'none',fontSize:13,fontWeight:'bold',cursor:isGuessed||isWrong?'default':'pointer',
-                        background: isGuessed?'#44aa22': isWrong?'#5a0000':'#3d1f00',
-                        color: isGuessed?'#8bc34a': isWrong?'#ff6666':'#d4a853',
-                        opacity: isGuessed||isWrong?0.7:1,
-                        transition:'all 0.15s',
-                        boxShadow: isGuessed||isWrong?'none':'0 2px 0 #1a0800',
-                      }}>
-                      {l}
-                    </button>
-                  );
+                  const isG=guessed.includes(l),isW=wrong.includes(l);
+                  return(<button key={l} onClick={()=>guess(l)} disabled={isG||isW} style={{width:30,height:36,borderRadius:7,border:'none',fontSize:13,fontWeight:'bold',cursor:isG||isW?'default':'pointer',background:isG?'#44aa22':isW?'#5a0000':'#3d1f00',color:isG?'#8bc34a':isW?'#ff6666':'#d4a853',opacity:isG||isW?0.7:1,boxShadow:isG||isW?'none':'0 2px 0 #1a0800'}}>{l}</button>);
                 })}
               </div>
             ))}
@@ -959,10 +820,6 @@ function GuessWordGame({ playerName, onScore }) {
   );
 }
 
-function CafeMysteryGame({ playerName, onBack }) {
-  return <CafeGame playerName={playerName} onBack={onBack}/>;
-}
-
 // ═══════════════════════════════════════════════════════════════════════════════
 // MAIN GAMES PAGE
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -970,83 +827,72 @@ export default function GamesPage() {
   const [activeGame, setActiveGame] = useState(null);
   const [showLB, setShowLB] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
-  const [username, setUsername] = useState(() => { try { return localStorage.getItem('cafeGameUser') || null; } catch { return null; } });
+  const [username, setUsername] = useState(()=>{try{return localStorage.getItem('cafeGameUser')||null;}catch{return null;}});
   const [showName, setShowName] = useState(false);
   const [pendingGame, setPendingGame] = useState(null);
-  const [playerName, setPlayerName] = useState(() => { try { return localStorage.getItem('cafePlayerName') || ''; } catch { return ''; } });
-  const [localBests, setLocalBests] = useState(() => { try { return JSON.parse(localStorage.getItem('cafeBests') || '{}'); } catch { return {}; } });
-
-  const [tab, setTab] = useState('games');
+  const [playerName, setPlayerName] = useState(()=>{try{return localStorage.getItem('cafePlayerName')||'';}catch{return '';}});
+  const [localBests, setLocalBests] = useState(()=>{try{return JSON.parse(localStorage.getItem('cafeBests')||'{}');}catch{return {};}});
 
   const saveLocal = (gameId, score) => {
     setLocalBests(prev => {
-      const upd = { ...prev, [gameId]: Math.max(prev[gameId] || 0, score) };
-      try { localStorage.setItem('cafeBests', JSON.stringify(upd)); } catch {}
+      const upd = {...prev,[gameId]:Math.max(prev[gameId]||0,score)};
+      try{localStorage.setItem('cafeBests',JSON.stringify(upd));}catch{}
       return upd;
     });
   };
 
   const handleGameSelect = (game) => {
-    if (game.id === 'cafemystery') { setActiveGame(game); return; }
-    if (game.id === 'zombie') { setActiveGame(game); return; }
-    setPendingGame(game);
-    setShowName(true);
+    if (game.id==='cafemystery'||game.id==='zombie'){setActiveGame(game);return;}
+    setPendingGame(game); setShowName(true);
   };
 
   const handleNameStart = (name) => {
-    setPlayerName(name);
-    try { localStorage.setItem('cafePlayerName', name); } catch {}
-    setShowName(false);
-    setActiveGame(pendingGame);
+    setPlayerName(name);try{localStorage.setItem('cafePlayerName',name);}catch{}
+    setShowName(false); setActiveGame(pendingGame);
   };
 
   const handleScore = async (gameId, score) => {
     saveLocal(gameId, score);
-    if (username && score > 0) {
-      try { await saveScore(username, gameId, score); } catch (e) { console.error(e); }
-    }
+    if (username && score > 0) { try{await saveScore(username,gameId,score);}catch(e){console.error(e);} }
   };
 
   const handleAuth = (user) => {
-    setUsername(user);
-    try { localStorage.setItem('cafeGameUser', user); } catch {}
+    setUsername(user);try{localStorage.setItem('cafeGameUser',user);}catch{}
     setShowAuth(false);
   };
 
   const handleLogout = () => {
-    setUsername(null);
-    try { localStorage.removeItem('cafeGameUser'); } catch {}
+    setUsername(null);try{localStorage.removeItem('cafeGameUser');}catch{}
   };
 
-  // ── render active game ──
+  // Active game fullscreen
   if (activeGame) {
-    const isSpecial = activeGame.id === 'cafemystery' || activeGame.id === 'zombie';
     return (
       <div style={S.fullscreen}>
         <div style={S.gameBar}>
-          <button style={S.backBtn} onClick={() => setActiveGame(null)}>← Exit</button>
-          <span style={S.gameTitle}>{activeGame.emoji} {activeGame.title}</span>
-          <button style={S.lbBtn} onClick={() => { setActiveGame(null); setShowLB(true); }}>🏆</button>
+          <button style={S.backBtn} onClick={()=>setActiveGame(null)}>← Exit</button>
+          <span style={S.gameTitle}>{activeGame.title}</span>
+          <button style={S.lbBtn} onClick={()=>{setActiveGame(null);setShowLB(true);}}>🏆</button>
         </div>
         <div style={S.gameContent}>
-          {activeGame.id === 'snake' && <SnakeGame playerName={playerName} onScore={s=>handleScore('snake',s)} />}
-          {activeGame.id === 'tetris' && <TetrisGame playerName={playerName} onScore={s=>handleScore('tetris',s)} />}
-          {activeGame.id === 'racing' && <RacingGame playerName={playerName} onScore={s=>handleScore('racing',s)} />}
-          {activeGame.id === 'zombie' && <ZombieGame playerName={playerName} username={username} onScore={s=>handleScore('zombie',s)} onBack={()=>setActiveGame(null)} />}
-          {activeGame.id === 'guessword' && <GuessWordGame playerName={playerName} onScore={s=>handleScore('guessword',s)} />}
-          {activeGame.id === 'cafemystery' && <CafeMysteryGame playerName={playerName} onBack={()=>setActiveGame(null)} />}
+          {activeGame.id==='snake'       && <SnakeGame      playerName={playerName} onScore={s=>handleScore('snake',s)} />}
+          {activeGame.id==='tetris'      && <TetrisGame     playerName={playerName} onScore={s=>handleScore('tetris',s)} />}
+          {activeGame.id==='racing'      && <RacingGame     playerName={playerName} onScore={s=>handleScore('racing',s)} />}
+          {activeGame.id==='zombie'      && <ZombieGame     playerName={playerName} username={username} onScore={s=>handleScore('zombie',s)} onBack={()=>setActiveGame(null)} />}
+          {activeGame.id==='guessword'   && <GuessWordGame  playerName={playerName} onScore={s=>handleScore('guessword',s)} />}
+          {activeGame.id==='cafemystery' && <CafeGame       playerName={playerName} onBack={()=>setActiveGame(null)} />}
         </div>
       </div>
     );
   }
 
-  // ── main grid ──
   return (
     <div style={S.wrap}>
-      {showAuth && <AuthModal onAuth={handleAuth} onClose={() => setShowAuth(false)} />}
-      {showName && pendingGame && <NameModal gameTitle={`${pendingGame.emoji} ${pendingGame.title}`} username={username} onStart={handleNameStart} onClose={()=>setShowName(false)} />}
-      {showLB && <LeaderboardModal onClose={()=>setShowLB(false)} username={username} />}
+      {showAuth   && <AuthModal onAuth={handleAuth} onClose={()=>setShowAuth(false)} />}
+      {showName && pendingGame && <NameModal gameTitle={pendingGame.title} username={username} onStart={handleNameStart} onClose={()=>setShowName(false)} />}
+      {showLB     && <LeaderboardModal onClose={()=>setShowLB(false)} username={username} />}
 
+      {/* Header */}
       <div style={S.header}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10}}>
           <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
@@ -1063,7 +909,7 @@ export default function GamesPage() {
         <div style={S.sub}>Theonyx Café Arcade</div>
       </div>
 
-      {/* auth bar */}
+      {/* Auth bar */}
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 16px',background:'#2a1000',borderBottom:'1px solid #3d1f00'}}>
         {username ? (
           <>
@@ -1081,18 +927,16 @@ export default function GamesPage() {
         )}
       </div>
 
-      {/* game grid */}
+      {/* Game grid — NO emoji icons, clean brown cards */}
       <div style={S.grid}>
         {GAME_LIST.map(game => (
-          <div key={game.id} style={S.card} onClick={() => handleGameSelect(game)}
-            onMouseEnter={e=>e.currentTarget.style.transform='scale(1.03)'}
-            onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}>
-            <div style={S.cardIcon}>{game.emoji}</div>
+          <div key={game.id} style={S.card}
+            onClick={()=>handleGameSelect(game)}
+            onMouseEnter={e=>{e.currentTarget.style.transform='scale(1.03)';e.currentTarget.style.borderColor='#d4a853';}}
+            onMouseLeave={e=>{e.currentTarget.style.transform='scale(1)';e.currentTarget.style.borderColor='#6b3a1f';}}>
             <div style={S.cardTitle}>{game.title}</div>
             <div style={S.cardSub}>{game.sub}</div>
-            {localBests[game.id] > 0 && (
-              <div style={S.cardBest}>Best: {localBests[game.id]}</div>
-            )}
+            {localBests[game.id]>0 && <div style={S.cardBest}>Best: {localBests[game.id]}</div>}
           </div>
         ))}
       </div>
