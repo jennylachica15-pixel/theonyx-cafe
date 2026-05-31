@@ -197,6 +197,8 @@ function LeaderboardModal({ onClose, username }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 // SNAKE — bigger canvas, fills screen, starts slow
 // ═══════════════════════════════════════════════════════════════════════════════
+const ORB_COLORS = ['#ff4444','#ff8800','#44ff88','#4488ff','#ff44ff','#ffff44','#44ffff','#ff6644','#ff2288','#00ffcc'];
+
 function SnakeGame({ playerName, onScore }) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
@@ -223,16 +225,20 @@ function SnakeGame({ playerName, onScore }) {
   // Joystick ref
   const jsRef = useRef({ cx: 72, cy: 0, r: 55, knobR: 22, kx: 0, ky: 0, active: false, maxDist: 32 });
 
-  // Orbs - generated once
+  // Orbs - regenerate positions based on canvas size
   const orbsRef = useRef(null);
-  if (!orbsRef.current) {
-    const orbColors = ['#ff4444','#ff8800','#44ff88','#4488ff','#ff44ff','#ffff44','#44ffff','#ff6644'];
-    orbsRef.current = Array.from({length:22},(_,i) => ({
-      x: 20 + Math.random()*(320), y: 20 + Math.random()*(480),
+  const orbColors = ORB_COLORS;
+  if (!orbsRef.current || orbsRef.current.length === 0) {
+    orbsRef.current = Array.from({length:30},(_,i) => ({
+      x: 20 + Math.random()*(W-40),
+      y: 20 + Math.random()*(H-40),
       color: orbColors[i % orbColors.length],
-      size: 2.5 + Math.random()*3,
+      size: 2 + Math.random()*3.5,
       phase: Math.random()*Math.PI*2,
-      speed: 0.03 + Math.random()*0.04,
+      speed: 0.02 + Math.random()*0.05,
+      // Each orb drifts slowly
+      vx: (Math.random()-0.5)*0.3,
+      vy: (Math.random()-0.5)*0.3,
     }));
   }
 
@@ -345,7 +351,7 @@ function SnakeGame({ playerName, onScore }) {
       }
       g.snake.unshift(head);
       if (head.x===g.food.x && head.y===g.food.y) {
-        g.score+=10; setScore(g.score); g.food=placeFood(g.snake,COLS,ROWS);
+        g.score+=10; setScore(g.score); g.food=placeFood(g.snake,COLS,ROWS); for(let k=0;k<2;k++) g.snake.push({...g.snake[g.snake.length-1]});
       } else g.snake.pop();
     }, Math.max(90, 220 - Math.floor((stateRef.current?.score||0)/50)*15));
     return () => clearInterval(interval);
@@ -358,44 +364,68 @@ function SnakeGame({ playerName, onScore }) {
     let rafId;
     let fn = 0;
 
-    const draw = () => {
+    // Pre-render hex grid once (huge performance win)
+    const bgCanvas = document.createElement('canvas');
+    bgCanvas.width = W; bgCanvas.height = H;
+    const bgCtx = bgCanvas.getContext('2d');
+    bgCtx.fillStyle='#0d1117'; bgCtx.fillRect(0,0,W,H);
+    const _hs=26, _hh=_hs*Math.sqrt(3);
+    bgCtx.strokeStyle='#1e2530'; bgCtx.lineWidth=0.8;
+    for(let row=-1;row<H/_hh+2;row++){
+      for(let col=-1;col<W/(_hs*1.5)+2;col++){
+        const hcx=col*_hs*1.5, hcy=row*_hh+(col%2)*_hh/2;
+        bgCtx.fillStyle=((row+col)%3===0)?'#13181f':'#0f1419';
+        bgCtx.beginPath();
+        for(let a=0;a<6;a++){
+          const ang=Math.PI/180*(60*a);
+          bgCtx.lineTo(hcx+_hs*0.95*Math.cos(ang), hcy+_hs*0.95*Math.sin(ang));
+        }
+        bgCtx.closePath(); bgCtx.fill(); bgCtx.stroke();
+      }
+    }
+
+        const draw = () => {
       fn++;
       const g = stateRef.current;
       const js = jsRef.current;
       const orbs = orbsRef.current;
-      const t = Date.now()*0.001;
+      // === DRAW PRE-RENDERED HEX BACKGROUND ===
+      ctx.drawImage(bgCanvas, 0, 0);
 
-      // === SLITHER.IO HEX BACKGROUND ===
-      ctx.fillStyle='#0d1117'; ctx.fillRect(0,0,W,H);
-      const hs=26, hh=hs*Math.sqrt(3);
-      ctx.strokeStyle='#1e2530'; ctx.lineWidth=0.8;
-      for(let row=-1;row<H/hh+2;row++){
-        for(let col=-1;col<W/(hs*1.5)+2;col++){
-          const hcx=col*hs*1.5, hcy=row*hh+(col%2)*hh/2;
-          ctx.fillStyle=((row+col)%3===0)?'#13181f':'#0f1419';
-          ctx.beginPath();
-          for(let a=0;a<6;a++){
-            const ang=Math.PI/180*(60*a);
-            const hx=hcx+hs*0.95*Math.cos(ang), hy=hcy+hs*0.95*Math.sin(ang);
-            a===0?ctx.moveTo(hx,hy):ctx.lineTo(hx,hy);
-          }
-          ctx.closePath(); ctx.fill(); ctx.stroke();
-        }
-      }
-
-      // === GLOWING ORBS ===
+      // === GLOWING ORBS — drift around the map ===
       orbs.forEach(o => {
+        // Drift position
+        o.x += o.vx; o.y += o.vy;
+        // Bounce off edges
+        if(o.x < 10 || o.x > W-10) o.vx *= -1;
+        if(o.y < 10 || o.y > H-10) o.vy *= -1;
+        // Check if snake ate this orb
+        if(g && g.snake.length > 0) {
+          const head = g.snake[0];
+          const hx = head.x*CELL+CELL/2, hy = head.y*CELL+CELL/2;
+          if(Math.sqrt((o.x-hx)**2+(o.y-hy)**2) < CELL*0.9) {
+            // Respawn orb at random position, give score bonus
+            o.x = 20+Math.random()*(W-40); o.y = 20+Math.random()*(H-40);
+            o.color = ORB_COLORS[Math.floor(Math.random()*ORB_COLORS.length)];
+            o.vx = (Math.random()-0.5)*0.4; o.vy = (Math.random()-0.5)*0.4;
+            // Grow snake by 3 segments
+            for(let k=0;k<3;k++) g.snake.push({...g.snake[g.snake.length-1]});
+            g.score += 5; setScore(g.score);
+          }
+        }
         const pulse=0.7+0.3*Math.sin(fn*o.speed+o.phase);
         const r=o.size*pulse;
-        ctx.shadowColor=o.color; ctx.shadowBlur=r*3;
-        ctx.fillStyle=o.color; ctx.globalAlpha=0.3*pulse;
-        ctx.beginPath(); ctx.arc(o.x,o.y,r*3,0,Math.PI*2); ctx.fill();
+        // Glow ring
+        ctx.fillStyle=o.color; ctx.globalAlpha=0.18*pulse;
+        ctx.beginPath(); ctx.arc(o.x,o.y,r*3.5,0,Math.PI*2); ctx.fill();
+        ctx.globalAlpha=0.5*pulse;
+        ctx.beginPath(); ctx.arc(o.x,o.y,r*1.8,0,Math.PI*2); ctx.fill();
         ctx.globalAlpha=1;
-        ctx.fillStyle='#fff'; ctx.shadowBlur=r*2;
-        ctx.beginPath(); ctx.arc(o.x,o.y,r*0.55,0,Math.PI*2); ctx.fill();
+        // Core bright
         ctx.fillStyle=o.color;
         ctx.beginPath(); ctx.arc(o.x,o.y,r,0,Math.PI*2); ctx.fill();
-        ctx.shadowBlur=0;
+        ctx.fillStyle='rgba(255,255,255,0.95)';
+        ctx.beginPath(); ctx.arc(o.x,o.y,r*0.35,0,Math.PI*2); ctx.fill();
       });
 
       if (g) {
@@ -411,6 +441,26 @@ function SnakeGame({ playerName, onScore }) {
         ctx.shadowBlur=0;
 
         // === SMOOTH SNAKE ===
+        // Draw snake body as smooth connected path first
+        if(g.snake.length > 1) {
+          // Draw connecting lines between segments for smoothness
+          ctx.save();
+          ctx.lineCap='round'; ctx.lineJoin='round';
+          for(let i=g.snake.length-1;i>0;i--){
+            const s=g.snake[i], s2=g.snake[i-1];
+            const tt=i/g.snake.length;
+            const thick=(CELL*(0.82-tt*0.35))*2;
+            const hue=110-tt*20, light=55-tt*15;
+            ctx.strokeStyle=`hsl(${hue},85%,${light}%)`;
+            ctx.lineWidth=thick;
+            ctx.beginPath();
+            ctx.moveTo(s.x*CELL+CELL/2, s.y*CELL+CELL/2);
+            ctx.lineTo(s2.x*CELL+CELL/2, s2.y*CELL+CELL/2);
+            ctx.stroke();
+          }
+          ctx.restore();
+        }
+        // Draw circles on top for scale effect (no shadowBlur on each)
         g.snake.forEach((s,i) => {
           const px=s.x*CELL+CELL/2, py=s.y*CELL+CELL/2;
           const tt=i/g.snake.length, thick=CELL*(0.82-tt*0.35);
@@ -420,16 +470,10 @@ function SnakeGame({ playerName, onScore }) {
           sg.addColorStop(0.5,`hsl(${hue},85%,${light}%)`);
           sg.addColorStop(1,`hsl(${hue-10},70%,${light-20}%)`);
           ctx.fillStyle=sg;
-          ctx.shadowColor=`hsl(${hue},90%,${light}%)`;
-          ctx.shadowBlur=i===0?14:5*(1-tt);
+          if(i===0){ ctx.shadowColor=`hsl(${hue},90%,${light}%)`; ctx.shadowBlur=12; }
           ctx.beginPath(); ctx.arc(px,py,thick,0,Math.PI*2); ctx.fill();
-          if(i>0&&i%2===0){
-            ctx.strokeStyle=`hsla(${hue-20},60%,${light-10}%,0.25)`;
-            ctx.lineWidth=0.8; ctx.shadowBlur=0;
-            ctx.beginPath(); ctx.arc(px,py,thick*0.7,0,Math.PI*2); ctx.stroke();
-          }
+          ctx.shadowBlur=0;
         });
-        ctx.shadowBlur=0;
 
         // Head details
         if (g.snake.length >= 2) {
