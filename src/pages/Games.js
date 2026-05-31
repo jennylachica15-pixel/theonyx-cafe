@@ -9,10 +9,10 @@ import CafeGame from './CafeGame';
 
 // ─── THEME ───────────────────────────────────────────────────────────────────
 const S = {
-  wrap: { minHeight: '100vh', background: '#1a0a00', color: '#f5e6d0', fontFamily: "'Georgia', serif" },
-  header: { background: 'linear-gradient(135deg, #3d1f00 0%, #6b3a1f 100%)', padding: '20px 16px 12px', textAlign: 'center', borderBottom: '2px solid #8b5a2b' },
-  logo: { fontSize: 28, fontWeight: 'bold', color: '#d4a853', letterSpacing: 2 },
-  sub: { fontSize: 12, color: '#a07850', marginTop: 2 },
+  wrap: { minHeight: '100vh', background: '#0a0400', color: '#f5e6d0', fontFamily: "'Georgia', serif", position:'relative', overflow:'hidden' },
+  header: { position:'relative', zIndex:2, background: 'linear-gradient(180deg, #3d1500 0%, #1a0800 100%)', padding: '20px 16px 14px', textAlign: 'center', borderBottom: '2px solid #8b4a00', overflow:'hidden' },
+  logo: { fontSize: 28, fontWeight: 'bold', letterSpacing: 3, background: 'linear-gradient(180deg, #fff8d0 0%, #ffc200 40%, #ff7700 100%)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', animation:'logoGlow 2s ease-in-out infinite alternate' },
+  sub: { fontSize: 11, color: '#c87a30', marginTop: 4, letterSpacing: 2, textTransform:'uppercase' },
   grid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, padding: 16 },
   // Clean brown card — no emoji icon
   card: {
@@ -25,7 +25,7 @@ const S = {
     cursor: 'pointer',
     transition: 'all 0.2s',
   },
-  cardTitle: { fontSize: 14, fontWeight: 'bold', color: '#d4a853', textTransform: 'uppercase', letterSpacing: 1 },
+  cardTitle: { fontSize: 13, fontWeight: 'bold', letterSpacing: 1, textTransform:'uppercase', background:'linear-gradient(180deg,#fff8d0,#ffc200)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' },
   cardSub: { fontSize: 11, color: '#a07850', marginTop: 6 },
   cardBest: { fontSize: 11, color: '#8bc34a', marginTop: 8, background: 'rgba(139,195,74,0.1)', borderRadius: 8, padding: '2px 8px' },
   // Fullscreen game
@@ -1140,37 +1140,58 @@ export default function GamesPage() {
       {showName && pendingGame && <NameModal gameTitle={pendingGame.title} username={username} onStart={handleNameStart} onClose={()=>setShowName(false)} />}
       {showLB     && <LeaderboardModal onClose={()=>setShowLB(false)} username={username} />}
 
+      {/* Floating ember particles */}
+      <div style={{position:'fixed',inset:0,pointerEvents:'none',zIndex:0,overflow:'hidden'}}>
+        {Array.from({length:20}).map((_,i)=>(
+          <div key={i} style={{
+            position:'absolute',
+            borderRadius:'50%',
+            width: `${2+Math.random()*4}px`,
+            height: `${2+Math.random()*4}px`,
+            left:`${(i*17)%100}%`,
+            background:['#ff8800','#ffcc00','#ff4400','#ffd700','#ff6600'][i%5],
+            boxShadow:`0 0 6px #ff8800`,
+            animation:`floatUp ${3+i*0.4}s linear ${i*0.3}s infinite`,
+            opacity:0,
+          }}/>
+        ))}
+      </div>
+
       {/* Header */}
       <div style={S.header}>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10}}>
-          <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-            <rect x="4" y="8" width="20" height="14" rx="3" fill="#6b3a1f" stroke="#d4a853" strokeWidth="1.5"/>
-            <rect x="7" y="11" width="5" height="4" rx="1" fill="#d4a853"/>
-            <rect x="16" y="11" width="5" height="4" rx="1" fill="#d4a853"/>
-            <rect x="12" y="13" width="4" height="2" rx="1" fill="#d4a853"/>
-            <line x1="9" y1="4" x2="9" y2="8" stroke="#d4a853" strokeWidth="1.5" strokeLinecap="round"/>
-            <line x1="14" y1="3" x2="14" y2="8" stroke="#d4a853" strokeWidth="1.5" strokeLinecap="round"/>
-            <line x1="19" y1="4" x2="19" y2="8" stroke="#d4a853" strokeWidth="1.5" strokeLinecap="round"/>
+        <div style={{position:'absolute',inset:0,background:'radial-gradient(ellipse at 50% 0%, rgba(255,140,0,0.2) 0%, transparent 70%)',pointerEvents:'none'}}/>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:12,position:'relative'}}>
+          <svg width="34" height="34" viewBox="0 0 34 34" fill="none">
+            <rect x="3" y="9" width="28" height="18" rx="4" fill="#6b3a00" stroke="#d4a853" strokeWidth="1.5"/>
+            <rect x="7" y="13" width="6" height="5" rx="1.5" fill="#ffc200"/>
+            <rect x="21" y="13" width="6" height="5" rx="1.5" fill="#ffc200"/>
+            <rect x="15" y="15" width="4" height="3" rx="1" fill="#ffc200"/>
+            <line x1="10" y1="5" x2="10" y2="9" stroke="#ffc200" strokeWidth="1.8" strokeLinecap="round"/>
+            <line x1="17" y1="4" x2="17" y2="9" stroke="#ffc200" strokeWidth="1.8" strokeLinecap="round"/>
+            <line x1="24" y1="5" x2="24" y2="9" stroke="#ffc200" strokeWidth="1.8" strokeLinecap="round"/>
           </svg>
           <span style={S.logo}>GAME CORNER</span>
         </div>
-        <div style={S.sub}>Theonyx Café Arcade</div>
+        <div style={S.sub}>⚔ Theonyx Café Arcade ⚔</div>
       </div>
 
+      {/* Fire line */}
+      <div style={{height:3,background:'linear-gradient(90deg,transparent 0%,#ff4400 20%,#ffcc00 50%,#ff4400 80%,transparent 100%)',boxShadow:'0 0 10px rgba(255,140,0,0.7)',position:'relative',zIndex:2}}/>
+
       {/* Auth bar */}
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 16px',background:'#2a1000',borderBottom:'1px solid #3d1f00'}}>
+      <div style={{position:'relative',zIndex:2,display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 16px',background:'linear-gradient(90deg,#1a0800,#2a1000,#1a0800)',borderBottom:'1px solid #3d1500'}}>
         {username ? (
           <>
             <span style={{color:'#8bc34a',fontSize:13}}>👤 {username}</span>
             <div style={{display:'flex',gap:8}}>
-              <button onClick={()=>setShowLB(true)} style={{background:'#d4a853',border:'none',color:'#1a0a00',padding:'6px 14px',borderRadius:16,fontSize:12,fontWeight:'bold',cursor:'pointer'}}>🏆 Leaderboard</button>
-              <button onClick={handleLogout} style={{background:'#3d1f00',border:'1px solid #6b3a1f',color:'#a07850',padding:'6px 12px',borderRadius:16,fontSize:12,cursor:'pointer'}}>Logout</button>
+              <button onClick={()=>setShowLB(true)} style={{background:'#1a0800',border:'2px solid #d4a853',color:'#ffd700',padding:'6px 14px',borderRadius:16,fontSize:12,fontWeight:'bold',cursor:'pointer',textShadow:'0 0 8px rgba(255,200,0,0.8)'}}>🏆 Leaderboard</button>
+              <button onClick={handleLogout} style={{background:'transparent',border:'1px solid #6b3a1f',color:'#a07850',padding:'6px 12px',borderRadius:16,fontSize:12,cursor:'pointer'}}>Logout</button>
             </div>
           </>
         ) : (
           <>
-            <span style={{color:'#a07850',fontSize:13}}>Sign in to save scores globally</span>
-            <button onClick={()=>setShowAuth(true)} style={{background:'#d4a853',border:'none',color:'#1a0a00',padding:'6px 14px',borderRadius:16,fontSize:12,fontWeight:'bold',cursor:'pointer'}}>Sign In / Register</button>
+            <span style={{color:'#c8a070',fontSize:12}}>Sign in to save scores globally</span>
+            <button onClick={()=>setShowAuth(true)} style={{background:'linear-gradient(180deg,#1a0800,#2c1000)',border:'2px solid #d4a853',color:'#ffd700',padding:'7px 16px',borderRadius:20,fontSize:12,fontWeight:'bold',cursor:'pointer',letterSpacing:'0.5px',textShadow:'0 0 8px rgba(255,200,0,0.8)',boxShadow:'0 0 12px rgba(212,168,83,0.4)'}}>Sign In / Register</button>
           </>
         )}
       </div>
@@ -1180,8 +1201,13 @@ export default function GamesPage() {
         {GAME_LIST.map(game => (
           <div key={game.id} style={S.card}
             onClick={()=>handleGameSelect(game)}
-            onMouseEnter={e=>{e.currentTarget.style.transform='scale(1.03)';e.currentTarget.style.borderColor='#d4a853';}}
-            onMouseLeave={e=>{e.currentTarget.style.transform='scale(1)';e.currentTarget.style.borderColor='#6b3a1f';}}>
+            onMouseEnter={e=>{e.currentTarget.style.transform='scale(1.04) translateY(-2px)';e.currentTarget.style.boxShadow='0 0 20px rgba(255,140,0,0.4), 0 0 40px rgba(255,80,0,0.2)';e.currentTarget.style.borderColor='#d4a853';}}
+            onMouseLeave={e=>{e.currentTarget.style.transform='scale(1)';e.currentTarget.style.boxShadow='none';e.currentTarget.style.borderColor='#6b3a00';}}>
+            {/* Corner brackets */}
+            <div style={{position:'absolute',top:6,left:6,width:14,height:14,borderTop:'1.5px solid rgba(255,160,0,0.6)',borderLeft:'1.5px solid rgba(255,160,0,0.6)'}}/>
+            <div style={{position:'absolute',bottom:6,right:6,width:14,height:14,borderBottom:'1.5px solid rgba(255,160,0,0.6)',borderRight:'1.5px solid rgba(255,160,0,0.6)'}}/>
+            {/* Top glow line */}
+            <div style={{position:'absolute',top:-1,left:'20%',right:'20%',height:2,borderRadius:2,background:'rgba(255,200,0,0.7)',boxShadow:'0 0 8px rgba(255,160,0,0.8)'}}/>
             <div style={S.cardTitle}>{game.title}</div>
             <div style={S.cardSub}>{game.sub}</div>
             {localBests[game.id]>0 && <div style={S.cardBest}>Best: {localBests[game.id]}</div>}
@@ -1190,5 +1216,17 @@ export default function GamesPage() {
       </div>
 
     </div>
+      <style>{`
+        @keyframes logoGlow {
+          from { filter: drop-shadow(0 0 6px #ff8800) drop-shadow(0 0 14px #ff4400); }
+          to   { filter: drop-shadow(0 0 14px #ffcc00) drop-shadow(0 0 28px #ff8800); }
+        }
+        @keyframes floatUp {
+          0%   { transform:translateY(100vh) scale(0); opacity:0; }
+          10%  { opacity:0.8; }
+          90%  { opacity:0.4; }
+          100% { transform:translateY(-40px) scale(1.5); opacity:0; }
+        }
+      \`}</style>
   );
 }
