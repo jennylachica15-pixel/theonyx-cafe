@@ -41,8 +41,7 @@ const MENU_NAMES = ['Latte','Matcha','Americano','Espresso','Cappuccino','Frappe
 const GAME_LIST = [
   { id: 'snake',    emoji: '🐍', title: 'Snake',              sub: 'Collect coffee beans' },
   { id: 'tetris',   emoji: '🟦', title: 'Tetris',             sub: 'Classic stacking' },
-  { id: 'runner',   emoji: '🏃', title: 'Café Runner',        sub: 'Jump the obstacles' },
-  { id: 'spotdiff', emoji: '🔍', title: 'Spot the Difference',sub: 'Find 5 differences' },
+  { id: 'runner',   emoji: '🍄', title: 'Mario Runner',       sub: 'Jump like Mario!' },
   { id: 'racing',   emoji: '🏎️', title: 'Café Racer',         sub: 'Dodge the barriers' },
   { id: 'zombie',   emoji: '🧟', title: 'Zombie Barista',     sub: 'Multiplayer survival' },
   { id: 'cafemystery', emoji: '☕', title: 'Café Mystery',    sub: 'Social deduction' },
@@ -383,169 +382,264 @@ function TetrisGame({ playerName, onScore }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// CAFÉ RUNNER
+// MARIO RUNNER
 // ═══════════════════════════════════════════════════════════════════════════════
 function RunnerGame({ playerName, onScore }) {
   const canvasRef = useRef(null);
   const stateRef = useRef(null);
   const rafRef = useRef(null);
   const [score, setScore] = useState(0);
+  const [lives, setLives] = useState(3);
   const [gameOver, setGameOver] = useState(false);
   const [started, setStarted] = useState(false);
-  const W=320, H=300;
+  const W=320, H=380;
+  const GY=300; // ground y
+
+  // Mario pixel art draw
+  const drawMario = (ctx, x, y, frame) => {
+    const s=18;
+    // shadow
+    ctx.fillStyle='rgba(0,0,0,0.2)';
+    ctx.beginPath();ctx.ellipse(x,y+2,s*0.6,4,0,0,Math.PI*2);ctx.fill();
+    // legs (animated)
+    const legOff = frame%2===0?3:-3;
+    ctx.fillStyle='#c84b00';
+    ctx.fillRect(x-s*0.35,y-s*0.5+legOff,s*0.28,s*0.5);
+    ctx.fillRect(x+s*0.07,y-s*0.5-legOff,s*0.28,s*0.5);
+    // shoes
+    ctx.fillStyle='#5a3010';
+    ctx.fillRect(x-s*0.42,y-s*0.05+legOff,s*0.38,s*0.18);
+    ctx.fillRect(x+s*0.04,y-s*0.05-legOff,s*0.38,s*0.18);
+    // body/overalls
+    ctx.fillStyle='#e52c00';
+    ctx.fillRect(x-s*0.42,y-s*1.1,s*0.84,s*0.6);
+    ctx.fillStyle='#0066cc';
+    ctx.fillRect(x-s*0.32,y-s*1.15,s*0.64,s*0.35);
+    // overall straps
+    ctx.fillStyle='#ffd700';
+    ctx.fillRect(x-s*0.28,y-s*1.1,s*0.12,s*0.05);
+    ctx.fillRect(x+s*0.16,y-s*1.1,s*0.12,s*0.05);
+    // arms
+    ctx.fillStyle='#e52c00';
+    ctx.fillRect(x-s*0.65,y-s*1.05,s*0.26,s*0.38);
+    ctx.fillRect(x+s*0.38,y-s*1.05,s*0.26,s*0.38);
+    // hands
+    ctx.fillStyle='#ffe0b0';
+    ctx.fillRect(x-s*0.65,y-s*0.7,s*0.26,s*0.22);
+    ctx.fillRect(x+s*0.38,y-s*0.7,s*0.26,s*0.22);
+    // head
+    ctx.fillStyle='#ffe0b0';
+    ctx.fillRect(x-s*0.38,y-s*1.8,s*0.76,s*0.65);
+    // hat
+    ctx.fillStyle='#e52c00';
+    ctx.fillRect(x-s*0.5,y-s*2.0,s,s*0.28);
+    ctx.fillRect(x-s*0.28,y-s*2.28,s*0.56,s*0.3);
+    // eyes
+    ctx.fillStyle='#333';
+    ctx.fillRect(x-s*0.2,y-s*1.55,s*0.14,s*0.16);
+    ctx.fillRect(x+s*0.06,y-s*1.55,s*0.14,s*0.16);
+    // mustache
+    ctx.fillStyle='#5a2d00';
+    ctx.fillRect(x-s*0.32,y-s*1.3,s*0.64,s*0.14);
+  };
+
+  const drawGoomba = (ctx, x, y) => {
+    const s=16;
+    ctx.fillStyle='rgba(0,0,0,0.2)';ctx.beginPath();ctx.ellipse(x,y+2,s*0.7,4,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#8b4513';
+    ctx.beginPath();ctx.ellipse(x,y-s*0.3,s*0.7,s*0.55,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#a0522d';
+    ctx.fillRect(x-s*0.6,y-s*0.35,s*0.3,s*0.55);
+    ctx.fillRect(x+s*0.3,y-s*0.35,s*0.3,s*0.55);
+    ctx.fillStyle='#ffe0b0';
+    ctx.beginPath();ctx.ellipse(x,y-s*0.8,s*0.6,s*0.55,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#333';
+    ctx.fillRect(x-s*0.3,y-s*0.95,s*0.2,s*0.22);
+    ctx.fillRect(x+s*0.1,y-s*0.95,s*0.2,s*0.22);
+    ctx.fillStyle='#fff';
+    ctx.fillRect(x-s*0.4,y-s*0.6,s*0.22,s*0.18);
+    ctx.fillRect(x+s*0.18,y-s*0.6,s*0.22,s*0.18);
+  };
+
+  const drawPipe = (ctx, x, y, h) => {
+    const w=42;
+    ctx.fillStyle='#1a8a1a';
+    ctx.fillRect(x-w/2,y-h,w,h);
+    ctx.fillStyle='#22aa22';
+    ctx.fillRect(x-w/2+3,y-h,w-6,h-4);
+    ctx.fillStyle='#0d6b0d';
+    ctx.fillRect(x-w/2-4,y-h-16,w+8,18);
+    ctx.fillStyle='#1a8a1a';
+    ctx.fillRect(x-w/2-4+3,y-h-14,w+8-6,14);
+  };
+
+  const drawCoin = (ctx, x, y, frame) => {
+    const pulse = Math.abs(Math.sin(frame*0.15));
+    ctx.fillStyle='#ffd700';
+    ctx.beginPath();ctx.ellipse(x,y,10*pulse+3,12,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#ffee88';
+    ctx.beginPath();ctx.ellipse(x,y,5*pulse+1,8,0,0,Math.PI*2);ctx.fill();
+  };
+
   const LEVELS=[
-    {bg:'#0a1628',ground:'#1a3a5c',sky:'Deep Ocean',obstacles:['🦑','🐙','🦐']},
-    {bg:'#1a0a00',ground:'#3d1f00',sky:'Café Street',obstacles:['☕','🧁','🍰']},
-    {bg:'#1a2a0a',ground:'#2a4a0a',sky:'Forest',obstacles:['🌳','🌿','🍄']},
-    {bg:'#0a0a2a',ground:'#1a1a4a',sky:'Night Sky',obstacles:['⭐','🌙','💫']},
-    {bg:'#000000',ground:'#1a0a1a',sky:'Space',obstacles:['🪐','☄️','🌠']},
+    {skyTop:'#5c94fc',skyBot:'#5c94fc',ground:'#c84b00',groundTop:'#6ab04c',pipes:true,name:'World 1-1'},
+    {skyTop:'#ff9a3c',skyBot:'#ff6622',ground:'#a04020',groundTop:'#8b6914',pipes:true,name:'World 1-2'},
+    {skyTop:'#1a1a3a',skyBot:'#0a0a2a',ground:'#4040aa',groundTop:'#8080ff',pipes:false,name:'World 1-3 Night'},
+    {skyTop:'#ff4444',skyBot:'#aa0000',ground:'#555',groundTop:'#888',pipes:true,name:'World 1-4 Castle'},
+    {skyTop:'#001133',skyBot:'#003366',ground:'#001a44',groundTop:'#4488ff',pipes:false,name:'World 2-1 Sky'},
   ];
+
   const initState=()=>({
-    player:{x:60,y:220,vy:0,onGround:true},
-    obstacles:[],score:0,speed:3,lastTime:0,spawnTimer:0,level:0,dist:0
+    player:{x:70,y:GY,vy:0,onGround:true,frame:0},
+    obstacles:[],coins:[],score:0,speed:3.2,
+    lastTime:0,spawnTimer:0,coinTimer:0,
+    level:0,dist:0,lives:3,cloudX:[40,140,240],
+    bgX:0,
   });
+
   const drawGame=useCallback(()=>{
-    const canvas=canvasRef.current;if(!canvas)return;const ctx=canvas.getContext('2d');const st=stateRef.current;
+    const canvas=canvasRef.current;if(!canvas)return;
+    const ctx=canvas.getContext('2d');
+    const st=stateRef.current;if(!st)return;
     const lv=LEVELS[st.level];
-    ctx.fillStyle=lv.bg;ctx.fillRect(0,0,W,H);
-    ctx.fillStyle=lv.ground;ctx.fillRect(0,240,W,60);
-    ctx.fillStyle='rgba(255,255,255,0.6)';ctx.font='12px serif';ctx.fillText(`${lv.sky} — Lv ${st.level+1}`,8,20);
-    ctx.font='30px serif';ctx.fillText('🏃',st.player.x,st.player.y);
-    st.obstacles.forEach(o=>{ctx.font='28px serif';ctx.fillText(o.emoji,o.x,o.y);});
+    // sky gradient
+    const grad=ctx.createLinearGradient(0,0,0,H);
+    grad.addColorStop(0,lv.skyTop);grad.addColorStop(1,lv.skyBot);
+    ctx.fillStyle=grad;ctx.fillRect(0,0,W,H);
+    // clouds (day levels)
+    if(st.level<2||st.level===4){
+      st.cloudX.forEach(cx=>{
+        ctx.fillStyle='rgba(255,255,255,0.9)';
+        ctx.beginPath();ctx.ellipse(cx,60,28,18,0,0,Math.PI*2);ctx.fill();
+        ctx.beginPath();ctx.ellipse(cx-20,68,18,14,0,0,Math.PI*2);ctx.fill();
+        ctx.beginPath();ctx.ellipse(cx+20,68,18,14,0,0,Math.PI*2);ctx.fill();
+      });
+    }
+    // stars (night level)
+    if(st.level===2){
+      ctx.fillStyle='#fff';
+      for(let i=0;i<20;i++){
+        const sx=(i*73+st.bgX*0.3)%W;
+        const sy=(i*37)%200;
+        ctx.fillRect(sx,sy,2,2);
+      }
+    }
+    // ground
+    ctx.fillStyle=lv.ground;ctx.fillRect(0,GY+8,W,H-GY-8);
+    ctx.fillStyle=lv.groundTop;ctx.fillRect(0,GY,W,14);
+    // ground bricks
+    ctx.strokeStyle='rgba(0,0,0,0.2)';ctx.lineWidth=1;
+    for(let i=0;i<W;i+=32)ctx.strokeRect(i,GY,32,14);
+    for(let i=0;i<W;i+=32)ctx.strokeRect(i,GY+14,32,14);
+    // coins
+    st.coins.forEach(c=>drawCoin(ctx,c.x,c.y,c.frame||0));
+    // obstacles
+    st.obstacles.forEach(o=>{
+      if(o.type==='pipe') drawPipe(ctx,o.x,GY,o.h);
+      else drawGoomba(ctx,o.x,o.y);
+    });
+    // mario
+    drawMario(ctx,st.player.x,st.player.y,st.player.frame);
+    // HUD bar at top
+    ctx.fillStyle='rgba(0,0,0,0.6)';ctx.fillRect(0,0,W,28);
+    ctx.fillStyle='#fff';ctx.font='bold 12px Arial';ctx.textAlign='left';
+    ctx.fillText(`MARIO`,8,18);
+    ctx.textAlign='center';
+    ctx.fillText(`⭐ ${st.score}`,W/2,18);
+    ctx.fillText(lv.name,W/2,H-8);
+    ctx.textAlign='right';
+    ctx.fillText(`❤️ ${'♥'.repeat(st.lives)}`,W-8,18);
   },[]);
+
   const gameLoop=useCallback((ts)=>{
     const st=stateRef.current;if(!st)return;
     const dt=Math.min(ts-st.lastTime,50);st.lastTime=ts;
-    st.player.vy+=0.6;st.player.y+=st.player.vy;
-    if(st.player.y>=220){st.player.y=220;st.player.vy=0;st.player.onGround=true;}
-    st.dist+=st.speed;st.score=Math.floor(st.dist/10);st.level=Math.min(4,Math.floor(st.score/200));
-    st.speed=3+st.score/150;
+    st.player.frame++;
+    st.bgX+=st.speed;
+    st.cloudX=st.cloudX.map(cx=>(cx-st.speed*0.4+W)%W);
+    // gravity
+    st.player.vy+=0.55;st.player.y+=st.player.vy;
+    if(st.player.y>=GY){st.player.y=GY;st.player.vy=0;st.player.onGround=true;}
+    st.dist+=st.speed;st.score=Math.floor(st.dist/8)+st.coins.filter(c=>c.collected).length*50;
+    st.level=Math.min(4,Math.floor(st.dist/1200));
+    st.speed=3.2+st.dist/2000;
     setScore(st.score);
+    // spawn obstacles
     st.spawnTimer+=dt;
-    if(st.spawnTimer>1000-st.score*0.3){
+    const interval=Math.max(800,2200-st.dist*0.15);
+    if(st.spawnTimer>interval){
       st.spawnTimer=0;
-      const lv=LEVELS[st.level];
-      st.obstacles.push({x:W+20,y:225,emoji:lv.obstacles[Math.floor(Math.random()*lv.obstacles.length)]});
+      const isPipe=LEVELS[st.level].pipes&&Math.random()<0.5;
+      if(isPipe){
+        const h=40+Math.floor(Math.random()*60);
+        st.obstacles.push({type:'pipe',x:W+30,h,w:42});
+      } else {
+        st.obstacles.push({type:'goomba',x:W+20,y:GY,w:28,h:28});
+      }
     }
-    st.obstacles=st.obstacles.map(o=>({...o,x:o.x-st.speed})).filter(o=>o.x>-40);
-    const px=st.player.x+8,py=st.player.y-20;
-    if(st.obstacles.some(o=>Math.abs(o.x+14-px)<22&&Math.abs(o.y-14-py)<20)){
-      setGameOver(true);onScore(st.score);return;
+    // spawn coins
+    st.coinTimer+=dt;
+    if(st.coinTimer>1400){st.coinTimer=0;st.coins.push({x:W+10,y:GY-50-Math.random()*80,frame:0,collected:false});}
+    // move obstacles
+    st.obstacles=st.obstacles.map(o=>({...o,x:o.x-st.speed})).filter(o=>o.x>-60);
+    st.coins=st.coins.map(c=>({...c,x:c.x-st.speed,frame:c.frame+1})).filter(c=>c.x>-30);
+    // collect coins
+    st.coins.forEach(c=>{
+      if(!c.collected&&Math.abs(c.x-st.player.x)<20&&Math.abs(c.y-st.player.y)<28){
+        c.collected=true;st.score+=50;setScore(st.score);
+      }
+    });
+    st.coins=st.coins.filter(c=>!c.collected);
+    // collisions
+    const px=st.player.x, py=st.player.y;
+    const hit=st.obstacles.some(o=>{
+      if(o.type==='pipe') return Math.abs(o.x-px)<26&&py>GY-o.h-10&&py<=GY+5;
+      return Math.abs(o.x-px)<22&&Math.abs(o.y-py)<26;
+    });
+    if(hit){
+      st.lives--;
+      setLives(st.lives);
+      if(st.lives<=0){setGameOver(true);onScore(st.score);return;}
+      // respawn
+      st.player.x=70;st.player.y=GY;st.player.vy=0;
+      st.obstacles=[];
     }
     drawGame();rafRef.current=requestAnimationFrame(gameLoop);
   },[drawGame,onScore]);
-  const startGame=()=>{stateRef.current=initState();setScore(0);setGameOver(false);setStarted(true);rafRef.current=requestAnimationFrame(gameLoop);};
+
+  const startGame=()=>{stateRef.current=initState();setScore(0);setLives(3);setGameOver(false);setStarted(true);rafRef.current=requestAnimationFrame(gameLoop);};
   useEffect(()=>()=>{if(rafRef.current)cancelAnimationFrame(rafRef.current);},[]);
-  const jump=()=>{const st=stateRef.current;if(st&&st.player.onGround){st.player.vy=-12;st.player.onGround=false;}};
-  return(
-    <div style={{display:'flex',flexDirection:'column',alignItems:'center',height:'100%',paddingTop:8}}>
-      <div style={{color:'#d4a853',fontSize:16,fontWeight:'bold',marginBottom:8}}>{playerName} | Score: {score}</div>
-      <canvas ref={canvasRef} width={W} height={H} style={{border:'2px solid #6b3a1f',borderRadius:8,maxWidth:'100%'}}/>
-      {!started&&!gameOver&&<button style={{...S.btn(),marginTop:16,width:160}} onClick={startGame}>▶ Start</button>}
-      {gameOver&&<div style={{textAlign:'center',marginTop:12}}><div style={{color:'#ff6b6b',fontSize:18,fontWeight:'bold'}}>Game Over!</div><div style={{color:'#d4a853',marginBottom:8}}>Score: {score}</div><button style={{...S.btn(),width:160}} onClick={startGame}>▶ Again</button></div>}
-      {started&&!gameOver&&<button style={{background:'#6b3a1f',border:'2px solid #d4a853',color:'#d4a853',padding:'16px 60px',borderRadius:12,fontSize:20,cursor:'pointer',marginTop:16}} onClick={jump}>⬆ JUMP</button>}
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// SPOT THE DIFFERENCE
-// ═══════════════════════════════════════════════════════════════════════════════
-function SpotDiffGame({ playerName, onScore }) {
-  const [score, setScore] = useState(0);
-  const [found, setFound] = useState([]);
-  const [wrong, setWrong] = useState(null);
-  const [timeLeft, setTimeLeft] = useState(90);
-  const [started, setStarted] = useState(false);
-  const [gameOver, setGameOver] = useState(false);
-  const [sceneIdx, setSceneIdx] = useState(0);
-  const timerRef = useRef(null);
-
-  const SCENES = [
-    { title:'☕ The Coffee Bar', w:300, h:220,
-      base: [{type:'rect',x:10,y:180,w:280,h:30,fill:'#6b3a1f'},{type:'rect',x:0,y:140,w:300,h:45,fill:'#3d1f00'},{type:'circle',x:60,y:120,r:30,fill:'#d4a853'},{type:'circle',x:150,y:110,r:25,fill:'#8b4513'},{type:'circle',x:240,y:125,r:28,fill:'#a0522d'},{type:'rect',x:20,y:50,w:60,h:80,fill:'#2a1000'},{type:'rect',x:200,y:60,w:70,h:70,fill:'#2a1000'}],
-      diffs:[{id:0,x:60,y:120,r:30,desc:'Cup color'},{id:1,x:240,y:125,r:28,desc:'Cup size'},{id:2,x:20,y:50,w:60,h:80,desc:'Left window'},{id:3,x:200,y:60,w:70,h:70,desc:'Right window'},{id:4,x:10,y:180,w:280,h:30,desc:'Counter color'}]
-    },
-    { title:'🍰 The Cake Display', w:300, h:220,
-      base:[{type:'rect',x:0,y:160,w:300,h:60,fill:'#5d3010'},{type:'rect',x:20,y:80,w:80,h:85,fill:'#f5e6d0',stroke:'#8b5a2b'},{type:'rect',x:110,y:90,w:80,h:75,fill:'#ffe4b5',stroke:'#8b5a2b'},{type:'rect',x:200,y:85,w:80,h:80,fill:'#ffc0cb',stroke:'#8b5a2b'},{type:'circle',x:60,y:75,r:20,fill:'#ff6b6b'},{type:'circle',x:150,y:65,r:18,fill:'#d4a853'},{type:'circle',x:240,y:70,r:22,fill:'#8bc34a'}],
-      diffs:[{id:0,x:20,y:80,w:80,h:85,desc:'Left cake'},{id:1,x:110,y:90,w:80,h:75,desc:'Middle cake'},{id:2,x:60,y:75,r:20,desc:'Red topping'},{id:3,x:150,y:65,r:18,desc:'Gold topping'},{id:4,x:240,y:70,r:22,desc:'Green topping'}]
-    },
-    { title:'🌿 The Garden Table', w:300, h:220,
-      base:[{type:'rect',x:0,y:0,w:300,h:220,fill:'#0a2a0a'},{type:'ellipse',x:150,y:160,rx:140,ry:30,fill:'#5d3010'},{type:'circle',x:50,y:80,r:35,fill:'#2a6a2a'},{type:'circle',x:150,y:60,r:40,fill:'#1a5a1a'},{type:'circle',x:250,y:75,r:32,fill:'#3a7a3a'},{type:'rect',x:120,y:130,w:60,h:60,fill:'#f5e6d0'},{type:'circle',x:150,y:110,r:15,fill:'#d4a853'}],
-      diffs:[{id:0,x:50,y:80,r:35,desc:'Left plant'},{id:1,x:150,y:60,r:40,desc:'Center plant'},{id:2,x:250,y:75,r:32,desc:'Right plant'},{id:3,x:120,y:130,w:60,h:60,desc:'Table cloth'},{id:4,x:150,y:110,r:15,desc:'Cup'}]
-    },
-  ];
-
-  const scene = SCENES[sceneIdx];
-
-  useEffect(()=>{
-    if(started&&!gameOver){
-      timerRef.current=setInterval(()=>{
-        setTimeLeft(t=>{if(t<=1){clearInterval(timerRef.current);setGameOver(true);onScore(score);return 0;}return t-1;});
-      },1000);
-    }
-    return()=>clearInterval(timerRef.current);
-  },[started,gameOver]);
-
-  const startGame=()=>{setFound([]);setWrong(null);setTimeLeft(90);setScore(0);setStarted(true);setGameOver(false);setSceneIdx(Math.floor(Math.random()*SCENES.length));};
-
-  const tapRight=(id)=>{
-    if(found.includes(id)) return;
-    const nf=[...found,id];setFound(nf);
-    const ns=score+20;setScore(ns);
-    if(nf.length===5){clearInterval(timerRef.current);setGameOver(true);onScore(ns);}
-  };
-  const tapWrong=(x,y)=>{setWrong({x,y});setTimeout(()=>setWrong(null),600);};
-
-  const renderScene=(isDiff)=>(
-    <svg width={scene.w} height={scene.h} style={{border:'1px solid #6b3a1f',borderRadius:8,cursor:'crosshair'}}
-      onClick={(e)=>{
-        if(!isDiff) return;
-        const rect=e.currentTarget.getBoundingClientRect();
-        const sx=e.clientX-rect.left,sy=e.clientY-rect.top;
-        const scaleX=scene.w/rect.width,scaleY=scene.h/rect.height;
-        const cx=sx*scaleX,cy=sy*scaleY;
-        const hit=scene.diffs.find(d=>{
-          if(found.includes(d.id)) return false;
-          if(d.r) return Math.hypot(cx-d.x,cy-d.y)<d.r+10;
-          return cx>=d.x-5&&cx<=d.x+d.w+5&&cy>=d.y-5&&cy<=d.y+d.h+5;
-        });
-        if(hit) tapRight(hit.id);
-        else tapWrong(cx,cy);
-      }}>
-      {scene.base.map((s,i)=>{
-        if(s.type==='rect') return <rect key={i} x={s.x} y={s.y} width={s.w} height={s.h} fill={s.fill} stroke={s.stroke||'none'} strokeWidth={s.stroke?2:0}/>;
-        if(s.type==='circle') return <circle key={i} cx={s.x} cy={s.y} r={s.r} fill={isDiff&&!found.includes(i%5)?'#ff6b6b':s.fill}/>;
-        if(s.type==='ellipse') return <ellipse key={i} cx={s.x} cy={s.y} rx={s.rx} ry={s.ry} fill={s.fill}/>;
-        return null;
-      })}
-      {isDiff&&found.map(id=>{
-        const d=scene.diffs[id];
-        return d.r?<circle key={id} cx={d.x} cy={d.y} r={d.r+4} fill="none" stroke="#8bc34a" strokeWidth={3}/>
-          :<rect key={id} x={d.x-2} y={d.y-2} width={(d.w||0)+4} height={(d.h||0)+4} fill="none" stroke="#8bc34a" strokeWidth={3}/>;
-      })}
-      {isDiff&&wrong&&<>
-        <circle cx={wrong.x} cy={wrong.y} r={15} fill="none" stroke="#ff6b6b" strokeWidth={3}/>
-        <line x1={wrong.x-10} y1={wrong.y-10} x2={wrong.x+10} y2={wrong.y+10} stroke="#ff6b6b" strokeWidth={2}/>
-        <line x1={wrong.x+10} y1={wrong.y-10} x2={wrong.x-10} y2={wrong.y+10} stroke="#ff6b6b" strokeWidth={2}/>
-      </>}
-    </svg>
-  );
+  const jump=()=>{const st=stateRef.current;if(st&&st.player.onGround){st.player.vy=-13;st.player.onGround=false;}};
 
   return(
-    <div style={{display:'flex',flexDirection:'column',alignItems:'center',height:'100%',padding:'8px 8px 0',overflowY:'auto'}}>
-      <div style={{color:'#d4a853',fontSize:15,fontWeight:'bold',marginBottom:4}}>{scene.title}</div>
-      <div style={{display:'flex',gap:12,marginBottom:8,fontSize:13,color:'#a07850'}}>
-        <span>Found: {found.length}/5</span><span>⏱ {timeLeft}s</span><span>Score: {score}</span>
-      </div>
-      {!started&&!gameOver&&<button style={{...S.btn(),width:160,marginTop:40}} onClick={startGame}>▶ Start</button>}
-      {gameOver&&<div style={{textAlign:'center',marginTop:12}}><div style={{color:found.length===5?'#8bc34a':'#ff6b6b',fontSize:18,fontWeight:'bold'}}>{found.length===5?'All Found! 🎉':'Time Up!'}</div><div style={{color:'#d4a853',marginBottom:8}}>Score: {score}</div><button style={{...S.btn(),width:160}} onClick={startGame}>▶ Again</button></div>}
-      {started&&!gameOver&&(
-        <div style={{display:'flex',gap:8,flexWrap:'wrap',justifyContent:'center'}}>
-          {renderScene(false)}{renderScene(true)}
+    <div style={{display:'flex',flexDirection:'column',height:'100%',background:'#1a0a00',overflow:'hidden'}}>
+      <canvas ref={canvasRef} width={W} height={H} style={{width:'100%',flex:1,display:'block',imageRendering:'pixelated'}}/>
+      {!started&&!gameOver&&(
+        <div style={{position:'absolute',top:'40%',left:'50%',transform:'translate(-50%,-50%)',textAlign:'center'}}>
+          <div style={{background:'rgba(0,0,0,0.8)',border:'4px solid #fff',borderRadius:8,padding:'20px 32px',fontFamily:"'Arial Black',Arial,sans-serif"}}>
+            <div style={{fontSize:22,color:'#ffd700',fontWeight:900,marginBottom:4}}>MARIO RUNNER</div>
+            <div style={{fontSize:13,color:'#fff',marginBottom:16}}>Jump pipes & collect coins!</div>
+            <button onClick={startGame} style={{background:'linear-gradient(180deg,#44dd44,#22aa22)',border:'none',borderRadius:8,padding:'12px 28px',color:'#fff',fontSize:16,fontWeight:900,cursor:'pointer',boxShadow:'0 4px 0 #116611',textTransform:'uppercase'}}>▶ START</button>
+          </div>
         </div>
       )}
-      <div style={{fontSize:12,color:'#a07850',marginTop:6}}>Tap differences on the RIGHT image</div>
+      {gameOver&&(
+        <div style={{position:'absolute',top:'40%',left:'50%',transform:'translate(-50%,-50%)',textAlign:'center'}}>
+          <div style={{background:'rgba(0,0,0,0.88)',border:'4px solid #ff4444',borderRadius:8,padding:'20px 32px',fontFamily:"'Arial Black',Arial,sans-serif"}}>
+            <div style={{fontSize:22,color:'#ff4444',fontWeight:900,marginBottom:4}}>GAME OVER</div>
+            <div style={{fontSize:14,color:'#ffd700',marginBottom:16}}>Score: {score}</div>
+            <button onClick={startGame} style={{background:'linear-gradient(180deg,#ff4444,#cc0000)',border:'none',borderRadius:8,padding:'12px 28px',color:'#fff',fontSize:15,fontWeight:900,cursor:'pointer',boxShadow:'0 4px 0 #880000',textTransform:'uppercase'}}>▶ TRY AGAIN</button>
+          </div>
+        </div>
+      )}
+      {started&&!gameOver&&(
+        <button
+          onPointerDown={e=>{e.preventDefault();jump();}}
+          onTouchStart={e=>{e.preventDefault();jump();}}
+          style={{background:'linear-gradient(180deg,#e52c00,#aa1100)',border:'4px solid #ffd700',color:'#ffd700',padding:'18px',fontSize:22,fontWeight:900,cursor:'pointer',fontFamily:"'Arial Black',Arial,sans-serif",letterSpacing:1,boxShadow:'0 5px 0 #880000',flexShrink:0,touchAction:'none',userSelect:'none',WebkitUserSelect:'none'}}>
+          🍄 JUMP
+        </button>
+      )}
     </div>
   );
 }
@@ -809,7 +903,6 @@ export default function GamesPage() {
           {activeGame.id === 'snake' && <SnakeGame playerName={playerName} onScore={s=>handleScore('snake',s)} />}
           {activeGame.id === 'tetris' && <TetrisGame playerName={playerName} onScore={s=>handleScore('tetris',s)} />}
           {activeGame.id === 'runner' && <RunnerGame playerName={playerName} onScore={s=>handleScore('runner',s)} />}
-          {activeGame.id === 'spotdiff' && <SpotDiffGame playerName={playerName} onScore={s=>handleScore('spotdiff',s)} />}
           {activeGame.id === 'racing' && <RacingGame playerName={playerName} onScore={s=>handleScore('racing',s)} />}
           {activeGame.id === 'zombie' && <ZombieGame playerName={playerName} username={username} onScore={s=>handleScore('zombie',s)} onBack={()=>setActiveGame(null)} />}
           {activeGame.id === 'cafemystery' && <CafeMysteryGame playerName={playerName} onBack={()=>setActiveGame(null)} />}
