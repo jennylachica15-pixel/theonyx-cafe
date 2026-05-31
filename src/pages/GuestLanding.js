@@ -216,6 +216,36 @@ export default function GuestLanding() {
             ))}
           </div>
         ))}
+
+        {/* Footer CTA */}
+        <div style={{ background: 'rgba(20,8,0,0.65)', borderRadius: 16, padding: '24px 20px', marginTop: 8, border: '1px solid rgba(212,168,83,0.25)', textAlign: 'center', backdropFilter: 'blur(8px)' }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700, color: '#f0d080', marginBottom: 8 }}>
+            Come Visit Us!
+          </div>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)', lineHeight: 1.8, marginBottom: 16 }}>
+            Whether you're looking for a quiet place to unwind, catch up with friends, or enjoy a great meal — Theonyx Cafe is the perfect spot. We warmly welcome you to visit, sit back, and experience the warm atmosphere we've created just for you.
+          </div>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, justifyContent: 'center', marginBottom: 14 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d4a853" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 2 }}>
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+              <circle cx="12" cy="10" r="3"/>
+            </svg>
+            <div style={{ fontSize: 13, color: '#d4a853', fontWeight: 500, lineHeight: 1.6, textAlign: 'left' }}>
+              52 Carillo Street, Brgy. San Nicolas<br />Bay, Laguna
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center', marginBottom: 18 }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#d4a853" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+            </svg>
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>Open everyday · 10:00 AM – 11:00 PM</div>
+          </div>
+          <a href="https://maps.app.goo.gl/wZTLY5BWJavdjoni6" target="_blank" rel="noreferrer"
+            style={{ display: 'inline-block', padding: '11px 28px', borderRadius: 12, background: '#d4a853', color: '#1a0a00', fontSize: 13, fontWeight: 700, textDecoration: 'none', fontFamily: 'var(--font-display)', letterSpacing: 0.5 }}>
+            Get Directions
+          </a>
+        </div>
+
       </div>
       <div style={{ height: 80 }} />
     </div>
