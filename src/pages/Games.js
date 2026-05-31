@@ -1,863 +1,938 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import CafeGame from './CafeGame';
 
-// ─── THEME ───────────────────────────────────────────────────────────────────
-const C = {
-  bg: '#1a0f0a', card: '#2d1a10', brown: '#6b3a2a', gold: '#c8902a',
-  cream: '#f5e6c8', light: '#e8d5b0', white: '#fff8f0',
-  green: '#4a7c59', red: '#8b2020', blue: '#2a4a8b',
+const T = {
+  bg: '#140800', card: '#2c1a00', cardLight: '#3d2500',
+  gold: '#d4a853', goldLight: '#e8c87a', cream: '#f5e6c8',
+  brown: '#6b3d11', text: '#f0d9b5', dim: '#8a6a3a',
+  danger: '#e05c2a', success: '#5a9a3a',
 };
 
-// ─── SAFE LOCALSTORAGE ───────────────────────────────────────────────────────
-const storage = {
-  get: (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
-  set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+const LS_KEY = 'theonyx_leaderboard';
+const getBoard = () => { try { const d = localStorage.getItem(LS_KEY); return d ? JSON.parse(d) : {}; } catch { return {}; } };
+const saveScore = (game, name, score) => {
+  const board = getBoard();
+  if (!board[game]) board[game] = [];
+  board[game].push({ name, score, date: new Date().toLocaleDateString() });
+  board[game].sort((a, b) => b.score - a.score);
+  board[game] = board[game].slice(0, 10);
+  try { localStorage.setItem(LS_KEY, JSON.stringify(board)); } catch {}
+};
+const getTop = (game) => (getBoard()[game] || []).slice(0, 10);
+
+const S = {
+  wrap: { minHeight: '100vh', background: `linear-gradient(160deg,#140800 0%,#2c1400 60%,#1a0a00 100%)`, color: T.text, fontFamily: 'Georgia,serif', paddingBottom: 20 },
+  header: { textAlign: 'center', padding: '20px 16px 6px', borderBottom: `1px solid ${T.brown}33` },
+  title: { fontSize: 22, fontWeight: 'bold', color: T.gold, letterSpacing: 3, textTransform: 'uppercase', margin: 0 },
+  sub: { fontSize: 11, color: T.dim, letterSpacing: 2, marginTop: 3 },
+  gameGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, padding: 14 },
+  card: () => ({ background: '#261200', border: `1.5px solid ${T.brown}88`, borderRadius: 14, padding: '16px 10px', textAlign: 'center', cursor: 'pointer', transition: 'all 0.18s' }),
+  fullscreen: { position: 'fixed', inset: 0, zIndex: 400, background: `linear-gradient(160deg,#140800 0%,#2c1400 60%,#1a0a00 100%)`, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
+  fsHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'rgba(10,4,0,0.85)', borderBottom: `1px solid ${T.brown}55`, flexShrink: 0 },
+  backBtn: { display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(212,168,83,0.12)', border: `1px solid ${T.gold}44`, borderRadius: 10, color: T.gold, fontSize: 13, fontWeight: 'bold', padding: '7px 14px', cursor: 'pointer' },
+  fsTitle: { fontSize: 13, fontWeight: 'bold', color: T.gold, letterSpacing: 2, textTransform: 'uppercase' },
+  fsContent: { flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' },
+  gameBar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 14px', background: '#1e0e00', borderBottom: `1px solid ${T.brown}44`, flexShrink: 0 },
+  score: { fontSize: 13, color: T.gold, fontWeight: 'bold' },
+  btn: (bg = T.gold) => ({ background: bg, color: bg === T.gold ? '#1a0800' : T.gold, border: `1px solid ${T.gold}44`, borderRadius: 8, padding: '7px 14px', fontSize: 12, fontWeight: 'bold', cursor: 'pointer' }),
+  padBtn: { background: '#2c1400', border: `1px solid ${T.brown}`, color: T.gold, borderRadius: 8, padding: '14px 0', fontSize: 18, cursor: 'pointer', textAlign: 'center', userSelect: 'none' },
+  overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.82)', zIndex: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 },
+  modal: { background: '#1e0e00', border: `1.5px solid ${T.gold}55`, borderRadius: 20, padding: '28px 24px', width: '100%', maxWidth: 340, textAlign: 'center' },
+  input: { width: '100%', padding: '11px 14px', borderRadius: 10, border: `1px solid ${T.gold}44`, fontSize: 14, background: 'rgba(255,255,255,0.06)', color: T.cream, outline: 'none', boxSizing: 'border-box', marginBottom: 10, textAlign: 'center', fontFamily: 'Georgia,serif' },
+  lbTab: (active) => ({ flex: 1, padding: '8px 4px', textAlign: 'center', fontSize: 10, fontWeight: active ? 'bold' : 'normal', color: active ? T.gold : T.dim, borderBottom: `2px solid ${active ? T.gold : 'transparent'}`, cursor: 'pointer', letterSpacing: 0.5, textTransform: 'uppercase' }),
+  row: (i) => ({ display: 'flex', alignItems: 'center', padding: '8px 14px', background: i % 2 === 0 ? '#1e0e00' : '#261200', borderBottom: `1px solid ${T.brown}22` }),
+  medal: ['🥇', '🥈', '🥉'],
 };
 
-// ─── SPOT THE DIFFERENCE SCENES ──────────────────────────────────────────────
-// Each scene: id, title, differences array [{x,y,r,label}]
-const SPOT_SCENES = [
-  {
-    id: 'morning',
-    title: '☀️ Morning Rush',
-    drawLeft: (ctx, w, h) => {
-      // Background
-      ctx.fillStyle = '#f5e6c8'; ctx.fillRect(0, 0, w, h);
-      // Sky window
-      ctx.fillStyle = '#87CEEB'; ctx.fillRect(10, 10, w - 20, 80);
-      // Counter
-      ctx.fillStyle = '#8B4513'; ctx.fillRect(0, h - 80, w, 80);
-      ctx.fillStyle = '#6b3a2a'; ctx.fillRect(0, h - 85, w, 8);
-      // Coffee machine
-      ctx.fillStyle = '#333'; ctx.fillRect(30, h - 160, 60, 80);
-      ctx.fillStyle = '#c00'; ctx.beginPath(); ctx.arc(60, h - 130, 8, 0, Math.PI * 2); ctx.fill();
-      // Cups on counter
-      ctx.fillStyle = '#fff'; ctx.fillRect(120, h - 110, 25, 30); // cup1
-      ctx.fillStyle = '#6b3000'; ctx.fillRect(123, h - 108, 19, 15); // coffee
-      ctx.fillStyle = '#fff'; ctx.fillRect(160, h - 110, 25, 30); // cup2
-      ctx.fillStyle = '#4a7c59'; ctx.fillRect(163, h - 108, 19, 15); // matcha
-      // Clock
-      ctx.strokeStyle = '#333'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(w - 40, 60, 25, 0, Math.PI * 2); ctx.stroke();
-      ctx.fillStyle = '#333';
-      ctx.beginPath(); ctx.moveTo(w - 40, 60); ctx.lineTo(w - 40, 42); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(w - 40, 60); ctx.lineTo(w - 26, 60); ctx.stroke();
-      // Chalkboard menu
-      ctx.fillStyle = '#2d5a27'; ctx.fillRect(w - 100, h - 200, 90, 110);
-      ctx.fillStyle = '#fff'; ctx.font = '10px monospace';
-      ctx.fillText('MENU', w - 88, h - 185);
-      ctx.fillText('Latte $4', w - 92, h - 170);
-      ctx.fillText('Matcha $5', w - 92, h - 155);
-      ctx.fillText('Espresso $3', w - 92, h - 140);
-      // Plant
-      ctx.fillStyle = '#4a7c59';
-      ctx.beginPath(); ctx.arc(w - 160, h - 130, 20, Math.PI, 0); ctx.fill();
-      ctx.beginPath(); ctx.arc(w - 145, h - 148, 15, Math.PI, 0); ctx.fill();
-      ctx.fillStyle = '#6b3a2a'; ctx.fillRect(w - 168, h - 112, 16, 32);
-    },
-    drawRight: (ctx, w, h) => {
-      // Same but with differences
-      ctx.fillStyle = '#f5e6c8'; ctx.fillRect(0, 0, w, h);
-      ctx.fillStyle = '#87CEEB'; ctx.fillRect(10, 10, w - 20, 80);
-      ctx.fillStyle = '#8B4513'; ctx.fillRect(0, h - 80, w, 80);
-      ctx.fillStyle = '#6b3a2a'; ctx.fillRect(0, h - 85, w, 8);
-      // Coffee machine — DIFF1: machine is blue instead of #333
-      ctx.fillStyle = '#2244aa'; ctx.fillRect(30, h - 160, 60, 80);
-      ctx.fillStyle = '#c00'; ctx.beginPath(); ctx.arc(60, h - 130, 8, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#fff'; ctx.fillRect(120, h - 110, 25, 30);
-      ctx.fillStyle = '#6b3000'; ctx.fillRect(123, h - 108, 19, 15);
-      // DIFF2: second cup missing
-      // Clock — DIFF3: clock hands point differently
-      ctx.strokeStyle = '#333'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(w - 40, 60, 25, 0, Math.PI * 2); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(w - 40, 60); ctx.lineTo(w - 40, 42); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(w - 40, 60); ctx.lineTo(w - 40, 76); ctx.stroke(); // down not right
-      // DIFF4: Chalkboard is brown
-      ctx.fillStyle = '#6b3a2a'; ctx.fillRect(w - 100, h - 200, 90, 110);
-      ctx.fillStyle = '#fff'; ctx.font = '10px monospace';
-      ctx.fillText('MENU', w - 88, h - 185);
-      ctx.fillText('Latte $4', w - 92, h - 170);
-      ctx.fillText('Matcha $5', w - 92, h - 155);
-      ctx.fillText('Espresso $3', w - 92, h - 140);
-      // DIFF5: Plant is red/flower
-      ctx.fillStyle = '#cc3333';
-      ctx.beginPath(); ctx.arc(w - 160, h - 130, 20, Math.PI, 0); ctx.fill();
-      ctx.beginPath(); ctx.arc(w - 145, h - 148, 15, Math.PI, 0); ctx.fill();
-      ctx.fillStyle = '#6b3a2a'; ctx.fillRect(w - 168, h - 112, 16, 32);
-    },
-    diffs: [
-      { x: 0.18, y: 0.52, r: 0.07, label: 'Machine color' },
-      { x: 0.55, y: 0.65, r: 0.06, label: 'Missing cup' },
-      { x: 0.87, y: 0.2, r: 0.06, label: 'Clock hands' },
-      { x: 0.75, y: 0.45, r: 0.09, label: 'Chalkboard color' },
-      { x: 0.68, y: 0.58, r: 0.07, label: 'Plant color' },
-    ],
-  },
-  {
-    id: 'afternoon',
-    title: '🌤 Afternoon Café',
-    drawLeft: (ctx, w, h) => {
-      ctx.fillStyle = '#fde8c8'; ctx.fillRect(0, 0, w, h);
-      // Table
-      ctx.fillStyle = '#c8a060'; ctx.fillRect(20, h * 0.55, w - 40, 15);
-      ctx.fillStyle = '#a07840'; ctx.fillRect(40, h * 0.55 + 15, 12, h * 0.35);
-      ctx.fillStyle = '#a07840'; ctx.fillRect(w - 52, h * 0.55 + 15, 12, h * 0.35);
-      // Coffee cup on table
-      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(w * 0.3, h * 0.4); ctx.lineTo(w * 0.3 + 5, h * 0.55); ctx.lineTo(w * 0.5 - 5, h * 0.55); ctx.lineTo(w * 0.5, h * 0.4); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = '#5c2d00'; ctx.fillRect(w * 0.32, h * 0.42, w * 0.16, h * 0.08);
-      ctx.strokeStyle = '#ddd'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(w * 0.5 + 10, h * 0.49, 8, 0.5, 2.6); ctx.stroke();
-      // Book
-      ctx.fillStyle = '#c8401a'; ctx.fillRect(w * 0.55, h * 0.38, 50, 65);
-      ctx.fillStyle = '#b03010'; ctx.fillRect(w * 0.55, h * 0.38, 6, 65);
-      ctx.fillStyle = '#fff'; ctx.font = '8px monospace';
-      ctx.fillText('CAFE', w * 0.56 + 8, h * 0.38 + 25);
-      ctx.fillText('STORY', w * 0.56 + 6, h * 0.38 + 38);
-      // Window with sunshine
-      ctx.fillStyle = '#87CEEB'; ctx.fillRect(10, 10, w * 0.4, 90);
-      ctx.fillStyle = '#FFD700'; ctx.beginPath(); ctx.arc(50, 55, 20, 0, Math.PI * 2); ctx.fill();
-      // Flower vase
-      ctx.fillStyle = '#6b8baa'; ctx.beginPath();
-      ctx.moveTo(w * 0.78, h * 0.55); ctx.lineTo(w * 0.72, h * 0.3); ctx.lineTo(w * 0.84, h * 0.3); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = '#ff69b4'; ctx.beginPath(); ctx.arc(w * 0.78, h * 0.26, 12, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#ff9999'; ctx.beginPath(); ctx.arc(w * 0.71, h * 0.3, 8, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#ff9999'; ctx.beginPath(); ctx.arc(w * 0.85, h * 0.3, 8, 0, Math.PI * 2); ctx.fill();
-    },
-    drawRight: (ctx, w, h) => {
-      ctx.fillStyle = '#fde8c8'; ctx.fillRect(0, 0, w, h);
-      ctx.fillStyle = '#c8a060'; ctx.fillRect(20, h * 0.55, w - 40, 15);
-      ctx.fillStyle = '#a07840'; ctx.fillRect(40, h * 0.55 + 15, 12, h * 0.35);
-      ctx.fillStyle = '#a07840'; ctx.fillRect(w - 52, h * 0.55 + 15, 12, h * 0.35);
-      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(w * 0.3, h * 0.4); ctx.lineTo(w * 0.3 + 5, h * 0.55); ctx.lineTo(w * 0.5 - 5, h * 0.55); ctx.lineTo(w * 0.5, h * 0.4); ctx.closePath(); ctx.fill();
-      // DIFF1: coffee is green (matcha)
-      ctx.fillStyle = '#4a7c3a'; ctx.fillRect(w * 0.32, h * 0.42, w * 0.16, h * 0.08);
-      ctx.strokeStyle = '#ddd'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(w * 0.5 + 10, h * 0.49, 8, 0.5, 2.6); ctx.stroke();
-      // DIFF2: book is blue
-      ctx.fillStyle = '#1a4488'; ctx.fillRect(w * 0.55, h * 0.38, 50, 65);
-      ctx.fillStyle = '#0a2468'; ctx.fillRect(w * 0.55, h * 0.38, 6, 65);
-      ctx.fillStyle = '#fff'; ctx.font = '8px monospace';
-      ctx.fillText('CAFE', w * 0.56 + 8, h * 0.38 + 25);
-      ctx.fillText('STORY', w * 0.56 + 6, h * 0.38 + 38);
-      // Window with sunshine — DIFF3: no sun
-      ctx.fillStyle = '#87CEEB'; ctx.fillRect(10, 10, w * 0.4, 90);
-      // Flower vase — DIFF4: vase is red
-      ctx.fillStyle = '#aa3a2a'; ctx.beginPath();
-      ctx.moveTo(w * 0.78, h * 0.55); ctx.lineTo(w * 0.72, h * 0.3); ctx.lineTo(w * 0.84, h * 0.3); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = '#ff69b4'; ctx.beginPath(); ctx.arc(w * 0.78, h * 0.26, 12, 0, Math.PI * 2); ctx.fill();
-      // DIFF5: only 1 side flower, not 2
-      ctx.fillStyle = '#ff9999'; ctx.beginPath(); ctx.arc(w * 0.71, h * 0.3, 8, 0, Math.PI * 2); ctx.fill();
-    },
-    diffs: [
-      { x: 0.4, y: 0.46, r: 0.07, label: 'Coffee color' },
-      { x: 0.65, y: 0.55, r: 0.08, label: 'Book color' },
-      { x: 0.16, y: 0.3, r: 0.08, label: 'Missing sun' },
-      { x: 0.78, y: 0.44, r: 0.07, label: 'Vase color' },
-      { x: 0.88, y: 0.3, r: 0.06, label: 'Missing flower' },
-    ],
-  },
-  {
-    id: 'evening',
-    title: '🌙 Evening Closing',
-    drawLeft: (ctx, w, h) => {
-      // Night scene
-      ctx.fillStyle = '#1a1a3a'; ctx.fillRect(0, 0, w, h);
-      // Moon
-      ctx.fillStyle = '#fffabb'; ctx.beginPath(); ctx.arc(w - 50, 50, 22, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#1a1a3a'; ctx.beginPath(); ctx.arc(w - 40, 44, 18, 0, Math.PI * 2); ctx.fill();
-      // Stars
-      [[30, 30], [80, 20], [120, 45], [60, 70], [150, 25]].forEach(([x, y]) => {
-        ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x, y, 2, 0, Math.PI * 2); ctx.fill();
-      });
-      // Café storefront
-      ctx.fillStyle = '#3d1a08'; ctx.fillRect(20, h * 0.25, w - 40, h * 0.65);
-      // Sign
-      ctx.fillStyle = '#c8902a'; ctx.fillRect(40, h * 0.2, w - 80, 40);
-      ctx.fillStyle = '#1a0f0a'; ctx.font = 'bold 14px serif'; ctx.textAlign = 'center';
-      ctx.fillText('THEONYX CAFÉ', w / 2, h * 0.2 + 26);
-      ctx.textAlign = 'left';
-      // Windows lit up
-      ctx.fillStyle = '#ffe090'; ctx.fillRect(50, h * 0.35, 50, 50);
-      ctx.fillStyle = '#ffe090'; ctx.fillRect(w - 100, h * 0.35, 50, 50);
-      // Door
-      ctx.fillStyle = '#6b3a2a'; ctx.fillRect(w / 2 - 20, h * 0.6, 40, 70);
-      ctx.fillStyle = '#c8902a'; ctx.beginPath(); ctx.arc(w / 2 + 10, h * 0.6 + 38, 3, 0, Math.PI * 2); ctx.fill();
-      // Chairs outside
-      ctx.fillStyle = '#5c2d00'; ctx.fillRect(30, h * 0.72, 30, 4); // seat
-      ctx.fillStyle = '#5c2d00'; ctx.fillRect(32, h * 0.72 + 4, 4, 20); // leg L
-      ctx.fillStyle = '#5c2d00'; ctx.fillRect(52, h * 0.72 + 4, 4, 20); // leg R
-      ctx.fillStyle = '#5c2d00'; ctx.fillRect(w - 60, h * 0.72, 30, 4);
-      ctx.fillStyle = '#5c2d00'; ctx.fillRect(w - 58, h * 0.72 + 4, 4, 20);
-      ctx.fillStyle = '#5c2d00'; ctx.fillRect(w - 38, h * 0.72 + 4, 4, 20);
-      // Closed sign
-      ctx.fillStyle = '#aa1111'; ctx.fillRect(w / 2 - 30, h * 0.38, 60, 24);
-      ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.textAlign = 'center';
-      ctx.fillText('CLOSED', w / 2, h * 0.38 + 16);
-      ctx.textAlign = 'left';
-    },
-    drawRight: (ctx, w, h) => {
-      ctx.fillStyle = '#1a1a3a'; ctx.fillRect(0, 0, w, h);
-      // DIFF1: full moon (no crescent)
-      ctx.fillStyle = '#fffabb'; ctx.beginPath(); ctx.arc(w - 50, 50, 22, 0, Math.PI * 2); ctx.fill();
-      // Stars — DIFF2: fewer stars (3 instead of 5)
-      [[30, 30], [80, 20], [150, 25]].forEach(([x, y]) => {
-        ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x, y, 2, 0, Math.PI * 2); ctx.fill();
-      });
-      ctx.fillStyle = '#3d1a08'; ctx.fillRect(20, h * 0.25, w - 40, h * 0.65);
-      ctx.fillStyle = '#c8902a'; ctx.fillRect(40, h * 0.2, w - 80, 40);
-      ctx.fillStyle = '#1a0f0a'; ctx.font = 'bold 14px serif'; ctx.textAlign = 'center';
-      ctx.fillText('THEONYX CAFÉ', w / 2, h * 0.2 + 26);
-      ctx.textAlign = 'left';
-      ctx.fillStyle = '#ffe090'; ctx.fillRect(50, h * 0.35, 50, 50);
-      // DIFF3: right window is dark
-      ctx.fillStyle = '#2a1a08'; ctx.fillRect(w - 100, h * 0.35, 50, 50);
-      ctx.fillStyle = '#6b3a2a'; ctx.fillRect(w / 2 - 20, h * 0.6, 40, 70);
-      ctx.fillStyle = '#c8902a'; ctx.beginPath(); ctx.arc(w / 2 + 10, h * 0.6 + 38, 3, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#5c2d00'; ctx.fillRect(30, h * 0.72, 30, 4);
-      ctx.fillStyle = '#5c2d00'; ctx.fillRect(32, h * 0.72 + 4, 4, 20);
-      ctx.fillStyle = '#5c2d00'; ctx.fillRect(52, h * 0.72 + 4, 4, 20);
-      // DIFF4: right chair missing
-      // DIFF5: Open sign (not Closed)
-      ctx.fillStyle = '#11aa44'; ctx.fillRect(w / 2 - 30, h * 0.38, 60, 24);
-      ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.textAlign = 'center';
-      ctx.fillText('OPEN!', w / 2, h * 0.38 + 16);
-      ctx.textAlign = 'left';
-    },
-    diffs: [
-      { x: 0.86, y: 0.15, r: 0.07, label: 'Full moon' },
-      { x: 0.35, y: 0.15, r: 0.1, label: 'Fewer stars' },
-      { x: 0.82, y: 0.4, r: 0.08, label: 'Dark window' },
-      { x: 0.88, y: 0.74, r: 0.08, label: 'Missing chair' },
-      { x: 0.5, y: 0.41, r: 0.09, label: 'Sign changed' },
-    ],
-  },
-];
+// ─── MENU SUGGESTIONS ─────────────────────────────────────────────
+const MENU_SUGGESTIONS = ['Latte','Matcha','Americano','Espresso','Cappuccino','Frappe','Dirty Matcha','Milk Tea','Mocha','Caramel'];
 
-// ─── GAMES METADATA ──────────────────────────────────────────────────────────
-const GAME_LIST = [
-  { id: 'snake', label: 'Snake', icon: '🐍', desc: 'Collect coffee beans!' },
-  { id: 'tetris', label: 'Tetris', icon: '🟦', desc: 'Stack the blocks!' },
-  { id: 'runner', label: 'Café Runner', icon: '🏃', desc: 'Ocean to the Sun!' },
-  { id: 'spot', label: 'Spot It', icon: '🔍', desc: 'Find 5 differences!' },
-];
-
-const MENU_NAMES = ['Latte', 'Matcha', 'Americano', 'Espresso', 'Cappuccino', 'Frappe', 'Mocha', 'Barista'];
-
-// ─── LEADERBOARD ─────────────────────────────────────────────────────────────
-function getScores(gameId) { return storage.get(`scores_${gameId}`, []); }
-function addScore(gameId, name, score) {
-  const scores = getScores(gameId);
-  scores.push({ name, score, date: new Date().toLocaleDateString() });
-  scores.sort((a, b) => b.score - a.score);
-  storage.set(`scores_${gameId}`, scores.slice(0, 10));
-}
-
-// ─── NAME ENTRY ───────────────────────────────────────────────────────────────
-function NameEntry({ gameLabel, onStart }) {
+// ─── NAME MODAL ───────────────────────────────────────────────────
+function NameModal({ game, onStart }) {
   const [name, setName] = useState('');
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', padding: 24, gap: 16 }}>
-      <div style={{ fontSize: 48 }}>{GAME_LIST.find(g => g.label === gameLabel)?.icon}</div>
-      <div style={{ color: C.gold, fontSize: 22, fontWeight: 'bold' }}>{gameLabel}</div>
-      <div style={{ color: C.cream, fontSize: 14 }}>Enter your name:</div>
-      <input
-        value={name}
-        onChange={e => setName(e.target.value)}
-        placeholder="Your name..."
-        style={{ padding: '10px 16px', borderRadius: 10, border: `2px solid ${C.gold}`, background: C.card, color: C.white, fontSize: 16, textAlign: 'center', width: 200 }}
-        autoFocus
-      />
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center', maxWidth: 280 }}>
-        {MENU_NAMES.map(n => (
-          <button key={n} onClick={() => setName(n)}
-            style={{ padding: '6px 12px', borderRadius: 20, border: `1px solid ${C.brown}`, background: name === n ? C.gold : C.card, color: name === n ? C.bg : C.cream, fontSize: 12, cursor: 'pointer' }}>
-            {n}
-          </button>
-        ))}
-      </div>
-      <button onClick={() => name.trim() && onStart(name.trim())}
-        style={{ padding: '12px 40px', borderRadius: 25, background: C.gold, color: C.bg, fontWeight: 'bold', fontSize: 16, border: 'none', cursor: 'pointer', opacity: name.trim() ? 1 : 0.5 }}>
-        Play!
-      </button>
-    </div>
-  );
-}
-
-// ─── LEADERBOARD PANEL ───────────────────────────────────────────────────────
-function Leaderboard({ onClose }) {
-  const medals = ['🥇', '🥈', '🥉'];
-  return (
-    <div style={{ height: '100%', overflowY: 'auto', padding: 20 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <div style={{ color: C.gold, fontSize: 20, fontWeight: 'bold' }}>🏆 Leaderboard</div>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', color: C.cream, fontSize: 22, cursor: 'pointer' }}>✕</button>
-      </div>
-      {GAME_LIST.map(g => {
-        const scores = getScores(g.id);
-        return (
-          <div key={g.id} style={{ background: C.card, borderRadius: 12, padding: 14, marginBottom: 14 }}>
-            <div style={{ color: C.gold, fontWeight: 'bold', marginBottom: 8 }}>{g.icon} {g.label}</div>
-            {scores.length === 0
-              ? <div style={{ color: C.brown, fontSize: 13 }}>No scores yet!</div>
-              : scores.slice(0, 5).map((s, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', color: C.cream, fontSize: 13, padding: '3px 0', borderBottom: i < 4 ? `1px solid ${C.brown}33` : 'none' }}>
-                  <span>{medals[i] || `${i + 1}.`} {s.name}</span>
-                  <span style={{ color: C.gold }}>{s.score} pts</span>
-                </div>
-              ))}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// ─── SNAKE GAME ──────────────────────────────────────────────────────────────
-function SnakeGame({ playerName, onExit, onScore }) {
-  const canvasRef = useRef();
-  const state = useRef({
-    snake: [{ x: 10, y: 10 }], dir: { x: 1, y: 0 }, nextDir: { x: 1, y: 0 },
-    food: { x: 15, y: 15 }, score: 0, running: true, speed: 220,
-  });
-  const animRef = useRef();
-  const lastRef = useRef(0);
-  const CELL = 22, COLS = 16, ROWS = 22;
-
-  const placeFood = useCallback(() => {
-    const s = state.current;
-    let pos;
-    do { pos = { x: Math.floor(Math.random() * COLS), y: Math.floor(Math.random() * ROWS) }; }
-    while (s.snake.some(b => b.x === pos.x && b.y === pos.y));
-    s.food = pos;
-  }, []);
-
-  const draw = useCallback(() => {
-    const canvas = canvasRef.current; if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    const s = state.current;
-    ctx.fillStyle = C.bg; ctx.fillRect(0, 0, canvas.width, canvas.height);
-    // Grid
-    ctx.strokeStyle = C.card; ctx.lineWidth = 0.5;
-    for (let i = 0; i <= COLS; i++) { ctx.beginPath(); ctx.moveTo(i * CELL, 0); ctx.lineTo(i * CELL, ROWS * CELL); ctx.stroke(); }
-    for (let j = 0; j <= ROWS; j++) { ctx.beginPath(); ctx.moveTo(0, j * CELL); ctx.lineTo(COLS * CELL, j * CELL); ctx.stroke(); }
-    // Food (coffee bean)
-    const fx = s.food.x * CELL + CELL / 2, fy = s.food.y * CELL + CELL / 2;
-    ctx.fillStyle = C.gold; ctx.beginPath(); ctx.ellipse(fx, fy, 7, 9, 0.4, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = C.brown; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.moveTo(fx - 3, fy - 5); ctx.quadraticCurveTo(fx, fy, fx + 3, fy + 5); ctx.stroke();
-    // Snake
-    s.snake.forEach((b, i) => {
-      const x = b.x * CELL + 1, y = b.y * CELL + 1, sz = CELL - 2;
-      ctx.fillStyle = i === 0 ? C.gold : (i % 2 === 0 ? '#8b5e3c' : C.brown);
-      ctx.beginPath(); ctx.roundRect(x, y, sz, sz, 4); ctx.fill();
-      if (i === 0) { ctx.fillStyle = '#1a0f0a'; ctx.beginPath(); ctx.arc(x + sz * 0.65, y + sz * 0.3, 2.5, 0, Math.PI * 2); ctx.fill(); }
-    });
-    // Score
-    ctx.fillStyle = C.cream; ctx.font = 'bold 14px monospace';
-    ctx.fillText(`☕ ${s.score}`, 8, canvas.height - 8);
-    ctx.fillStyle = C.brown; ctx.font = '11px monospace';
-    ctx.fillText(playerName, canvas.width - ctx.measureText(playerName).width - 8, canvas.height - 8);
-  }, [playerName]);
-
-  const step = useCallback((ts) => {
-    const s = state.current;
-    if (!s.running) return;
-    if (ts - lastRef.current < s.speed) { animRef.current = requestAnimationFrame(step); return; }
-    lastRef.current = ts;
-    s.dir = { ...s.nextDir };
-    const head = { x: s.snake[0].x + s.dir.x, y: s.snake[0].y + s.dir.y };
-    if (head.x < 0 || head.x >= COLS || head.y < 0 || head.y >= ROWS || s.snake.some(b => b.x === head.x && b.y === head.y)) {
-      s.running = false;
-      addScore('snake', playerName, s.score);
-      onScore(s.score);
-      return;
-    }
-    s.snake.unshift(head);
-    if (head.x === s.food.x && head.y === s.food.y) {
-      s.score += 10; placeFood();
-      if (s.score % 50 === 0) s.speed = Math.max(80, s.speed - 20);
-    } else { s.snake.pop(); }
-    draw();
-    animRef.current = requestAnimationFrame(step);
-  }, [playerName, placeFood, draw, onScore]);
-
-  useEffect(() => {
-    placeFood(); draw();
-    animRef.current = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(animRef.current);
-  }, [placeFood, draw, step]);
-
-  const setDir = useCallback((dx, dy) => {
-    const s = state.current;
-    if ((dx !== 0 && s.dir.x === 0) || (dy !== 0 && s.dir.y === 0)) s.nextDir = { x: dx, y: dy };
-  }, []);
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'center', gap: 8 }}>
-      <canvas ref={canvasRef} width={COLS * CELL} height={ROWS * CELL}
-        style={{ borderRadius: 10, border: `2px solid ${C.brown}`, maxWidth: '100%' }} />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,52px)', gridTemplateRows: 'repeat(3,52px)', gap: 4 }}>
-        {[['', '▲', ''], ['◀', '', '▶'], ['', '▼', '']].flat().map((btn, i) => {
-          const dirs = { '▲': [0,-1], '▼': [0,1], '◀': [-1,0], '▶': [1,0] };
-          return btn ? (
-            <button key={i} onPointerDown={() => { const d = dirs[btn]; if (d) setDir(d[0], d[1]); }}
-              style={{ width: 52, height: 52, borderRadius: 10, background: C.card, border: `2px solid ${C.brown}`, color: C.gold, fontSize: 20, cursor: 'pointer', touchAction: 'manipulation' }}>
-              {btn}
-            </button>
-          ) : <div key={i} />;
-        })}
-      </div>
-    </div>
-  );
-}
-
-// ─── TETRIS GAME ─────────────────────────────────────────────────────────────
-const PIECES = [
-  { shape: [[1,1,1,1]], color: '#00f5d4' },
-  { shape: [[1,1],[1,1]], color: '#fee440' },
-  { shape: [[0,1,0],[1,1,1]], color: '#9b5de5' },
-  { shape: [[1,0],[1,0],[1,1]], color: '#f15bb5' },
-  { shape: [[0,1],[0,1],[1,1]], color: '#00bbf9' },
-  { shape: [[0,1,1],[1,1,0]], color: '#4CAF50' },
-  { shape: [[1,1,0],[0,1,1]], color: '#ff9f1c' },
-];
-
-function TetrisGame({ playerName, onExit, onScore }) {
-  const COLS = 10, ROWS = 20, CELL = 28;
-  const canvasRef = useRef();
-  const stRef = useRef({ board: Array(ROWS).fill(null).map(() => Array(COLS).fill(0)), cur: null, score: 0, running: true, dropTime: 0, speed: 600 });
-  const animRef = useRef();
-
-  const newPiece = useCallback(() => {
-    const t = PIECES[Math.floor(Math.random() * PIECES.length)];
-    return { shape: t.shape, color: t.color, x: Math.floor(COLS / 2) - Math.floor(t.shape[0].length / 2), y: 0 };
-  }, []);
-
-  const collides = useCallback((board, piece, ox = 0, oy = 0) => {
-    for (let r = 0; r < piece.shape.length; r++)
-      for (let c = 0; c < piece.shape[r].length; c++)
-        if (piece.shape[r][c]) {
-          const nx = piece.x + c + ox, ny = piece.y + r + oy;
-          if (nx < 0 || nx >= COLS || ny >= ROWS || (ny >= 0 && board[ny][nx])) return true;
-        }
-    return false;
-  }, []);
-
-  const draw = useCallback(() => {
-    const canvas = canvasRef.current; if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    const s = stRef.current;
-    ctx.fillStyle = '#0d0d1a'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-    // Grid
-    ctx.strokeStyle = '#1a1a2e'; ctx.lineWidth = 0.5;
-    for (let c = 0; c <= COLS; c++) { ctx.beginPath(); ctx.moveTo(c * CELL, 0); ctx.lineTo(c * CELL, ROWS * CELL); ctx.stroke(); }
-    for (let r = 0; r <= ROWS; r++) { ctx.beginPath(); ctx.moveTo(0, r * CELL); ctx.lineTo(COLS * CELL, r * CELL); ctx.stroke(); }
-    // Board
-    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) if (s.board[r][c]) {
-      ctx.fillStyle = s.board[r][c];
-      ctx.fillRect(c * CELL + 1, r * CELL + 1, CELL - 2, CELL - 2);
-      ctx.fillStyle = 'rgba(255,255,255,0.2)';
-      ctx.fillRect(c * CELL + 1, r * CELL + 1, CELL - 2, 4);
-    }
-    // Current piece
-    if (s.cur) s.cur.shape.forEach((row, r) => row.forEach((v, c) => {
-      if (v) {
-        const px = (s.cur.x + c) * CELL, py = (s.cur.y + r) * CELL;
-        ctx.fillStyle = s.cur.color; ctx.fillRect(px + 1, py + 1, CELL - 2, CELL - 2);
-        ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fillRect(px + 1, py + 1, CELL - 2, 4);
-      }
-    }));
-    // Score
-    ctx.fillStyle = C.gold; ctx.font = 'bold 14px monospace';
-    ctx.fillText(`${s.score}`, 4, canvas.height - 4);
-  }, []);
-
-  const lock = useCallback(() => {
-    const s = stRef.current;
-    s.cur.shape.forEach((row, r) => row.forEach((v, c) => {
-      if (v && s.cur.y + r >= 0) s.board[s.cur.y + r][s.cur.x + c] = s.cur.color;
-    }));
-    let cleared = 0;
-    s.board = s.board.filter(row => { if (row.every(c => c)) { cleared++; return false; } return true; });
-    while (s.board.length < ROWS) s.board.unshift(Array(COLS).fill(0));
-    s.score += [0, 40, 100, 300, 1200][cleared] || 0;
-    if (cleared) s.speed = Math.max(100, s.speed - cleared * 20);
-    const next = newPiece();
-    if (collides(s.board, next)) { s.running = false; addScore('tetris', playerName, s.score); onScore(s.score); return; }
-    s.cur = next;
-  }, [newPiece, collides, playerName, onScore]);
-
-  const loop = useCallback((ts) => {
-    const s = stRef.current; if (!s.running) { draw(); return; }
-    if (ts - s.dropTime > s.speed) {
-      s.dropTime = ts;
-      if (!collides(s.board, s.cur, 0, 1)) s.cur.y++;
-      else lock();
-    }
-    draw();
-    animRef.current = requestAnimationFrame(loop);
-  }, [collides, lock, draw]);
-
-  useEffect(() => {
-    stRef.current.cur = newPiece();
-    animRef.current = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(animRef.current);
-  }, [newPiece, loop]);
-
-  const moveLeft = () => { const s = stRef.current; if (!collides(s.board, s.cur, -1, 0)) s.cur.x--; };
-  const moveRight = () => { const s = stRef.current; if (!collides(s.board, s.cur, 1, 0)) s.cur.x++; };
-  const rotate = () => {
-    const s = stRef.current;
-    const rot = s.cur.shape[0].map((_, i) => s.cur.shape.map(r => r[i]).reverse());
-    const orig = s.cur.shape; s.cur.shape = rot;
-    if (collides(s.board, s.cur)) s.cur.shape = orig;
-  };
-  const drop = () => { const s = stRef.current; while (!collides(s.board, s.cur, 0, 1)) s.cur.y++; lock(); };
-
-  const btnStyle = { width: 64, height: 52, borderRadius: 10, background: C.card, border: `2px solid ${C.brown}`, color: C.gold, fontSize: 22, cursor: 'pointer', touchAction: 'manipulation' };
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'center', gap: 8 }}>
-      <canvas ref={canvasRef} width={COLS * CELL} height={ROWS * CELL}
-        style={{ borderRadius: 10, border: `2px solid ${C.brown}`, maxWidth: '100%', maxHeight: '55vh' }} />
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
-        <button onPointerDown={moveLeft} style={btnStyle}>◀</button>
-        <button onPointerDown={rotate} style={btnStyle}>↺</button>
-        <button onPointerDown={drop} style={{ ...btnStyle, width: 80 }}>▼▼</button>
-        <button onPointerDown={moveRight} style={btnStyle}>▶</button>
-      </div>
-    </div>
-  );
-}
-
-// ─── CAFÉ RUNNER ──────────────────────────────────────────────────────────────
-const RUNNER_LEVELS = [
-  { id: 'ocean', label: '🌊 Ocean Floor', bg: '#0a1628', ground: '#1a3d6b', sky: 'linear-gradient(#0a1628,#1a3d6b)', obstacles: ['🦑', '🐙', '🦀'], collectibles: ['🐚', '💎'], speed: 4 },
-  { id: 'beach', label: '🏖 Sandy Beach', bg: '#f5deb3', ground: '#c2a060', sky: 'linear-gradient(#87CEEB,#f5deb3)', obstacles: ['🌴', '🦀', '⛱️'], collectibles: ['🐚', '🌸'], speed: 5 },
-  { id: 'city', label: '🌆 City Streets', bg: '#1a1a2e', ground: '#333', sky: 'linear-gradient(#1a1a2e,#16213e)', obstacles: ['🚗', '🚧', '🗑️'], collectibles: ['☕', '💰'], speed: 6 },
-  { id: 'mountain', label: '⛰️ Mountains', bg: '#2d4a2d', ground: '#4a7c3a', sky: 'linear-gradient(#87CEEB,#2d4a2d)', obstacles: ['🪨', '🌲', '🐻'], collectibles: ['🍄', '⭐'], speed: 7 },
-  { id: 'sky', label: '☁️ Sky High', bg: '#87CEEB', ground: '#f0f0ff', sky: 'linear-gradient(#87CEEB,#ffffff)', obstacles: ['☁️', '🦅', '⛈️'], collectibles: ['⭐', '🌈'], speed: 8 },
-  { id: 'space', label: '🚀 Outer Space', bg: '#0a0a1a', ground: '#1a1a3a', sky: 'linear-gradient(#0a0a1a,#1a1a3a)', obstacles: ['☄️', '👾', '🛸'], collectibles: ['⭐', '💫'], speed: 9 },
-  { id: 'sun', label: '☀️ The Sun!', bg: '#ff8c00', ground: '#ff4500', sky: 'linear-gradient(#ffd700,#ff4500)', obstacles: ['🔥', '💥', '🌋'], collectibles: ['💎', '🏆'], speed: 11 },
-];
-
-function RunnerGame({ playerName, onExit, onScore }) {
-  const canvasRef = useRef();
-  const [levelIdx, setLevelIdx] = useState(0);
-  const stRef = useRef(null);
-  const animRef = useRef();
-  const W = 360, H = 260, GY = H - 60;
-
-  const initState = useCallback((lvlIdx) => {
-    stRef.current = {
-      x: 60, y: GY, vy: 0, onGround: true,
-      obstacles: [], collectibles: [],
-      score: 0, dist: 0, running: true,
-      spawnTimer: 0, lvlIdx,
-    };
-  }, []);
-
-  const draw = useCallback(() => {
-    const canvas = canvasRef.current; if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    const s = stRef.current;
-    const lvl = RUNNER_LEVELS[s.lvlIdx];
-    // Sky
-    const grad = ctx.createLinearGradient(0, 0, 0, H);
-    const colors = lvl.sky.match(/#[0-9a-fA-F]{6}/g) || ['#87CEEB', '#f5deb3'];
-    grad.addColorStop(0, colors[0]); grad.addColorStop(1, colors[1] || colors[0]);
-    ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
-    // Ground
-    ctx.fillStyle = lvl.ground; ctx.fillRect(0, GY + 40, W, H - GY - 40);
-    ctx.fillStyle = lvl.bg + '88'; ctx.fillRect(0, GY + 36, W, 8);
-    // Player (barista running)
-    ctx.font = '36px serif'; ctx.fillText('🏃', s.x - 18, s.y + 36);
-    // Obstacles
-    s.obstacles.forEach(o => { ctx.font = '30px serif'; ctx.fillText(o.emoji, o.x - 15, GY + 38); });
-    // Collectibles
-    s.collectibles.forEach(c => { ctx.font = '22px serif'; ctx.fillText(c.emoji, c.x - 11, c.y + 11); });
-    // Level label
-    ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(0, 0, W, 28);
-    ctx.fillStyle = '#fff'; ctx.font = 'bold 13px monospace'; ctx.textAlign = 'center';
-    ctx.fillText(lvl.label, W / 2, 19);
-    ctx.textAlign = 'left';
-    // Score
-    ctx.fillStyle = C.gold; ctx.font = 'bold 13px monospace';
-    ctx.fillText(`⭐ ${s.score}`, 6, H - 6);
-    // Level progress bar
-    const progress = Math.min(1, s.dist / 800);
-    ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(0, H - 20, W, 6);
-    ctx.fillStyle = C.gold; ctx.fillRect(0, H - 20, W * progress, 6);
-  }, []);
-
-  const gameLoop = useCallback((ts) => {
-    const canvas = canvasRef.current; if (!canvas) return;
-    const s = stRef.current; if (!s || !s.running) return;
-    const lvl = RUNNER_LEVELS[s.lvlIdx];
-    // Physics
-    s.vy += 0.7;
-    s.y += s.vy;
-    if (s.y >= GY) { s.y = GY; s.vy = 0; s.onGround = true; }
-    const spd = lvl.speed;
-    // Obstacles
-    s.spawnTimer++;
-    if (s.spawnTimer > 90 - s.lvlIdx * 5) {
-      s.spawnTimer = 0;
-      s.obstacles.push({ x: W + 20, emoji: lvl.obstacles[Math.floor(Math.random() * lvl.obstacles.length)] });
-      if (Math.random() < 0.4) s.collectibles.push({ x: W + 80 + Math.random() * 100, y: GY - 40 - Math.random() * 60, emoji: lvl.collectibles[Math.floor(Math.random() * lvl.collectibles.length)] });
-    }
-    s.obstacles.forEach(o => { o.x -= spd; });
-    s.collectibles.forEach(c => { c.x -= spd; });
-    s.obstacles = s.obstacles.filter(o => o.x > -40);
-    s.collectibles = s.collectibles.filter(c => c.x > -40);
-    // Collision
-    for (const o of s.obstacles) {
-      if (Math.abs(o.x - s.x) < 24 && s.y >= GY - 5) {
-        s.running = false; addScore('runner', playerName, s.score); onScore(s.score); return;
-      }
-    }
-    for (let i = s.collectibles.length - 1; i >= 0; i--) {
-      const c = s.collectibles[i];
-      if (Math.abs(c.x - s.x) < 22 && Math.abs(c.y - s.y) < 30) { s.score += 5; s.collectibles.splice(i, 1); }
-    }
-    s.score++; s.dist++;
-    // Level up
-    if (s.dist >= 800 && s.lvlIdx < RUNNER_LEVELS.length - 1) {
-      s.lvlIdx++; s.dist = 0; s.obstacles = []; s.collectibles = [];
-      setLevelIdx(s.lvlIdx);
-    }
-    draw();
-    animRef.current = requestAnimationFrame(gameLoop);
-  }, [playerName, draw, onScore]);
-
-  useEffect(() => {
-    initState(0);
-    animRef.current = requestAnimationFrame(gameLoop);
-    return () => cancelAnimationFrame(animRef.current);
-  }, [initState, gameLoop]);
-
-  const jump = () => { const s = stRef.current; if (s.onGround) { s.vy = -13; s.onGround = false; } };
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'center', gap: 10 }}>
-      <div style={{ color: C.gold, fontSize: 13 }}>Level: {RUNNER_LEVELS[levelIdx].label}</div>
-      <canvas ref={canvasRef} width={W} height={H} style={{ borderRadius: 10, border: `2px solid ${C.brown}`, maxWidth: '100%' }} />
-      <button onPointerDown={jump}
-        style={{ padding: '16px 64px', borderRadius: 25, background: C.gold, color: C.bg, fontSize: 20, fontWeight: 'bold', border: 'none', cursor: 'pointer', touchAction: 'manipulation' }}>
-        JUMP!
-      </button>
-      <div style={{ color: C.brown, fontSize: 12 }}>Reach the ☀️ Sun!</div>
-    </div>
-  );
-}
-
-// ─── SPOT THE DIFFERENCE ─────────────────────────────────────────────────────
-function SpotGame({ playerName, onExit, onScore }) {
-  const [sceneIdx] = useState(() => Math.floor(Math.random() * SPOT_SCENES.length));
-  const scene = SPOT_SCENES[sceneIdx];
-  const leftRef = useRef(); const rightRef = useRef();
-  const [found, setFound] = useState([]);
-  const [flashes, setFlashes] = useState([]);
-  const [time, setTime] = useState(90);
-  const [done, setDone] = useState(false);
-  const [finalScore, setFinalScore] = useState(0);
-
-  useEffect(() => {
-    const draw = (canvas, fn) => {
-      if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-      fn(ctx, canvas.width, canvas.height);
-    };
-    draw(leftRef.current, scene.drawLeft);
-    draw(rightRef.current, scene.drawRight);
-  }, [scene]);
-
-  useEffect(() => {
-    if (done) return;
-    const t = setInterval(() => setTime(p => { if (p <= 1) { setDone(true); return 0; } return p - 1; }), 1000);
-    return () => clearInterval(t);
-  }, [done]);
-
-  const handleTap = useCallback((e, side) => {
-    if (done) return;
-    const canvas = side === 'right' ? rightRef.current : leftRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const rx = (e.clientX - rect.left) / rect.width;
-    const ry = (e.clientY - rect.top) / rect.height;
-    for (let i = 0; i < scene.diffs.length; i++) {
-      if (found.includes(i)) continue;
-      const d = scene.diffs[i];
-      const dx = rx - d.x, dy = ry - d.y;
-      if (Math.sqrt(dx * dx + dy * dy) < d.r) {
-        const newFound = [...found, i];
-        setFound(newFound);
-        setFlashes(f => [...f, { x: d.x, y: d.y, id: Date.now() }]);
-        if (newFound.length === scene.diffs.length) {
-          const sc = newFound.length * 20 + time * 2;
-          setFinalScore(sc); setDone(true); addScore('spot', playerName, sc); onScore(sc);
-        }
-        return;
-      }
-    }
-  }, [done, found, scene, time, playerName, onScore]);
-
-  const cW = 160, cH = 200;
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'center', gap: 8, padding: 12 }}>
-      <div style={{ color: C.gold, fontWeight: 'bold', fontSize: 15 }}>{scene.title}</div>
-      <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
-        {[leftRef, rightRef].map((ref, idx) => (
-          <div key={idx} style={{ position: 'relative' }}>
-            <canvas ref={ref} width={cW} height={cH}
-              onClick={e => handleTap(e, idx === 1 ? 'right' : 'left')}
-              style={{ borderRadius: 8, border: `2px solid ${C.brown}`, display: 'block', cursor: 'crosshair' }} />
-            {found.map(fi => {
-              const d = scene.diffs[fi];
-              return (
-                <div key={fi} style={{ position: 'absolute', left: d.x * cW - 14, top: d.y * cH - 14, width: 28, height: 28, borderRadius: '50%', border: '3px solid #0f0', pointerEvents: 'none' }} />
-              );
-            })}
-          </div>
-        ))}
-      </div>
-      <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-        <div style={{ color: time <= 15 ? '#f55' : C.cream, fontSize: 14 }}>⏱ {time}s</div>
-        <div style={{ color: C.gold, fontSize: 14 }}>{found.length}/{scene.diffs.length} found</div>
-      </div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', maxWidth: 340 }}>
-        {scene.diffs.map((d, i) => (
-          <div key={i} style={{ padding: '4px 10px', borderRadius: 12, background: found.includes(i) ? C.green : C.card, color: found.includes(i) ? '#fff' : C.brown, fontSize: 12, border: `1px solid ${found.includes(i) ? C.green : C.brown}` }}>
-            {found.includes(i) ? '✓ ' : ''}{d.label}
-          </div>
-        ))}
-      </div>
-      {done && (
-        <div style={{ textAlign: 'center', color: C.gold, fontWeight: 'bold', fontSize: 16 }}>
-          {found.length === scene.diffs.length ? `🎉 All found! +${finalScore} pts` : `⏰ Time's up! ${found.length}/${scene.diffs.length}`}
+    <div style={S.overlay}>
+      <div style={S.modal}>
+        <div style={{ fontSize: 32, marginBottom: 8 }}>{{ snake:'🐍',mario:'🏃',tetris:'🟦',spot:'🔍' }[game]}</div>
+        <div style={{ fontSize: 16, fontWeight: 'bold', color: T.gold, marginBottom: 4 }}>Enter Your Name</div>
+        <div style={{ fontSize: 11, color: T.dim, marginBottom: 14 }}>Name yourself after a menu item!</div>
+        <input style={S.input} placeholder="e.g. Latte, Matcha..." value={name} onChange={e => setName(e.target.value)} maxLength={20} autoFocus onKeyDown={e => e.key === 'Enter' && name.trim() && onStart(name.trim())} />
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, justifyContent: 'center', marginBottom: 14 }}>
+          {MENU_SUGGESTIONS.map(s => <span key={s} onClick={() => setName(s)} style={{ fontSize: 11, padding: '3px 9px', borderRadius: 20, background: name === s ? T.gold+'33' : T.card, color: name === s ? T.gold : T.dim, border: `1px solid ${name === s ? T.gold : T.brown+'55'}`, cursor: 'pointer' }}>{s}</span>)}
         </div>
-      )}
+        <button style={{ ...S.btn(), width: '100%', padding: '12px', opacity: name.trim() ? 1 : 0.4 }} disabled={!name.trim()} onClick={() => onStart(name.trim())}>Start Game →</button>
+      </div>
     </div>
   );
 }
 
-// ─── FULLSCREEN WRAPPER ───────────────────────────────────────────────────────
-function FullscreenGame({ game, playerName, onExit }) {
-  const [score, setScore] = useState(null);
-  const [showLB, setShowLB] = useState(false);
+// ─── GAME OVER MODAL ──────────────────────────────────────────────
+function GameOverModal({ game, playerName, score, onRestart, onLeaderboard }) {
+  const top = getTop(game);
+  const rank = top.findIndex(e => e.name === playerName && e.score === score) + 1;
+  return (
+    <div style={S.overlay}>
+      <div style={S.modal}>
+        <div style={{ fontSize: 28, marginBottom: 6 }}>☠️</div>
+        <div style={{ fontSize: 18, fontWeight: 'bold', color: T.gold, marginBottom: 2 }}>Game Over</div>
+        <div style={{ fontSize: 13, color: T.dim, marginBottom: 10 }}>{playerName}</div>
+        <div style={{ fontSize: 36, fontWeight: 'bold', color: T.cream, marginBottom: 4 }}>{score}</div>
+        <div style={{ fontSize: 11, color: T.dim, marginBottom: 16 }}>{rank > 0 ? `🏆 #${rank} on leaderboard!` : 'Keep practicing!'}</div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button style={{ ...S.btn(T.cardLight), flex: 1, padding: '11px' }} onClick={onLeaderboard}>🏆 Board</button>
+          <button style={{ ...S.btn(), flex: 1, padding: '11px' }} onClick={onRestart}>Play Again</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-  const handleScore = (s) => setScore(s);
+// ─── LEADERBOARD ──────────────────────────────────────────────────
+function Leaderboard({ onClose }) {
+  const [tab, setTab] = useState('snake');
+  const GAMES = [{ id:'snake',label:'Snake' },{ id:'mario',label:'Runner' },{ id:'tetris',label:'Tetris' },{ id:'spot',label:'Spot' }];
+  const entries = getTop(tab);
+  return (
+    <div style={{ ...S.wrap, paddingBottom: 0 }}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 16px', background:'#1e0e00', borderBottom:`1px solid ${T.brown}55` }}>
+        <div style={{ fontSize:15, fontWeight:'bold', color:T.gold, letterSpacing:2 }}>🏆 LEADERBOARD</div>
+        <button style={S.btn(T.card)} onClick={onClose}>✕ Close</button>
+      </div>
+      <div style={{ display:'flex', borderBottom:`1px solid ${T.brown}55` }}>
+        {GAMES.map(g => <div key={g.id} style={S.lbTab(tab===g.id)} onClick={() => setTab(g.id)}>{g.label}</div>)}
+      </div>
+      {entries.length === 0
+        ? <div style={{ textAlign:'center', padding:40, color:T.dim, fontSize:13 }}>No scores yet — be the first! 🎮</div>
+        : entries.map((e,i) => (
+          <div key={i} style={S.row(i)}>
+            <div style={{ width:28, fontSize:i<3?18:13, textAlign:'center' }}>{i<3?S.medal[i]:`${i+1}.`}</div>
+            <div style={{ flex:1, fontSize:14, color:i===0?T.gold:T.cream, fontWeight:i===0?'bold':'normal', paddingLeft:8 }}>{e.name}</div>
+            <div style={{ fontSize:14, fontWeight:'bold', color:T.gold }}>{e.score.toLocaleString()}</div>
+            <div style={{ fontSize:10, color:T.dim, marginLeft:8 }}>{e.date}</div>
+          </div>
+        ))
+      }
+    </div>
+  );
+}
 
-  const GameComp = { snake: SnakeGame, tetris: TetrisGame, runner: RunnerGame, spot: SpotGame }[game.id];
+// ═══════════════════════════════════════════════════════════════════
+// SNAKE — bigger grid, starts slow
+// ═══════════════════════════════════════════════════════════════════
+function SnakeGame({ playerName, onGameOver }) {
+  const canvasRef = useRef(null);
+  const gameRef = useRef(null);
+  const containerRef = useRef(null);
+  const [score, setScore] = useState(0);
+  const [alive, setAlive] = useState(true);
+  const [size, setSize] = useState({ w: 340, h: 480 });
+
+  const CELL = 22;
+  const COLS = Math.floor(size.w / CELL);
+  const ROWS = Math.floor(size.h / CELL);
+  const W = COLS * CELL;
+  const H = ROWS * CELL;
+
+  useEffect(() => {
+    const update = () => {
+      if (containerRef.current) {
+        const w = Math.min(containerRef.current.clientWidth, 420);
+        const h = Math.min(window.innerHeight - 140, 600);
+        setSize({ w, h });
+      }
+    };
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+
+  const placeFood = (snake) => {
+    let pos;
+    do { pos = { x: Math.floor(Math.random()*COLS), y: Math.floor(Math.random()*ROWS) }; }
+    while (snake.some(s => s.x===pos.x && s.y===pos.y));
+    return pos;
+  };
+
+  const startGame = useCallback(() => {
+    const cx = Math.floor(COLS/2), cy = Math.floor(ROWS/2);
+    gameRef.current = { snake:[{x:cx,y:cy},{x:cx-1,y:cy},{x:cx-2,y:cy}], dir:{x:1,y:0}, nextDir:{x:1,y:0}, food:{x:cx+4,y:cy}, score:0, running:true, speed:220 };
+    setScore(0); setAlive(true);
+  }, [COLS, ROWS]);
+
+  useEffect(() => { if (COLS > 5 && ROWS > 5) startGame(); }, [COLS, ROWS, startGame]);
+
+  const draw = useCallback((g) => {
+    const canvas = canvasRef.current; if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#0a0500'; ctx.fillRect(0,0,W,H);
+    // subtle grid
+    ctx.fillStyle = '#1a0f0033';
+    for (let x=0;x<COLS;x++) for(let y=0;y<ROWS;y++) ctx.fillRect(x*CELL+CELL/2-1,y*CELL+CELL/2-1,2,2);
+    // food
+    ctx.fillStyle = T.gold;
+    ctx.beginPath(); ctx.arc(g.food.x*CELL+CELL/2, g.food.y*CELL+CELL/2, CELL/2-2, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#1a0f00';
+    ctx.beginPath(); ctx.ellipse(g.food.x*CELL+CELL/2, g.food.y*CELL+CELL/2, 2, CELL/2-5, 0, 0, Math.PI*2); ctx.fill();
+    // snake
+    g.snake.forEach((seg,i) => {
+      const ratio = Math.max(0, 1 - i/g.snake.length);
+      ctx.fillStyle = i===0 ? `rgb(220,90,50)` : `rgb(${Math.round(180*ratio+40)},${Math.round(60*ratio+15)},${Math.round(20*ratio+5)})`;
+      const p = i===0 ? 1 : 3;
+      ctx.beginPath(); ctx.roundRect(seg.x*CELL+p, seg.y*CELL+p, CELL-p*2, CELL-p*2, 5); ctx.fill();
+    });
+    // eyes
+    const h=g.snake[0];
+    ctx.fillStyle='#fff';
+    ctx.beginPath();
+    ctx.arc(h.x*CELL+CELL/2+g.dir.y*3-g.dir.x*4, h.y*CELL+CELL/2+g.dir.x*3-g.dir.y*4, 2.5,0,Math.PI*2);
+    ctx.arc(h.x*CELL+CELL/2+g.dir.y*3+g.dir.x*4, h.y*CELL+CELL/2+g.dir.x*3+g.dir.y*4, 2.5,0,Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle='#1a0f00';
+    ctx.beginPath();
+    ctx.arc(h.x*CELL+CELL/2+g.dir.y*3-g.dir.x*4, h.y*CELL+CELL/2+g.dir.x*3-g.dir.y*4, 1.2,0,Math.PI*2);
+    ctx.arc(h.x*CELL+CELL/2+g.dir.y*3+g.dir.x*4, h.y*CELL+CELL/2+g.dir.x*3+g.dir.y*4, 1.2,0,Math.PI*2);
+    ctx.fill();
+  }, [W,H,CELL,COLS,ROWS]);
+
+  useEffect(() => {
+    if (!alive) return;
+    const g = gameRef.current; if (!g) return;
+    const speed = Math.max(80, 220 - Math.floor(g.score/50)*15);
+    const interval = setInterval(() => {
+      const g = gameRef.current; if (!g||!g.running) return;
+      g.dir = {...g.nextDir};
+      const head = {x:g.snake[0].x+g.dir.x, y:g.snake[0].y+g.dir.y};
+      if (head.x<0||head.x>=COLS||head.y<0||head.y>=ROWS||g.snake.some(s=>s.x===head.x&&s.y===head.y)) {
+        g.running=false; saveScore('snake',playerName,g.score); setAlive(false); onGameOver(g.score); return;
+      }
+      g.snake.unshift(head);
+      if (head.x===g.food.x&&head.y===g.food.y) { g.score+=10; setScore(g.score); g.food=placeFood(g.snake); } else g.snake.pop();
+      draw(g);
+    }, speed);
+    return () => clearInterval(interval);
+  }, [alive, draw, COLS, ROWS, playerName, onGameOver]);
+
+  useEffect(() => {
+    if (!alive) {
+      const canvas = canvasRef.current; if(!canvas) return;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle='#0a0500'; ctx.fillRect(0,0,W,H);
+      ctx.fillStyle=T.gold; ctx.font=`bold 26px Georgia`; ctx.textAlign='center'; ctx.fillText('🐍 SNAKE',W/2,H/2-16);
+      ctx.font='13px Georgia'; ctx.fillStyle=T.dim; ctx.fillText('Collect the coffee beans!',W/2,H/2+14);
+    }
+  }, [alive,W,H]);
+
+  const turn = (d) => { const g=gameRef.current; if(!g) return; const m={up:{x:0,y:-1},down:{x:0,y:1},left:{x:-1,y:0},right:{x:1,y:0}}[d]; if(m.x!==-g.dir.x||m.y!==-g.dir.y) g.nextDir=m; };
+  useEffect(() => { const k=(e)=>{const m={ArrowUp:'up',ArrowDown:'down',ArrowLeft:'left',ArrowRight:'right'}; if(m[e.key]){e.preventDefault();turn(m[e.key]);}}; window.addEventListener('keydown',k); return()=>window.removeEventListener('keydown',k); },[]);
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: C.bg, display: 'flex', flexDirection: 'column', zIndex: 9999 }}>
-      {/* Top bar */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: C.card, borderBottom: `2px solid ${C.brown}`, flexShrink: 0 }}>
-        <button onClick={onExit} style={{ background: 'none', border: 'none', color: C.cream, fontSize: 22, cursor: 'pointer', padding: '4px 8px' }}>← Exit</button>
-        <div style={{ color: C.gold, fontWeight: 'bold', fontSize: 15 }}>{game.icon} {game.label}</div>
-        <button onClick={() => setShowLB(true)} style={{ background: 'none', border: 'none', color: C.gold, fontSize: 22, cursor: 'pointer', padding: '4px 8px' }}>🏆</button>
+    <div style={{ display:'flex', flexDirection:'column', flex:1 }}>
+      <div style={S.gameBar}>
+        <span style={S.score}>☕ {score}</span>
+        <span style={{ fontSize:11, color:T.dim }}>{playerName}</span>
+        <button style={S.btn()} onClick={startGame}>↺ Restart</button>
       </div>
-      {/* Game */}
-      <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
-        {showLB ? <Leaderboard onClose={() => setShowLB(false)} /> : (
-          <>
-            {score !== null && (
-              <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 10, gap: 16 }}>
-                <div style={{ fontSize: 48 }}>🎮</div>
-                <div style={{ color: C.gold, fontSize: 24, fontWeight: 'bold' }}>Game Over!</div>
-                <div style={{ color: C.cream, fontSize: 18 }}>Score: {score}</div>
-                <button onClick={onExit} style={{ padding: '12px 32px', borderRadius: 25, background: C.gold, color: C.bg, fontWeight: 'bold', fontSize: 16, border: 'none', cursor: 'pointer' }}>Back to Games</button>
-                <button onClick={() => setShowLB(true)} style={{ padding: '10px 28px', borderRadius: 25, background: 'transparent', color: C.gold, fontWeight: 'bold', fontSize: 14, border: `2px solid ${C.gold}`, cursor: 'pointer' }}>View Leaderboard</button>
-              </div>
-            )}
-            <GameComp playerName={playerName} onExit={onExit} onScore={handleScore} />
-          </>
+      <div ref={containerRef} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'8px 0' }}>
+        <canvas ref={canvasRef} width={W} height={H} style={{ display:'block', maxWidth:'100%' }} />
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6, maxWidth:200, margin:'10px auto 0', width:'100%' }}>
+          <div/><div style={S.padBtn} onClick={()=>turn('up')}>▲</div><div/>
+          <div style={S.padBtn} onClick={()=>turn('left')}>◀</div>
+          <div style={S.padBtn} onClick={()=>turn('down')}>▼</div>
+          <div style={S.padBtn} onClick={()=>turn('right')}>▶</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CAFÉ RUNNER — bigger, ocean→beach→city→sky→space levels
+// ═══════════════════════════════════════════════════════════════════
+const LEVELS = [
+  { name:'🌊 Deep Ocean',   bg1:'#001830', bg2:'#003060', ground:'#0a3050', gline:'#0080b0', scoreMin:0,   scoreMax:80,  obstacleColor:'#2060a0', obstacleColor2:'#40a0d0' },
+  { name:'🏖️ Beach Shore',   bg1:'#0a2040', bg2:'#2060a0', ground:'#c8a050', gline:'#e8c070', scoreMin:80,  scoreMax:180, obstacleColor:'#d08030', obstacleColor2:'#f0c060' },
+  { name:'🌆 City Streets', bg1:'#1a1a2e', bg2:'#16213e', ground:'#2c2c3e', gline:'#d4a853', scoreMin:180, scoreMax:320, obstacleColor:'#8a3010', obstacleColor2:'#d4a853' },
+  { name:'☁️ Sky High',      bg1:'#1a0f30', bg2:'#4060a0', ground:'#8090a0', gline:'#ffffff', scoreMin:320, scoreMax:500, obstacleColor:'#8080c0', obstacleColor2:'#c0c0ff' },
+  { name:'🌙 Moon Base',     bg1:'#050510', bg2:'#101030', ground:'#303050', gline:'#8080c0', scoreMin:500, scoreMax:700, obstacleColor:'#606080', obstacleColor2:'#a0a0c0' },
+  { name:'☀️ Solar Wind',    bg1:'#200800', bg2:'#601800', ground:'#c04010', gline:'#ffa020', scoreMin:700, scoreMax:9999,obstacleColor:'#ff6020', obstacleColor2:'#ffc040' },
+];
+
+function MarioGame({ playerName, onGameOver }) {
+  const canvasRef = useRef(null);
+  const containerRef = useRef(null);
+  const stateRef = useRef(null);
+  const rafRef = useRef(null);
+  const [score, setScore] = useState(0);
+  const [running, setRunning] = useState(false);
+  const [levelName, setLevelName] = useState(LEVELS[0].name);
+  const [size, setSize] = useState({ w: 380, h: 300 });
+
+  useEffect(() => {
+    const update = () => {
+      if (containerRef.current) {
+        const w = Math.min(containerRef.current.clientWidth, 480);
+        const h = Math.min(Math.round(w * 0.65), 320);
+        setSize({ w, h });
+      }
+    };
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+
+  const W = size.w, H = size.h, GROUND = H - Math.round(H * 0.18);
+
+  const init = () => ({
+    player: { x: Math.round(W*0.15), y: GROUND-42, vy: 0, w: 28, h: 42, onGround: true, frame: 0 },
+    obstacles: [], particles: [],
+    clouds: [{x:W*0.15,y:H*0.15,w:60},{x:W*0.5,y:H*0.08,w:80},{x:W*0.8,y:H*0.2,w:50}],
+    speed: 3.5, score: 0, frame: 0, spawn: 80, running: true, level: 0,
+  });
+
+  const jump = useCallback(() => {
+    const s = stateRef.current;
+    if (s && s.running && s.player.onGround) { s.player.vy = -Math.sqrt(2 * 0.72 * (GROUND - 20)); s.player.onGround = false; }
+  }, [GROUND]);
+
+  const start = () => {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    stateRef.current = init(); setScore(0); setLevelName(LEVELS[0].name); setRunning(true);
+  };
+
+  useEffect(() => {
+    if (!running) return;
+    const loop = () => {
+      const s = stateRef.current; if (!s||!s.running) return;
+      const canvas = canvasRef.current; if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+
+      s.frame++; s.score += 0.06; s.speed = 3.5 + s.score * 0.018; setScore(Math.floor(s.score));
+
+      // Level detection
+      const lvlIdx = LEVELS.findIndex(l => s.score >= l.scoreMin && s.score < l.scoreMax);
+      const lvl = LEVELS[Math.max(0, lvlIdx)];
+      if (s.level !== lvlIdx && lvlIdx >= 0) { s.level = lvlIdx; setLevelName(lvl.name); }
+
+      // Physics
+      s.player.vy += 0.72; s.player.y += s.player.vy;
+      if (s.player.y >= GROUND - s.player.h) { s.player.y = GROUND - s.player.h; s.player.vy = 0; s.player.onGround = true; }
+      if (s.frame % 7 === 0 && s.player.onGround) s.player.frame = (s.player.frame+1)%2;
+
+      // Spawn obstacles
+      s.spawn--;
+      if (s.spawn <= 0) {
+        const h = 30 + Math.random()*35;
+        const isDouble = Math.random() > 0.7 && s.score > 50;
+        s.obstacles.push({ x: W+10, y: GROUND-h, w: 20+Math.random()*14, h, double: isDouble });
+        if (isDouble) s.obstacles.push({ x: W+10, y: GROUND-h*1.6, w: 16, h: h*0.6, floating: true });
+        s.spawn = Math.max(40, 75 - Math.floor(s.score/30)*3) + Math.random()*40;
+      }
+      s.obstacles.forEach(o => o.x -= s.speed);
+      s.obstacles = s.obstacles.filter(o => o.x > -60);
+      s.clouds.forEach(c => { c.x -= 0.6; if (c.x < -120) c.x = W+60; });
+
+      // Collision
+      const p = s.player;
+      for (const o of s.obstacles) {
+        if (p.x+p.w-6>o.x+3 && p.x+5<o.x+o.w-3 && p.y+p.h-4>o.y+3 && p.y+5<o.y+o.h) {
+          s.running=false; saveScore('mario',playerName,Math.floor(s.score)); setRunning(false); onGameOver(Math.floor(s.score)); return;
+        }
+      }
+
+      // Draw BG
+      const sky = ctx.createLinearGradient(0,0,0,GROUND);
+      sky.addColorStop(0, lvl.bg1); sky.addColorStop(1, lvl.bg2);
+      ctx.fillStyle=sky; ctx.fillRect(0,0,W,H);
+
+      // Stars/bubbles depending on level
+      if (s.level <= 1) { // ocean: bubbles
+        ctx.fillStyle='rgba(100,200,255,0.15)';
+        for (let i=0;i<12;i++) { ctx.beginPath(); ctx.arc((i*97+s.frame*0.3)%W, (i*67+s.frame*0.2)%(GROUND-10), 3+i%3, 0, Math.PI*2); ctx.fill(); }
+      } else {
+        ctx.fillStyle='#ffffff44';
+        for (let i=0;i<20;i++) ctx.fillRect((i*137+s.frame*0.1)%W, (i*53)%(GROUND-20), 1.5, 1.5);
+      }
+
+      // Sun/moon
+      if (s.level >= 4) {
+        ctx.fillStyle = s.level>=5 ? '#ffa020aa' : '#ffffffff';
+        ctx.beginPath(); ctx.arc(W-40, 30, s.level>=5 ? 22 : 14, 0, Math.PI*2); ctx.fill();
+      }
+
+      // Clouds
+      s.clouds.forEach(c => {
+        ctx.fillStyle = s.level<=1 ? '#0040801a' : '#3d250055';
+        ctx.beginPath(); ctx.ellipse(c.x,c.y,c.w/2,14,0,0,Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(c.x-14,c.y+6,c.w/3,10,0,0,Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(c.x+14,c.y+6,c.w/3,10,0,0,Math.PI*2); ctx.fill();
+      });
+
+      // Ground
+      ctx.fillStyle = lvl.ground; ctx.fillRect(0,GROUND,W,H-GROUND);
+      ctx.fillStyle = lvl.gline; ctx.fillRect(0,GROUND,W,3);
+      // Ground pattern
+      ctx.fillStyle = lvl.ground+'99';
+      for (let gx=(s.frame*s.speed*0.3)%44; gx<W; gx+=44) ctx.fillRect(gx,GROUND+6,22,2);
+
+      // Obstacles (themed)
+      s.obstacles.forEach(o => {
+        ctx.fillStyle = lvl.obstacleColor;
+        ctx.fillRect(o.x, o.y, o.w, o.h);
+        ctx.fillStyle = lvl.obstacleColor2;
+        ctx.fillRect(o.x+2, o.y+2, o.w-4, 6);
+        ctx.fillStyle = lvl.obstacleColor+'99';
+        ctx.fillRect(o.x+2, o.y+10, o.w-4, o.h-12);
+        // handle
+        ctx.strokeStyle = lvl.obstacleColor; ctx.lineWidth=2.5;
+        ctx.beginPath(); ctx.arc(o.x+o.w+4, o.y+o.h/2, 5, -Math.PI/2, Math.PI/2); ctx.stroke();
+      });
+
+      // Player (barista character)
+      const px=p.x, py=p.y;
+      ctx.fillStyle='#c8943a'; ctx.fillRect(px+4,py+15,20,20);
+      ctx.fillStyle='#e8b85a'; ctx.beginPath(); ctx.ellipse(px+14,py+10,12,12,0,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#1a0f00'; ctx.beginPath(); ctx.arc(px+10,py+9,2,0,Math.PI*2); ctx.arc(px+18,py+9,2,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#f5e6c8'; ctx.fillRect(px+6,py+17,16,14);
+      ctx.fillStyle='#6b3d11';
+      if (p.onGround&&p.frame===1) { ctx.fillRect(px+3,py+35,8,11); ctx.fillRect(px+17,py+37,8,9); }
+      else { ctx.fillRect(px+4,py+35,8,10); ctx.fillRect(px+16,py+35,8,10); }
+      ctx.fillStyle='#1a0f00'; ctx.fillRect(px+5,py+1,18,5); ctx.fillRect(px+8,py-8,12,10);
+
+      // Level badge
+      ctx.fillStyle=T.gold; ctx.font=`bold 12px Georgia`; ctx.textAlign='left';
+      ctx.fillText(`☕ ${Math.floor(s.score)}`, 8, 22);
+      ctx.font='10px Georgia'; ctx.fillStyle='rgba(255,255,255,0.6)';
+      ctx.fillText(lvl.name, 8, 36);
+
+      rafRef.current = requestAnimationFrame(loop);
+    };
+    rafRef.current = requestAnimationFrame(loop);
+    return () => { if(rafRef.current) cancelAnimationFrame(rafRef.current); };
+  }, [running, GROUND, W, H, playerName, onGameOver]);
+
+  useEffect(() => {
+    if (running) return;
+    const canvas=canvasRef.current; if(!canvas) return;
+    const ctx=canvas.getContext('2d');
+    const sky=ctx.createLinearGradient(0,0,0,H); sky.addColorStop(0,'#001830'); sky.addColorStop(1,'#003060');
+    ctx.fillStyle=sky; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='#0a3050'; ctx.fillRect(0,GROUND,W,H-GROUND);
+    ctx.fillStyle=T.gold; ctx.font=`bold 22px Georgia`; ctx.textAlign='center';
+    ctx.fillText('🏃 CAFÉ RUNNER',W/2,H/2-14);
+    ctx.font='12px Georgia'; ctx.fillStyle=T.dim; ctx.fillText('Ocean → Beach → City → Sky → Space!',W/2,H/2+12);
+  }, [running, W, H, GROUND]);
+
+  useEffect(() => { const k=(e)=>{if(e.code==='Space'||e.key==='ArrowUp'){e.preventDefault();jump();}}; window.addEventListener('keydown',k); return()=>window.removeEventListener('keydown',k); },[jump]);
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', flex:1 }}>
+      <div style={S.gameBar}>
+        <span style={S.score}>☕ {score}</span>
+        <span style={{ fontSize:11, color:T.dim }}>{levelName}</span>
+        <span style={{ fontSize:11, color:T.dim }}>{playerName}</span>
+      </div>
+      <div ref={containerRef} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'6px 0' }}>
+        <canvas ref={canvasRef} width={W} height={H} style={{ display:'block', maxWidth:'100%', cursor:'pointer', borderRadius:8 }} onClick={running ? jump : start} />
+        {running
+          ? <button style={{ ...S.btn(T.brown), border:`1px solid ${T.gold}55`, padding:'12px 60px', fontSize:22, marginTop:8 }} onClick={jump}>JUMP ↑</button>
+          : <button style={{ ...S.btn(), padding:'12px 48px', marginTop:8 }} onClick={start}>START</button>
+        }
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// TETRIS — fills full screen width
+// ═══════════════════════════════════════════════════════════════════
+function TetrisGame({ playerName, onGameOver }) {
+  const canvasRef = useRef(null);
+  const containerRef = useRef(null);
+  const stateRef = useRef(null);
+  const timerRef = useRef(null);
+  const [score, setScore] = useState(0);
+  const [lines, setLines] = useState(0);
+  const [alive, setAlive] = useState(false);
+  const [highScore, setHighScore] = useState(() => getTop('tetris')[0]?.score || 0);
+  const [size, setSize] = useState({ cell: 28, cols: 10, rows: 20 });
+
+  useEffect(() => {
+    const update = () => {
+      if (containerRef.current) {
+        const avail = Math.min(containerRef.current.clientWidth - 16, 360);
+        const cell = Math.floor(avail / 10);
+        const rows = Math.floor((window.innerHeight - 160) / cell);
+        setSize({ cell, cols: 10, rows: Math.max(16, Math.min(22, rows)) });
+      }
+    };
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+
+  const { cell: CELL, cols: COLS, rows: ROWS } = size;
+  const W = COLS * CELL, H = ROWS * CELL;
+
+  const PIECES = [
+    { shape:[[1,1,1,1]], color:T.gold },
+    { shape:[[1,1],[1,1]], color:'#c8501a' },
+    { shape:[[1,1,1],[0,1,0]], color:'#8a3a9a' },
+    { shape:[[1,1,1],[1,0,0]], color:T.danger },
+    { shape:[[1,1,1],[0,0,1]], color:'#3a7ac8' },
+    { shape:[[1,1,0],[0,1,1]], color:T.success },
+    { shape:[[0,1,1],[1,1,0]], color:'#c83a6a' },
+  ];
+
+  const emptyBoard = () => Array.from({length:ROWS},()=>Array(COLS).fill(null));
+  const rndPiece = () => { const p=PIECES[Math.floor(Math.random()*PIECES.length)]; return {shape:p.shape.map(r=>[...r]),color:p.color,x:Math.floor(COLS/2)-Math.floor(p.shape[0].length/2),y:0}; };
+  const rotate = (s) => s[0].map((_,i)=>s.map(r=>r[i]).reverse());
+  const valid = useCallback((board,piece,dx=0,dy=0,shape=null)=>{
+    const sh=shape||piece.shape;
+    for(let r=0;r<sh.length;r++) for(let c=0;c<sh[r].length;c++) if(sh[r][c]){const nx=piece.x+c+dx,ny=piece.y+r+dy; if(nx<0||nx>=COLS||ny>=ROWS) return false; if(ny>=0&&board[ny][nx]) return false;} return true;
+  },[COLS,ROWS]);
+
+  const drawBoard = useCallback((ctx, board, piece) => {
+    if (!ctx) return;
+    ctx.fillStyle='#080400'; ctx.fillRect(0,0,W,H);
+    ctx.strokeStyle='#2c1a0022'; ctx.lineWidth=0.5;
+    for(let r=0;r<ROWS;r++){ctx.beginPath();ctx.moveTo(0,r*CELL);ctx.lineTo(W,r*CELL);ctx.stroke();}
+    for(let c=0;c<COLS;c++){ctx.beginPath();ctx.moveTo(c*CELL,0);ctx.lineTo(c*CELL,H);ctx.stroke();}
+    const dc=(x,y,color,a=1)=>{
+      ctx.globalAlpha=a;
+      ctx.fillStyle=color; ctx.fillRect(x*CELL+1,y*CELL+1,CELL-2,CELL-2);
+      ctx.fillStyle='rgba(255,255,255,0.22)'; ctx.fillRect(x*CELL+1,y*CELL+1,CELL-2,4);
+      ctx.fillStyle='rgba(0,0,0,0.28)'; ctx.fillRect(x*CELL+1,y*CELL+CELL-5,CELL-2,4);
+      ctx.globalAlpha=1;
+    };
+    board.forEach((row,r)=>row.forEach((cell,c)=>{if(cell)dc(c,r,cell);}));
+    if(piece){
+      let gy=piece.y; while(valid(board,{...piece,y:gy+1})) gy++;
+      piece.shape.forEach((row,r)=>row.forEach((cell,c)=>{if(cell&&gy+r>=0)dc(piece.x+c,gy+r,piece.color,0.18);}));
+      piece.shape.forEach((row,r)=>row.forEach((cell,c)=>{if(cell&&piece.y+r>=0)dc(piece.x+c,piece.y+r,piece.color);}));
+    }
+  },[W,H,CELL,ROWS,COLS,valid]);
+
+  const startGame = useCallback(() => {
+    if(timerRef.current) clearInterval(timerRef.current);
+    const s={board:emptyBoard(),piece:rndPiece(),score:0,lines:0,running:true};
+    stateRef.current=s; setScore(0); setLines(0); setAlive(true);
+    drawBoard(canvasRef.current?.getContext('2d'),s.board,s.piece);
+  },[ROWS,COLS,drawBoard]);
+
+  const stepDown = useCallback(()=>{
+    const s=stateRef.current; if(!s||!s.running) return;
+    if(valid(s.board,s.piece,0,1)){s.piece.y++;}
+    else{
+      s.piece.shape.forEach((row,r)=>row.forEach((cell,c)=>{if(cell&&s.piece.y+r>=0)s.board[s.piece.y+r][s.piece.x+c]=s.piece.color;}));
+      let cleared=0;
+      for(let r=ROWS-1;r>=0;r--){if(s.board[r].every(c=>c)){s.board.splice(r,1);s.board.unshift(Array(COLS).fill(null));cleared++;r++;}}
+      s.lines+=cleared; s.score+=([0,100,300,500,800][cleared]||0)+10;
+      setScore(s.score); setLines(s.lines);
+      s.piece=rndPiece();
+      if(!valid(s.board,s.piece)){s.running=false; saveScore('tetris',playerName,s.score); setAlive(false); setHighScore(h=>Math.max(h,s.score)); onGameOver(s.score); return;}
+    }
+    drawBoard(canvasRef.current?.getContext('2d'),s.board,s.piece);
+  },[ROWS,COLS,valid,drawBoard,playerName,onGameOver]);
+
+  useEffect(()=>{
+    if(!alive) return;
+    const spd=Math.max(80,600-Math.floor((stateRef.current?.lines||0)/5)*45);
+    timerRef.current=setInterval(stepDown,spd);
+    return()=>clearInterval(timerRef.current);
+  },[alive,stepDown,lines]);
+
+  const move=(dx)=>{const s=stateRef.current; if(!s||!s.running) return; if(valid(s.board,s.piece,dx,0))s.piece.x+=dx; drawBoard(canvasRef.current?.getContext('2d'),s.board,s.piece);};
+  const rot=()=>{const s=stateRef.current; if(!s||!s.running) return; const r=rotate(s.piece.shape); if(valid(s.board,s.piece,0,0,r))s.piece.shape=r; drawBoard(canvasRef.current?.getContext('2d'),s.board,s.piece);};
+  const drop=()=>{const s=stateRef.current; if(!s||!s.running) return; while(valid(s.board,s.piece,0,1))s.piece.y++; stepDown();};
+
+  useEffect(()=>{
+    if(!alive) return;
+    const k=(e)=>{
+      if(e.key==='ArrowLeft'){e.preventDefault();move(-1);}
+      if(e.key==='ArrowRight'){e.preventDefault();move(1);}
+      if(e.key==='ArrowDown'){e.preventDefault();stepDown();}
+      if(e.key==='ArrowUp'){e.preventDefault();rot();}
+      if(e.key===' '){e.preventDefault();drop();}
+    };
+    window.addEventListener('keydown',k); return()=>window.removeEventListener('keydown',k);
+  },[alive,stepDown]);
+
+  useEffect(()=>{
+    if(!alive){const canvas=canvasRef.current; if(!canvas) return; const ctx=canvas.getContext('2d'); ctx.fillStyle='#080400'; ctx.fillRect(0,0,W,H); ctx.fillStyle=T.gold; ctx.font=`bold ${Math.round(CELL*0.9)}px Georgia`; ctx.textAlign='center'; ctx.fillText('🟦 TETRIS',W/2,H/2-16); ctx.font=`${Math.round(CELL*0.55)}px Georgia`; ctx.fillStyle=T.dim; ctx.fillText('Stack the blocks!',W/2,H/2+16);}
+  },[alive,W,H,CELL]);
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', flex:1 }}>
+      <div style={S.gameBar}>
+        <span style={S.score}>{score} pts</span>
+        <span style={{ fontSize:11, color:T.dim }}>{playerName} · {lines} lines</span>
+        <span style={{ fontSize:11, color:T.dim }}>Best:{highScore}</span>
+      </div>
+      <div ref={containerRef} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'flex-start', padding:'6px 0', overflowY:'auto' }}>
+        <canvas ref={canvasRef} width={W} height={H} style={{ display:'block' }} />
+        {alive ? (
+          <div style={{ padding:'8px 12px', width:'100%', maxWidth:300 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6, margin:'0 auto', maxWidth:200 }}>
+              <div/><div style={S.padBtn} onClick={rot}>↻</div><div/>
+              <div style={S.padBtn} onClick={()=>move(-1)}>◀</div>
+              <div style={S.padBtn} onClick={stepDown}>▼</div>
+              <div style={S.padBtn} onClick={()=>move(1)}>▶</div>
+            </div>
+            <button style={{ ...S.btn(T.brown), border:`1px solid ${T.gold}55`, padding:'11px', width:'100%', marginTop:6 }} onClick={drop}>DROP ↓↓</button>
+          </div>
+        ) : (
+          <button style={{ ...S.btn(), padding:'12px 48px', marginTop:10 }} onClick={startGame}>START</button>
         )}
       </div>
     </div>
   );
 }
 
-// ─── MAIN GAMES PAGE ─────────────────────────────────────────────────────────
-export default function GamesPage() {
-  const [screen, setScreen] = useState('menu'); // menu | name | game | leaderboard
-  const [selectedGame, setSelectedGame] = useState(null);
-  const [playerName, setPlayerName] = useState('');
+// ═══════════════════════════════════════════════════════════════════
+// SPOT THE DIFFERENCE — multiple scene sets
+// ═══════════════════════════════════════════════════════════════════
+const SPOT_DIFFS = [
+  { id:0, x:222, y:30,  r:16 },
+  { id:1, x:58,  y:102, r:15 },
+  { id:2, x:157, y:147, r:14 },
+  { id:3, x:252, y:138, r:13 },
+  { id:4, x:110, y:55,  r:13 },
+];
 
-  const selectGame = (g) => { setSelectedGame(g); setScreen('name'); };
-  const startGame = (name) => { setPlayerName(name); setScreen('game'); };
-  const exitGame = () => { setSelectedGame(null); setPlayerName(''); setScreen('menu'); };
+// Scene drawers — each returns a draw function
+const SCENES = [
+  // Scene 0: Café interior
+  {
+    name: 'The Café',
+    draw: (ctx, isB, W, H, foundIds, fl) => {
+      const GR = H - 48;
+      const wall = ctx.createLinearGradient(0,0,0,H); wall.addColorStop(0,'#2c1a00'); wall.addColorStop(1,'#1a0f00');
+      ctx.fillStyle=wall; ctx.fillRect(0,0,W,H);
+      ctx.fillStyle='#3d2200'; ctx.fillRect(0,GR,W,H-GR);
+      ctx.fillStyle='#4a2a00'; for(let fx=0;fx<W;fx+=38) ctx.fillRect(fx,GR,19,H-GR);
+      ctx.fillStyle='#1a3060'; ctx.fillRect(28,18,78,68);
+      ctx.fillStyle='#2a5090'; ctx.fillRect(30,20,35,64); ctx.fillStyle='#3a70b0'; ctx.fillRect(67,20,37,64);
+      ctx.strokeStyle='#6b3d11'; ctx.lineWidth=4; ctx.strokeRect(28,18,78,68); ctx.lineWidth=2;
+      ctx.beginPath(); ctx.moveTo(67,18); ctx.lineTo(67,86); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(28,52); ctx.lineTo(106,52); ctx.stroke();
+      ctx.fillStyle='#ffe08088'; [[43,33],[78,27],[93,43],[53,58],[83,63]].forEach(([sx,sy])=>{ctx.beginPath();ctx.arc(sx,sy,2,0,Math.PI*2);ctx.fill();});
+      if(isB){ctx.fillStyle='#ffe080';ctx.beginPath();ctx.arc(222,30,5,0,Math.PI*2);ctx.fill();}
+      ctx.fillStyle='#5c3010'; ctx.fillRect(0,GR-33,W,33);
+      ctx.fillStyle='#7a4020'; ctx.fillRect(0,GR-36,W,5);
+      ctx.fillStyle='#8a5530'; ctx.fillRect(168,GR-88,48,55);
+      ctx.fillStyle='#c8943a'; ctx.fillRect(173,GR-83,38,18);
+      ctx.fillStyle='#1a0f00'; ctx.beginPath(); ctx.arc(192,GR-75,7,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#3a6030'; ctx.beginPath(); ctx.arc(192,GR-75,4.5,0,Math.PI*2); ctx.fill();
+      if(!isB){ctx.fillStyle='#f5e6c8';ctx.fillRect(50,GR-36,14,18);ctx.fillStyle='#c8943a';ctx.fillRect(48,GR-38,18,4);ctx.strokeStyle='#6b3d11';ctx.lineWidth=2;ctx.beginPath();ctx.arc(64,GR-28,4,-Math.PI/2,Math.PI/2);ctx.stroke();}
+      ctx.fillStyle='#3d1f00'; ctx.fillRect(128,23,58,52);
+      ctx.fillStyle='#5a3010'; ctx.fillRect(131,26,52,47);
+      ctx.fillStyle='#d4a853'; ctx.font='bold 7px Georgia'; ctx.textAlign='left'; ctx.fillText('MENU',138,37);
+      ctx.fillStyle='#f5e6c8'; ctx.font='6px Georgia'; ctx.fillText('Latte ₱150',134,48); ctx.fillText('Espresso ₱120',134,57); ctx.fillText('Matcha ₱160',134,66);
+      ctx.fillStyle='#c8943a'; ctx.beginPath(); ctx.arc(110,55,15,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#1a0f00'; ctx.beginPath(); ctx.arc(110,55,12,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#c8943a'; ctx.beginPath(); ctx.arc(110,55,2,0,Math.PI*2); ctx.fill();
+      ctx.strokeStyle='#1a0f00'; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.moveTo(110,55); ctx.lineTo(110+Math.cos(isB?-Math.PI/6:Math.PI/3)*8,55+Math.sin(isB?-Math.PI/6:Math.PI/3)*8); ctx.stroke();
+      ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(110,55); ctx.lineTo(110,44); ctx.stroke();
+      ctx.fillStyle='#8a3010'; ctx.fillRect(238,GR-45,18,10);
+      ctx.fillStyle='#5a8030'; ctx.beginPath(); ctx.arc(247,GR-50,11,0,Math.PI*2); ctx.fill();
+      if(isB){ctx.fillStyle='#4a7025';ctx.beginPath();ctx.ellipse(265,GR-52,9,4.5,Math.PI/4,0,Math.PI*2);ctx.fill();}
+      ctx.fillStyle=isB?'#8a3030':'#2a5020'; ctx.fillRect(143,GR-30,28,20);
+      ctx.strokeStyle='#6b3d11'; ctx.lineWidth=2; ctx.strokeRect(143,GR-30,28,20);
+      ctx.fillStyle='#f5e6c8'; ctx.font='bold 6px Georgia'; ctx.textAlign='center'; ctx.fillText('OPEN',157,GR-20); ctx.fillText('10-11',157,GR-13);
+    }
+  },
+  // Scene 1: Outdoor garden café
+  {
+    name: 'Garden Café',
+    draw: (ctx, isB, W, H, foundIds, fl) => {
+      const GR = H - 45;
+      // Sky gradient
+      const sky = ctx.createLinearGradient(0,0,0,GR);
+      sky.addColorStop(0,'#87CEEB'); sky.addColorStop(1,'#c8e8ff');
+      ctx.fillStyle=sky; ctx.fillRect(0,0,W,GR);
+      // Ground
+      ctx.fillStyle='#4a8030'; ctx.fillRect(0,GR,W,H-GR);
+      ctx.fillStyle='#5a9040'; for(let i=0;i<W;i+=20) ctx.fillRect(i,GR,10,H-GR);
+      // Sun (diff 0: bigger in B)
+      ctx.fillStyle='#FFD700';
+      ctx.beginPath(); ctx.arc(isB?222:218, 30, isB?12:8, 0, Math.PI*2); ctx.fill();
+      // Big tree
+      ctx.fillStyle='#5a3010'; ctx.fillRect(30,GR-80,14,80);
+      ctx.fillStyle='#3a7020'; ctx.beginPath(); ctx.arc(37,GR-90,35,0,Math.PI*2); ctx.fill();
+      // Umbrella table
+      ctx.fillStyle='#c8302a'; ctx.beginPath(); ctx.moveTo(155,GR-55); ctx.lineTo(215,GR-55); ctx.lineTo(235,GR-40); ctx.lineTo(135,GR-40); ctx.closePath(); ctx.fill();
+      ctx.fillStyle='#8a1a14'; ctx.fillRect(183,GR-55,4,55);
+      ctx.fillStyle='#8a6030'; ctx.ellipse && (ctx.beginPath(),ctx.ellipse(185,GR-5,30,6,0,0,Math.PI*2),ctx.fill());
+      // Chairs (diff 1: missing chair in B)
+      if(!isB){ctx.fillStyle='#8a6030';ctx.fillRect(58,GR-22,18,22);ctx.fillRect(55,GR-30,24,8);}
+      ctx.fillStyle='#8a6030'; ctx.fillRect(240,GR-22,18,22); ctx.fillRect(237,GR-30,24,8);
+      // Flower pot (diff 2: different color)
+      ctx.fillStyle=isB?'#e05c2a':'#c8302a'; ctx.fillRect(255,GR-18,14,18);
+      ctx.fillStyle='#5a9040'; ctx.beginPath(); ctx.arc(262,GR-22,10,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#ff80a0'; ctx.beginPath(); ctx.arc(262,GR-25,5,0,Math.PI*2); ctx.fill();
+      // Bird (diff 3: extra bird in B)
+      if(isB){ctx.fillStyle='#333';ctx.beginPath();ctx.arc(252,35,4,0,Math.PI*2);ctx.fill();ctx.fillStyle='#555';ctx.beginPath();ctx.moveTo(248,35);ctx.quadraticCurveTo(242,28,250,30);ctx.stroke();}
+      // Cloud (diff 4: different shape)
+      ctx.fillStyle='#ffffffcc';
+      ctx.beginPath(); ctx.ellipse(110,40,isB?35:28,16,0,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(90,45,20,14,0,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(130,44,isB?22:16,12,0,0,Math.PI*2); ctx.fill();
+    }
+  },
+  // Scene 2: Rooftop at night
+  {
+    name: 'Rooftop Night',
+    draw: (ctx, isB, W, H, foundIds, fl) => {
+      const GR = H - 42;
+      ctx.fillStyle='#050510'; ctx.fillRect(0,0,W,H);
+      // Stars
+      const stars = [[20,15],[45,30],[80,10],[120,25],[160,8],[200,20],[240,35],[270,12],[50,50],[140,45],[210,55]];
+      stars.forEach(([sx,sy]) => { ctx.fillStyle='#ffffff'; ctx.beginPath(); ctx.arc(sx,sy,1.5,0,Math.PI*2); ctx.fill(); });
+      // Moon (diff 0: full moon in B vs crescent)
+      if(isB){ctx.fillStyle='#ffffc0';ctx.beginPath();ctx.arc(222,30,12,0,Math.PI*2);ctx.fill();}
+      else{ctx.fillStyle='#ffffc0';ctx.beginPath();ctx.arc(222,30,12,0,Math.PI*2);ctx.fill();ctx.fillStyle='#050510';ctx.beginPath();ctx.arc(228,27,10,0,Math.PI*2);ctx.fill();}
+      // Rooftop floor
+      ctx.fillStyle='#1a1a2e'; ctx.fillRect(0,GR,W,H-GR);
+      ctx.fillStyle='#252540'; ctx.fillRect(0,GR,W,4);
+      // City skyline in bg
+      [[0,30,20,GR],[25,20,18,GR],[48,35,15,GR],[68,15,22,GR],[95,28,20,GR],[235,25,20,GR],[258,18,16,GR],[278,30,18,GR]].forEach(([x,h,w,gr])=>{
+        ctx.fillStyle='#10102a'; ctx.fillRect(x,gr-h,w,h);
+        ctx.fillStyle='#ffd70044'; if(Math.random()>0.5) ctx.fillRect(x+3,gr-h+5,4,4);
+      });
+      // Table with candle
+      ctx.fillStyle='#3d2800'; ctx.fillRect(100,GR-25,100,25); ctx.fillRect(120,GR-5,10,5); ctx.fillRect(170,GR-5,10,5);
+      // Candle (diff 1: no candle in B)
+      if(!isB){ctx.fillStyle='#f5e6c8';ctx.fillRect(147,GR-38,8,14);ctx.fillStyle='#ff8020';ctx.beginPath();ctx.arc(151,GR-40,4,0,Math.PI*2);ctx.fill();}
+      // Cups on table
+      ctx.fillStyle='#f5e6c8'; ctx.fillRect(108,GR-32,12,8); ctx.fillRect(175,GR-32,12,8);
+      ctx.fillStyle='#c8943a'; ctx.fillRect(106,GR-34,16,4); ctx.fillRect(173,GR-34,16,4);
+      // String lights (diff 2: color change)
+      for(let lx=0;lx<W;lx+=20){
+        ctx.fillStyle=isB?`hsl(${lx*5},80%,60%)`:'#ffd700';
+        ctx.beginPath(); ctx.arc(lx,GR-50+Math.sin(lx*0.1)*8,3,0,Math.PI*2); ctx.fill();
+      }
+      ctx.strokeStyle='#88880044'; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(0,GR-50);
+      for(let lx=0;lx<W;lx+=5) { ctx.lineTo(lx, GR-50+Math.sin(lx*0.1)*8); } ctx.stroke();
+      // Plant (diff 3: extra in B)
+      if(isB){ctx.fillStyle='#3d1800';ctx.fillRect(260,GR-30,14,30);ctx.fillStyle='#3a7020';ctx.beginPath();ctx.arc(267,GR-35,14,0,Math.PI*2);ctx.fill();}
+      // Telescope (diff 4: pointing direction)
+      ctx.fillStyle='#808080'; ctx.save(); ctx.translate(55,GR-30);
+      ctx.rotate(isB?-Math.PI/4:-Math.PI/6); ctx.fillRect(-4,-20,8,22); ctx.restore();
+      ctx.fillStyle='#606060'; ctx.fillRect(48,GR-30,18,6);
+    }
+  },
+];
 
-  // Fullscreen game overlay
-  if (screen === 'game' && selectedGame) {
-    return <FullscreenGame game={selectedGame} playerName={playerName} onExit={exitGame} />;
-  }
+function SpotDiffGame({ playerName, onGameOver }) {
+  const [found, setFound] = useState([]);
+  const [flash, setFlash] = useState(null);
+  const [timeLeft, setTimeLeft] = useState(90);
+  const [done, setDone] = useState(false);
+  const [sceneIdx] = useState(() => Math.floor(Math.random() * SCENES.length));
+  const canvasA = useRef(null), canvasB = useRef(null);
+  const containerRef = useRef(null);
+  const [canvasSize, setCanvasSize] = useState({ w: 280, h: 200 });
+
+  const scene = SCENES[sceneIdx];
+
+  useEffect(() => {
+    const update = () => {
+      if (containerRef.current) {
+        const w = Math.min(Math.floor((containerRef.current.clientWidth - 20) / 2), 280);
+        const h = Math.round(w * 0.72);
+        setCanvasSize({ w, h });
+      }
+    };
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+
+  const { w: W, h: H } = canvasSize;
+
+  const redraw = useCallback(() => {
+    [canvasA, canvasB].forEach((ref, idx) => {
+      const canvas = ref.current; if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      scene.draw(ctx, idx === 1, W, H, found, flash);
+      // Draw found circles
+      if (found.length > 0) {
+        found.forEach(id => {
+          const d = SPOT_DIFFS[id];
+          if (!d) return;
+          const scaleX = W / 290, scaleY = H / 210;
+          ctx.strokeStyle = T.success; ctx.lineWidth = 2.5; ctx.setLineDash([4,2]);
+          ctx.beginPath(); ctx.arc(d.x*scaleX, d.y*scaleY, (d.r+4)*Math.min(scaleX,scaleY), 0, Math.PI*2); ctx.stroke();
+          ctx.setLineDash([]);
+        });
+      }
+      if (flash && flash.canvas === (idx===1?'b':'a')) {
+        ctx.strokeStyle=T.danger; ctx.lineWidth=2;
+        ctx.beginPath(); ctx.arc(flash.x, flash.y, 12, 0, Math.PI*2); ctx.stroke();
+      }
+    });
+  }, [found, flash, W, H, scene]);
+
+  useEffect(() => { redraw(); }, [redraw]);
+
+  useEffect(() => {
+    if (done) return;
+    const t = setInterval(() => setTimeLeft(tl => {
+      if (tl <= 1) { const sc=found.length*20; saveScore('spot',playerName,sc); setDone(true); onGameOver(sc); return 0; }
+      return tl - 1;
+    }), 1000);
+    return () => clearInterval(t);
+  }, [done, found.length, playerName, onGameOver]);
+
+  const tap = (e, isB) => {
+    if (done) return;
+    const canvas = isB ? canvasB.current : canvasA.current;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = W / rect.width, scaleY = H / rect.height;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
+    const baseScaleX = W / 290, baseScaleY = H / 210;
+    for (const d of SPOT_DIFFS) {
+      if (found.includes(d.id)) continue;
+      if (Math.sqrt((x-d.x*baseScaleX)**2 + (y-d.y*baseScaleY)**2) < (d.r+10)*Math.min(baseScaleX,baseScaleY)) {
+        const nf = [...found, d.id]; setFound(nf);
+        if (nf.length === SPOT_DIFFS.length) { const sc=nf.length*20+timeLeft*2; saveScore('spot',playerName,sc); setDone(true); onGameOver(sc); }
+        return;
+      }
+    }
+    setFlash({ x, y, canvas: isB?'b':'a' }); setTimeout(()=>setFlash(null), 500);
+  };
 
   return (
-    <div style={{ height: '100vh', background: C.bg, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      {/* Header */}
-      <div style={{ background: C.card, borderBottom: `2px solid ${C.brown}`, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-            <rect x="2" y="6" width="24" height="16" rx="4" fill={C.brown} />
-            <rect x="5" y="9" width="6" height="6" rx="1.5" fill={C.gold} />
-            <rect x="13" y="9" width="6" height="6" rx="1.5" fill={C.gold} />
-            <circle cx="7" cy="20" r="2" fill={C.gold} />
-            <circle cx="21" cy="20" r="2" fill={C.gold} />
-            <rect x="10" y="2" width="8" height="4" rx="2" fill={C.gold} />
-          </svg>
-          <div style={{ color: C.gold, fontWeight: 'bold', fontSize: 18 }}>Arcade</div>
+    <div style={{ display:'flex', flexDirection:'column', flex:1 }}>
+      <div style={S.gameBar}>
+        <span style={S.score}>Found: {found.length}/5</span>
+        <span style={{ fontSize:12, color: timeLeft<20?T.danger:T.dim }}>⏱ {timeLeft}s</span>
+        <span style={{ fontSize:11, color:T.dim }}>{scene.name}</span>
+      </div>
+      <div ref={containerRef} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', overflowY:'auto', padding:'6px 8px' }}>
+        <div style={{ fontSize:11, color:T.dim, marginBottom:6, textAlign:'center' }}>
+          {done ? (found.length===5?'🎉 All found!':'⏰ Time up!') : 'Tap the differences in either picture!'}
         </div>
-        <button onClick={() => setScreen('leaderboard')}
-          style={{ background: C.brown, border: 'none', color: C.gold, padding: '6px 14px', borderRadius: 16, fontSize: 13, fontWeight: 'bold', cursor: 'pointer' }}>
-          🏆 Top Scores
+        <div style={{ display:'flex', gap:8, justifyContent:'center' }}>
+          {[false,true].map(isB => (
+            <div key={String(isB)}>
+              <div style={{ fontSize:9, color:T.dim, textAlign:'center', marginBottom:3 }}>{isB?'Find here →':'Original'}</div>
+              <canvas ref={isB?canvasB:canvasA} width={W} height={H} style={{ borderRadius:8, border:`1px solid ${T.brown}55`, cursor:'crosshair', display:'block' }} onClick={e=>tap(e,isB)} />
+            </div>
+          ))}
+        </div>
+        <div style={{ display:'flex', justifyContent:'center', gap:6, flexWrap:'wrap', marginTop:10, padding:'0 8px' }}>
+          {SPOT_DIFFS.map(d => (
+            <span key={d.id} style={{ fontSize:11, padding:'3px 10px', borderRadius:20, background:found.includes(d.id)?T.success+'33':T.cardLight, color:found.includes(d.id)?T.success:T.dim, border:`1px solid ${found.includes(d.id)?T.success:T.brown+'44'}` }}>
+              {found.includes(d.id)?'✓':'?'} #{d.id+1}
+            </span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// MAIN GAMES PAGE
+// ═══════════════════════════════════════════════════════════════════
+const GAME_LIST = [
+  { id:'snake',       icon:'🐍', name:'Snake',        desc:'Eat the beans!' },
+  { id:'mario',       icon:'🏃', name:'Café Runner',  desc:'Ocean → Space!' },
+  { id:'tetris',      icon:'🟦', name:'Tetris',        desc:'Stack blocks!' },
+  { id:'spot',        icon:'🔍', name:'Spot the Diff', desc:'3 random scenes!' },
+  { id:'cafemystery', icon:'☕', name:'Café Mystery',  desc:'Multiplayer · 3-10 players!' },
+];
+
+const GAME_LABELS = { snake:'🐍 Snake', mario:'🏃 Café Runner', tetris:'🟦 Tetris', spot:'🔍 Spot the Diff', cafemystery:'☕ Café Mystery' };
+
+export default function GamesPage() {
+  const [activeGame, setActiveGame] = useState(null);
+  const [playerName, setPlayerName] = useState(null);
+  const [showName, setShowName] = useState(false);
+  const [pendingGame, setPendingGame] = useState(null);
+  const [gameOver, setGameOver] = useState(null);
+  const [showBoard, setShowBoard] = useState(false);
+
+  const pickGame = (id) => {
+    setActiveGame(null); setGameOver(null); setPlayerName(null); setPendingGame(id);
+    if (id === 'cafemystery') { setActiveGame('cafemystery'); setPlayerName('multiplayer'); }
+    else setShowName(true);
+  };
+
+  const handleName = (name) => { setPlayerName(name); setShowName(false); setActiveGame(pendingGame); setGameOver(null); };
+  const handleGameOver = (score) => { setGameOver({ score }); };
+  const exitGame = () => { setActiveGame(null); setGameOver(null); setPlayerName(null); setPendingGame(null); };
+  const restart = () => { setGameOver(null); setActiveGame(null); setTimeout(()=>setActiveGame(pendingGame),50); };
+
+  // FULLSCREEN GAME
+  if (activeGame && playerName) {
+    return (
+      <div style={S.fullscreen}>
+        <div style={S.fsHeader}>
+          <button style={S.backBtn} onClick={exitGame}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            Exit
+          </button>
+          <div style={S.fsTitle}>{GAME_LABELS[activeGame]}</div>
+          <button style={{ ...S.backBtn, padding:'7px 10px' }} onClick={() => { exitGame(); setShowBoard(true); }}>🏆</button>
+        </div>
+        <div style={S.fsContent}>
+          {activeGame==='snake'       && <SnakeGame    key={'s'+playerName} playerName={playerName} onGameOver={handleGameOver} />}
+          {activeGame==='mario'       && <MarioGame    key={'m'+playerName} playerName={playerName} onGameOver={handleGameOver} />}
+          {activeGame==='tetris'      && <TetrisGame   key={'t'+playerName} playerName={playerName} onGameOver={handleGameOver} />}
+          {activeGame==='spot'        && <SpotDiffGame key={'d'+playerName} playerName={playerName} onGameOver={handleGameOver} />}
+          {activeGame==='cafemystery' && <CafeGame onExit={exitGame} />}
+        </div>
+        {gameOver && (
+          <GameOverModal game={pendingGame} playerName={playerName} score={gameOver.score}
+            onRestart={restart} onLeaderboard={()=>{exitGame();setShowBoard(true);}} />
+        )}
+      </div>
+    );
+  }
+
+  if (showBoard) return <Leaderboard onClose={() => setShowBoard(false)} />;
+
+  return (
+    <div style={S.wrap}>
+      <div style={S.header}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:10, marginBottom:4 }}>
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={T.gold} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="6" width="20" height="12" rx="3"/>
+            <circle cx="8" cy="12" r="1.5" fill={T.gold}/>
+            <circle cx="16" cy="12" r="1.5" fill={T.gold}/>
+            <line x1="12" y1="9" x2="12" y2="15"/>
+            <line x1="9" y1="12" x2="15" y2="12"/>
+          </svg>
+          <h1 style={S.title}>Arcade Corner</h1>
+        </div>
+        <p style={S.sub}>THEONYX CAFE · PLAY & WIN</p>
+        <button style={{ ...S.btn(T.card), marginTop:8, border:`1px solid ${T.gold}55`, fontSize:12, padding:'6px 18px' }} onClick={()=>setShowBoard(true)}>
+          🏆 Leaderboard
         </button>
       </div>
-
-      {screen === 'leaderboard' && (
-        <div style={{ flex: 1, overflow: 'hidden', background: C.bg }}>
-          <Leaderboard onClose={() => setScreen('menu')} />
-        </div>
-      )}
-
-      {screen === 'name' && selectedGame && (
-        <div style={{ flex: 1, overflow: 'hidden', background: C.bg }}>
-          <NameEntry gameLabel={selectedGame.label} onStart={startGame} />
-        </div>
-      )}
-
-      {screen === 'menu' && (
-        <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
-          <div style={{ color: C.light, fontSize: 13, marginBottom: 14, textAlign: 'center' }}>
-            ☕ Pick a game and play!
+      <div style={S.gameGrid}>
+        {GAME_LIST.map(g => (
+          <div key={g.id} style={S.card()} onClick={() => pickGame(g.id)}>
+            <div style={{ fontSize:34, marginBottom:8 }}>{g.icon}</div>
+            <div style={{ fontSize:13, fontWeight:'bold', color:T.gold, letterSpacing:0.5 }}>{g.name}</div>
+            <div style={{ fontSize:10, color:T.dim, marginTop:3 }}>{g.desc}</div>
+            {getTop(g.id).length>0 && (
+              <div style={{ fontSize:10, color:T.dim, marginTop:6, borderTop:`1px solid ${T.brown}44`, paddingTop:5 }}>
+                🥇 {getTop(g.id)[0].name}: {getTop(g.id)[0].score}
+              </div>
+            )}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-            {GAME_LIST.map(g => {
-              const scores = getScores(g.id);
-              const top = scores[0];
-              return (
-                <button key={g.id} onClick={() => selectGame(g)}
-                  style={{ background: C.card, border: `2px solid ${C.brown}`, borderRadius: 16, padding: '18px 10px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, cursor: 'pointer', textAlign: 'center' }}>
-                  <div style={{ fontSize: 40 }}>{g.icon}</div>
-                  <div style={{ color: C.gold, fontWeight: 'bold', fontSize: 15 }}>{g.label}</div>
-                  <div style={{ color: C.light, fontSize: 11 }}>{g.desc}</div>
-                  {top && <div style={{ color: C.brown, fontSize: 10 }}>🥇 {top.name}: {top.score}</div>}
-                </button>
-              );
-            })}
-          </div>
-          <div style={{ marginTop: 16, padding: 14, background: C.card, borderRadius: 14, border: `1px solid ${C.brown}` }}>
-            <div style={{ color: C.gold, fontWeight: 'bold', fontSize: 13, marginBottom: 6 }}>🎯 How to play</div>
-            <div style={{ color: C.light, fontSize: 12, lineHeight: 1.6 }}>
-              🐍 Snake — avoid walls, eat coffee beans<br />
-              🟦 Tetris — clear rows, stack smart<br />
-              🏃 Runner — jump obstacles, reach the Sun!<br />
-              🔍 Spot It — find 5 differences before time runs out
-            </div>
-          </div>
-        </div>
-      )}
+        ))}
+      </div>
+      <div style={{ textAlign:'center', padding:'8px 16px 20px', color:T.dim, fontSize:11 }}>
+        Tap a game to play · Name yourself after a menu item ☕
+      </div>
+      {showName && <NameModal game={pendingGame} onStart={handleName} />}
     </div>
   );
 }
