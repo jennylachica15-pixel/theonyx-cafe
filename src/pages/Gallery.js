@@ -1,6 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { db } from '../firebase/config';
-import { collection, addDoc, serverTimestamp, onSnapshot, query, where, orderBy } from 'firebase/firestore';
+import {
+  collection, addDoc, serverTimestamp, onSnapshot,
+  query, where, doc, updateDoc, arrayUnion, arrayRemove,
+  getDocs
+} from 'firebase/firestore';
 
 const GOOGLE_CLIENT_ID = '596322682185-n5hm66hvol3nnqqllnuop995kcnefbgu.apps.googleusercontent.com';
 const GUEST_FOLDER_ID = '1hOrGU9k3HKBWdaOenygW-4ORVXu6gYeM';
@@ -38,24 +42,13 @@ const makeThumb = (file) => new Promise((resolve) => {
   img.src = URL.createObjectURL(file);
 });
 
-const s = {
-  page: { padding: '16px 16px 0', minHeight: '100vh', background: 'transparent' },
-  title: { fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: 'white', marginBottom: 4 },
-  sub: { fontSize: 13, color: 'rgba(255,255,255,0.6)', marginBottom: 16 },
-  uploadBox: { background: 'rgba(253,240,228,0.95)', borderRadius: 14, padding: '14px 16px', textAlign: 'center', border: '1.5px dashed rgba(200,149,108,0.5)', marginBottom: 14, cursor: 'pointer' },
-  previewImg: { width: '100%', borderRadius: 12, maxHeight: 220, objectFit: 'cover', marginBottom: 14 },
-  connectBtn: { padding: '8px 16px', borderRadius: 10, background: '#6b3a1f', color: '#f0d080', fontSize: 12, fontWeight: 600, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 14, border: '1px solid rgba(212,168,83,0.3)', cursor: 'pointer' },
-  connectedBadge: { background: 'rgba(216,243,220,0.9)', color: '#2d6a4f', borderRadius: 10, padding: '8px 12px', fontSize: 12, fontWeight: 500, marginBottom: 14, display: 'inline-flex', alignItems: 'center', gap: 6 },
-  progressBar: { height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.2)', marginBottom: 14, overflow: 'hidden' },
-  albumGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, paddingBottom: 80 },
-  albumCell: { background: 'rgba(107,58,31,0.4)', borderRadius: 12, overflow: 'hidden', cursor: 'pointer', border: '1px solid rgba(212,168,83,0.15)' },
-  consentModal: { position: 'fixed', inset: 0, background: 'rgba(26,10,0,0.75)', zIndex: 300, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' },
-  consentCard: { background: '#fdf6ee', borderRadius: '20px 20px 0 0', padding: '28px 24px 40px', width: '100%', maxWidth: 480, animation: 'slideUp 0.3s ease' },
-  agreeBtn: { width: '100%', padding: '13px', borderRadius: 12, background: '#1a0a00', color: '#f0d080', fontSize: 14, fontWeight: 600, marginBottom: 8, border: 'none', cursor: 'pointer' },
-  declineBtn: { width: '100%', padding: '12px', borderRadius: 12, background: '#fdf6ee', color: '#6b3a1f', fontSize: 14, border: '1.5px solid #e8d8c8', cursor: 'pointer', marginBottom: 8 },
-  input: { width: '100%', padding: '11px 14px', borderRadius: 10, border: '1.5px solid #e8d8c8', fontSize: 14, background: 'white', color: '#1a0a00', marginBottom: 14, outline: 'none', boxSizing: 'border-box' },
-  label: { display: 'block', fontSize: 12, fontWeight: 600, color: '#6b3a1f', marginBottom: 5, textTransform: 'uppercase', letterSpacing: 0.4 },
-  galleryTitle: { fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700, color: 'white', marginBottom: 10, marginTop: 4 },
+// Get or create a guest session ID stored in localStorage
+const getGuestId = () => {
+  try {
+    let id = localStorage.getItem('theonyx_guest_id');
+    if (!id) { id = Math.random().toString(36).slice(2); localStorage.setItem('theonyx_guest_id', id); }
+    return id;
+  } catch { return 'guest_' + Math.random().toString(36).slice(2); }
 };
 
 export default function Gallery() {
@@ -69,8 +62,14 @@ export default function Gallery() {
   const [progress, setProgress] = useState(0);
   const [success, setSuccess] = useState('');
   const [selected, setSelected] = useState(null);
+  const [expandedComments, setExpandedComments] = useState({});
+  const [commentText, setCommentText] = useState({});
+  const [commenterName, setCommenterName] = useState({});
+  const [comments, setComments] = useState({}); // { photoId: [...] }
+  const [submittingComment, setSubmittingComment] = useState({});
   const fileRef = useRef();
   const tokenClientRef = useRef(null);
+  const guestId = getGuestId();
 
   useEffect(() => {
     const q = query(collection(db, 'guestPhotos'), where('public', '==', true), where('approved', '==', true));
@@ -118,90 +117,215 @@ export default function Gallery() {
       if (!res.ok) throw new Error('Upload failed');
       const data = await res.json(); setProgress(90);
       const thumb = await makeThumb(wm);
-      await addDoc(collection(db, 'guestPhotos'), { fileName, driveFileId: data.id, thumb, feedback, public: isPublic, createdAt: serverTimestamp() });
-      setSuccess(isPublic ? '✅ Photo published to gallery!' : '✅ Photo saved privately.');
+      await addDoc(collection(db, 'guestPhotos'), {
+        fileName, driveFileId: data.id, thumb, feedback,
+        public: isPublic, hearts: [], createdAt: serverTimestamp()
+      });
+      setSuccess(isPublic ? '✅ Photo submitted for approval!' : '✅ Photo saved privately.');
       setPhoto(null); setPhotoFile(null); setFeedback('');
-      setProgress(100); setTimeout(() => { setSuccess(''); setProgress(0); }, 3000);
+      setProgress(100); setTimeout(() => { setSuccess(''); setProgress(0); }, 4000);
     } catch (e) { setSuccess('⚠️ Upload failed. Try again.'); setProgress(0); }
     setUploading(false);
   };
 
-  return (
-    <div style={s.page}>
-      <div style={s.title}>Snapshots</div>
-      <div style={s.sub}>Share your experience at Theonyx Cafe</div>
+  const toggleHeart = async (photoId, currentHearts) => {
+    const hearts = currentHearts || [];
+    const hasLiked = hearts.includes(guestId);
+    await updateDoc(doc(db, 'guestPhotos', photoId), {
+      hearts: hasLiked ? arrayRemove(guestId) : arrayUnion(guestId)
+    });
+  };
 
-      {/* Connect + Capture in one row */}
+  const toggleComments = async (photoId) => {
+    const isOpen = expandedComments[photoId];
+    if (!isOpen && !comments[photoId]) {
+      // Load comments
+      const snap = await getDocs(query(collection(db, 'guestPhotos', photoId, 'comments')));
+      const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      data.sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
+      setComments(prev => ({ ...prev, [photoId]: data }));
+    }
+    setExpandedComments(prev => ({ ...prev, [photoId]: !isOpen }));
+  };
+
+  const submitComment = async (photoId) => {
+    const text = (commentText[photoId] || '').trim();
+    const name = (commenterName[photoId] || '').trim();
+    if (!text) return;
+    setSubmittingComment(prev => ({ ...prev, [photoId]: true }));
+    const newComment = { text, name: name || 'Guest', createdAt: serverTimestamp() };
+    await addDoc(collection(db, 'guestPhotos', photoId, 'comments'), newComment);
+    // Update local state
+    setComments(prev => ({
+      ...prev,
+      [photoId]: [...(prev[photoId] || []), { ...newComment, createdAt: { seconds: Date.now()/1000 } }]
+    }));
+    setCommentText(prev => ({ ...prev, [photoId]: '' }));
+    setCommenterName(prev => ({ ...prev, [photoId]: '' }));
+    setSubmittingComment(prev => ({ ...prev, [photoId]: false }));
+  };
+
+  return (
+    <div style={{ padding: '16px 16px 0', minHeight: '100vh', background: 'transparent' }}>
+      <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: 'white', marginBottom: 4 }}>Snapshots</div>
+      <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginBottom: 16 }}>Share your experience at Theonyx Cafe</div>
+
+      {/* Connect + Capture row */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'stretch' }}>
         {!accessToken
-          ? <button style={{ ...s.connectBtn, marginBottom: 0, flex: '0 0 auto' }} onClick={() => tokenClientRef.current?.requestAccessToken()}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-              Connect to Upload
+          ? <button style={{ padding: '8px 14px', borderRadius: 10, background: '#6b3a1f', color: '#f0d080', fontSize: 12, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6, border: '1px solid rgba(212,168,83,0.3)', cursor: 'pointer', flexShrink: 0 }} onClick={() => tokenClientRef.current?.requestAccessToken()}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+              Connect
             </button>
-          : <div style={{ ...s.connectedBadge, marginBottom: 0, flex: '0 0 auto' }}>✅ Ready</div>
+          : <div style={{ padding: '8px 12px', borderRadius: 10, background: 'rgba(45,106,79,0.3)', color: '#6fcf97', fontSize: 11, fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 5, border: '1px solid rgba(45,106,79,0.3)', flexShrink: 0 }}>✅ Ready</div>
         }
         <div style={{ flex: 1, background: 'rgba(107,58,31,0.35)', borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', border: '1px solid rgba(212,168,83,0.25)' }} onClick={() => fileRef.current.click()}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#d4a853" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#d4a853" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
           <div>
             <div style={{ fontSize: 12, fontWeight: 600, color: '#f0d080' }}>Capture the moment here!</div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginTop: 1 }}>Camera or gallery</div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginTop: 1 }}>Camera or gallery</div>
           </div>
         </div>
       </div>
-
-      {/* Photo preview */}
-      {photo && !uploading && (
-        <img src={photo} alt="preview" style={{ width: '100%', borderRadius: 12, maxHeight: 200, objectFit: 'cover', marginBottom: 14 }} />
-      )}
       <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handleFile} />
 
-      {uploading && <div style={s.progressBar}><div style={{ height: '100%', borderRadius: 3, background: '#1a73e8', width: `${progress}%`, transition: 'width 0.3s' }} /></div>}
+      {photo && !uploading && <img src={photo} alt="preview" style={{ width: '100%', borderRadius: 12, maxHeight: 200, objectFit: 'cover', marginBottom: 14 }} />}
+      {uploading && <div style={{ height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.15)', marginBottom: 14, overflow: 'hidden' }}><div style={{ height: '100%', borderRadius: 2, background: '#d4a853', width: `${progress}%`, transition: 'width 0.3s' }} /></div>}
+      {success && <div style={{ fontSize: 12, color: success.includes('⚠️') ? '#ff6b6b' : '#6fcf97', marginBottom: 12, padding: '8px 12px', background: 'rgba(0,0,0,0.2)', borderRadius: 8 }}>{success}</div>}
 
-      {/* Public gallery grid */}
-      <div style={s.galleryTitle}>Guest Snapshots</div>
-      {photos.length === 0 && <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.6)', padding: '20px 0', fontSize: 13 }}>No approved photos yet. Be the first to share!</div>}
-      <div style={s.albumGrid}>
-        {photos.map(p => (
-          <div key={p.id} style={s.albumCell} onClick={() => setSelected(selected?.id === p.id ? null : p)}>
-            <div style={{ aspectRatio: '1', overflow: 'hidden', background: '#fdf6ee', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {p.thumb ? <img src={p.thumb} alt="guest" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 24 }}>📷</span>}
+      {/* Guest Snapshots */}
+      <div style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700, color: 'white', marginBottom: 12 }}>Guest Snapshots</div>
+      {photos.length === 0 && <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.4)', padding: '30px 0', fontSize: 13 }}>No photos yet. Be the first to share!</div>}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingBottom: 80 }}>
+        {photos.map(p => {
+          const hearts = p.hearts || [];
+          const hasLiked = hearts.includes(guestId);
+          const isExpanded = expandedComments[p.id];
+          const photoComments = comments[p.id] || [];
+
+          return (
+            <div key={p.id} style={{ background: 'rgba(20,8,0,0.6)', borderRadius: 14, overflow: 'hidden', border: '1px solid rgba(212,168,83,0.15)' }}>
+              {/* Photo */}
+              <div style={{ position: 'relative', cursor: 'pointer' }} onClick={() => setSelected(p)}>
+                {p.thumb
+                  ? <img src={p.thumb} alt="guest" style={{ width: '100%', aspectRatio: '4/3', objectFit: 'cover', display: 'block' }} />
+                  : <div style={{ width: '100%', aspectRatio: '4/3', background: 'rgba(107,58,31,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32 }}>📷</div>
+                }
+              </div>
+
+              {/* Actions row */}
+              <div style={{ padding: '10px 14px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: p.feedback ? 8 : 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                    {/* Heart button */}
+                    <button
+                      onClick={() => toggleHeart(p.id, p.hearts)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, padding: 0 }}
+                    >
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill={hasLiked ? '#e05a5a' : 'none'} stroke={hasLiked ? '#e05a5a' : 'rgba(255,255,255,0.5)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transition: 'all 0.2s' }}>
+                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                      </svg>
+                      <span style={{ fontSize: 12, color: hasLiked ? '#e05a5a' : 'rgba(255,255,255,0.5)', fontWeight: 600 }}>{hearts.length || 0}</span>
+                    </button>
+                    {/* Comment toggle */}
+                    <button
+                      onClick={() => toggleComments(p.id)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, padding: 0 }}
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                      </svg>
+                      <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>
+                        {isExpanded ? 'Hide' : photoComments.length > 0 ? `${photoComments.length} comment${photoComments.length !== 1 ? 's' : ''}` : 'Comment'}
+                      </span>
+                    </button>
+                  </div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>
+                    {p.createdAt?.toDate ? p.createdAt.toDate().toLocaleDateString('en-PH', { month: 'short', day: 'numeric' }) : 'Just now'}
+                  </div>
+                </div>
+
+                {/* Feedback caption */}
+                {p.feedback && <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', fontStyle: 'italic', marginTop: 4 }}>"{p.feedback}"</div>}
+
+                {/* Comments section */}
+                {isExpanded && (
+                  <div style={{ marginTop: 10, borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 10 }}>
+                    {/* Comments list */}
+                    {photoComments.length === 0
+                      ? <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginBottom: 10 }}>No comments yet. Be the first!</div>
+                      : photoComments.map((c, i) => (
+                          <div key={i} style={{ marginBottom: 8 }}>
+                            <span style={{ fontSize: 12, fontWeight: 600, color: '#d4a853' }}>{c.name} </span>
+                            <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.75)' }}>{c.text}</span>
+                            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginTop: 1 }}>
+                              {c.createdAt?.toDate ? c.createdAt.toDate().toLocaleDateString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Just now'}
+                            </div>
+                          </div>
+                        ))
+                    }
+                    {/* Add comment */}
+                    <div style={{ marginTop: 8 }}>
+                      <input
+                        style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(212,168,83,0.2)', background: 'rgba(255,255,255,0.06)', color: 'white', fontSize: 12, outline: 'none', boxSizing: 'border-box', marginBottom: 6 }}
+                        placeholder="Your name (optional)"
+                        value={commenterName[p.id] || ''}
+                        onChange={e => setCommenterName(prev => ({ ...prev, [p.id]: e.target.value }))}
+                      />
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <input
+                          style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(212,168,83,0.2)', background: 'rgba(255,255,255,0.06)', color: 'white', fontSize: 12, outline: 'none' }}
+                          placeholder="Write a comment..."
+                          value={commentText[p.id] || ''}
+                          onChange={e => setCommentText(prev => ({ ...prev, [p.id]: e.target.value }))}
+                          onKeyDown={e => e.key === 'Enter' && submitComment(p.id)}
+                        />
+                        <button
+                          onClick={() => submitComment(p.id)}
+                          disabled={submittingComment[p.id]}
+                          style={{ padding: '8px 14px', borderRadius: 8, background: '#d4a853', color: '#1a0a00', fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', flexShrink: 0 }}
+                        >
+                          Post
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-            <div style={{ padding: '6px 8px', background: 'rgba(107,58,31,0.4)' }}>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>{p.createdAt?.toDate ? p.createdAt.toDate().toLocaleDateString('en-PH', { month: 'short', day: 'numeric' }) : 'Just now'}</div>
-              {p.feedback && <div style={{ fontSize: 10, color: '#f0d080', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontStyle: 'italic' }}>"{p.feedback}"</div>}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Consent Modal */}
       {showConsent && photo && (
-        <div style={s.consentModal}>
-          <div style={s.consentCard}>
-            <img src={photo} alt="preview" style={{ width: '100%', borderRadius: 12, maxHeight: 180, objectFit: 'cover', marginBottom: 14 }} />
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: 17, fontWeight: 700, color: '#1a0a00', marginBottom: 10 }}>📸 Photo Consent</div>
-            <div style={{ fontSize: 13, color: '#6b3a1f', lineHeight: 1.6, marginBottom: 14 }}>
-              By tapping <strong>"I Agree"</strong>, you allow <strong>THEONYX CAFE</strong> to display your photo in our public gallery and social media. If you decline, your photo will be saved privately.
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(26,10,0,0.8)', zIndex: 300, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+          <div style={{ background: '#fdf6ee', borderRadius: '20px 20px 0 0', padding: '24px 20px 36px', width: '100%', maxWidth: 480, animation: 'slideUp 0.3s ease' }}>
+            <img src={photo} alt="preview" style={{ width: '100%', borderRadius: 10, maxHeight: 160, objectFit: 'cover', marginBottom: 14 }} />
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700, color: '#1a0a00', marginBottom: 8 }}>Photo Consent</div>
+            <div style={{ fontSize: 12, color: '#6b3a1f', lineHeight: 1.7, marginBottom: 14 }}>
+              By tapping <strong>"I Agree"</strong>, you allow <strong>THEONYX CAFE</strong> to display your photo in our public gallery and social media after review. If you decline, your photo will be saved privately.
             </div>
-            <label style={s.label}>Feedback (optional)</label>
-            <input style={s.input} placeholder="Share your experience at Theonyx..." value={feedback} onChange={e => setFeedback(e.target.value)} />
-            <button style={s.agreeBtn} onClick={() => uploadPhoto(true)}>✅ I Agree — Publish my photo</button>
-            <button style={s.declineBtn} onClick={() => uploadPhoto(false)}>🔒 No thanks — Keep it private</button>
-            <button style={{ ...s.declineBtn, color: '#c1121f', borderColor: '#ffcdd2' }} onClick={() => { setShowConsent(false); setPhoto(null); setPhotoFile(null); }}>Cancel</button>
+            <input style={{ width: '100%', padding: '10px 12px', borderRadius: 9, border: '1px solid #e8d8c8', fontSize: 13, background: 'white', color: '#1a0a00', marginBottom: 12, outline: 'none', boxSizing: 'border-box' }}
+              placeholder="Caption or feedback (optional)" value={feedback} onChange={e => setFeedback(e.target.value)} />
+            <button style={{ width: '100%', padding: '12px', borderRadius: 10, background: '#1a0a00', color: '#f0d080', fontSize: 14, fontWeight: 600, border: 'none', cursor: 'pointer', marginBottom: 8 }} onClick={() => uploadPhoto(true)}>I Agree — Submit for Approval</button>
+            <button style={{ width: '100%', padding: '11px', borderRadius: 10, background: 'transparent', color: '#6b3a1f', fontSize: 13, border: '1px solid #e8d8c8', cursor: 'pointer', marginBottom: 6 }} onClick={() => uploadPhoto(false)}>Keep it private</button>
+            <button style={{ width: '100%', padding: '10px', borderRadius: 10, background: 'transparent', color: '#c8956c', fontSize: 12, border: 'none', cursor: 'pointer' }} onClick={() => { setShowConsent(false); setPhoto(null); setPhotoFile(null); }}>Cancel</button>
           </div>
         </div>
       )}
 
       {/* Full photo viewer */}
       {selected && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.92)', zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={() => setSelected(null)}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.95)', zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={() => setSelected(null)}>
           <div style={{ maxWidth: 400, width: '100%' }}>
             {selected.thumb && <img src={selected.thumb} alt="full" style={{ width: '100%', borderRadius: 12 }} />}
-            {selected.feedback && <div style={{ color: 'white', textAlign: 'center', marginTop: 10, fontSize: 13, fontStyle: 'italic' }}>"{selected.feedback}"</div>}
+            {selected.feedback && <div style={{ color: 'rgba(255,255,255,0.7)', textAlign: 'center', marginTop: 10, fontSize: 13, fontStyle: 'italic' }}>"{selected.feedback}"</div>}
+            <div style={{ color: 'rgba(255,255,255,0.35)', textAlign: 'center', marginTop: 6, fontSize: 11 }}>Tap anywhere to close</div>
           </div>
         </div>
       )}
-      <div style={{ height: 80 }} />
     </div>
   );
 }
