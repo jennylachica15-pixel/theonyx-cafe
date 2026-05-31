@@ -311,143 +311,222 @@ function SnakeGame({ playerName, onScore }) {
 // TETRIS GAME
 // ═══════════════════════════════════════════════════════════════════════════════
 function TetrisGame({ playerName, onScore }) {
-  const canvasRef = useRef(null);
-  const containerRef = useRef(null);
-  const stateRef = useRef(null);
-  const rafRef = useRef(null);
-  const cellRef = useRef(20); // dynamic cell size
-  const [score, setScore] = useState(0);
-  const [gameOver, setGameOver] = useState(false);
-  const [started, setStarted] = useState(false);
+  const canvasRef   = useRef(null);
+  const nextCanvRef = useRef(null);
+  const containerRef= useRef(null);
+  const stateRef    = useRef(null);
+  const rafRef      = useRef(null);
+  const cellRef     = useRef(18);
   const COLS=10, ROWS=20;
+  const [score,  setScore]   = useState(0);
+  const [level,  setLevel]   = useState(1);
+  const [lines,  setLines]   = useState(0);
+  const [gameOver,setGameOver]= useState(false);
+  const [started, setStarted] = useState(false);
 
   const PIECES=[
-    {shape:[[1,1,1,1]],color:'#00bcd4'},
-    {shape:[[1,1],[1,1]],color:'#d4a853'},
-    {shape:[[1,1,1],[0,1,0]],color:'#9c27b0'},
-    {shape:[[1,1,1],[1,0,0]],color:'#ff9800'},
-    {shape:[[1,1,1],[0,0,1]],color:'#2196f3'},
-    {shape:[[1,1,0],[0,1,1]],color:'#f44336'},
-    {shape:[[0,1,1],[1,1,0]],color:'#4caf50'},
+    {shape:[[1,1,1,1]],        color:'#00e5ff', glow:'#00e5ff'},
+    {shape:[[1,1],[1,1]],      color:'#ffd600', glow:'#ffd600'},
+    {shape:[[1,1,1],[0,1,0]],  color:'#d500f9', glow:'#d500f9'},
+    {shape:[[1,1,1],[1,0,0]],  color:'#ff6d00', glow:'#ff6d00'},
+    {shape:[[1,1,1],[0,0,1]],  color:'#2979ff', glow:'#2979ff'},
+    {shape:[[1,1,0],[0,1,1]],  color:'#ff1744', glow:'#ff1744'},
+    {shape:[[0,1,1],[1,1,0]],  color:'#00e676', glow:'#00e676'},
   ];
-  const newPiece=()=>{const p=PIECES[Math.floor(Math.random()*PIECES.length)];return{shape:p.shape,color:p.color,x:Math.floor(COLS/2)-Math.floor(p.shape[0].length/2),y:0};};
+  const rng=()=>PIECES[Math.floor(Math.random()*PIECES.length)];
+  const newPiece=()=>{const p=rng();return{...p,x:Math.floor(COLS/2)-Math.floor(p.shape[0].length/2),y:0};};
   const rotate=s=>s[0].map((_,i)=>s.map(r=>r[i]).reverse());
   const collides=(board,piece,ox=0,oy=0)=>piece.shape.some((row,y)=>row.some((v,x)=>v&&(piece.x+x+ox<0||piece.x+x+ox>=COLS||piece.y+y+oy>=ROWS||board[piece.y+y+oy]?.[piece.x+x+ox])));
   const merge=(board,piece)=>{const b=board.map(r=>[...r]);piece.shape.forEach((row,y)=>row.forEach((v,x)=>{if(v)b[piece.y+y][piece.x+x]=piece.color;}));return b;};
-  const clearLines=(board)=>{const b=board.filter(r=>r.some(v=>!v));const cleared=ROWS-b.length;const empty=Array.from({length:cleared},()=>Array(COLS).fill(0));return{board:[...empty,...b],cleared};};
-  const initState=()=>({board:Array.from({length:ROWS},()=>Array(COLS).fill(0)),piece:newPiece(),next:newPiece(),score:0,lastTime:0,speed:600});
+  const clearLines=(board)=>{const b=board.filter(r=>r.some(v=>!v));const n=ROWS-b.length;return{board:[...Array.from({length:n},()=>Array(COLS).fill(0)),...b],cleared:n};};
+  const initState=()=>({board:Array.from({length:ROWS},()=>Array(COLS).fill(0)),piece:newPiece(),next:newPiece(),score:0,lines:0,level:1,lastTime:0,speed:600});
 
-  const resizeCanvas = useCallback(() => {
-    const canvas = canvasRef.current;
-    const container = containerRef.current;
-    if (!canvas || !container) return;
-    const availH = container.clientHeight - 70; // room for score + buttons
-    const availW = container.clientWidth - 8;   // small side padding
-    // cell must fit both width AND height
-    const cellByW = Math.floor(availW / COLS);
-    const cellByH = Math.floor(availH / ROWS);
-    const cell = Math.max(8, Math.min(cellByW, cellByH, 28)); // cap at 28px max
-    cellRef.current = cell;
-    canvas.width = COLS * cell;
-    canvas.height = ROWS * cell;
-  }, []);
+  const calcCell=useCallback(()=>{
+    const c=containerRef.current; if(!c)return 18;
+    // board takes ~65% of width, rest is sidebar
+    const bw=Math.floor(c.clientWidth*0.62);
+    const bh=c.clientHeight-110; // buttons take ~100px
+    const byW=Math.floor(bw/COLS);
+    const byH=Math.floor(bh/ROWS);
+    return Math.max(8,Math.min(byW,byH,26));
+  },[]);
 
-  const drawGame = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const CELL = cellRef.current;
-    const ctx = canvas.getContext('2d');
-    const st = stateRef.current;
-    if (!st) return;
-    ctx.fillStyle = '#0a0500';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    // grid
-    ctx.strokeStyle = 'rgba(61,31,0,0.35)';
-    ctx.lineWidth = 0.5;
-    for(let x=0;x<=COLS;x++){ctx.beginPath();ctx.moveTo(x*CELL,0);ctx.lineTo(x*CELL,ROWS*CELL);ctx.stroke();}
-    for(let y=0;y<=ROWS;y++){ctx.beginPath();ctx.moveTo(0,y*CELL);ctx.lineTo(COLS*CELL,y*CELL);ctx.stroke();}
-    // ghost piece
-    let gy = st.piece.y;
-    while (!collides(st.board,{...st.piece,y:gy+1})) gy++;
-    st.piece.shape.forEach((row,y)=>row.forEach((v,x)=>{
-      if(v){ctx.fillStyle='rgba(255,255,255,0.08)';ctx.fillRect((st.piece.x+x)*CELL+1,(gy+y)*CELL+1,CELL-2,CELL-2);}
-    }));
-    // board
-    st.board.forEach((row,y)=>row.forEach((v,x)=>{
-      if(v){
-        ctx.fillStyle=v;
-        ctx.fillRect(x*CELL+1,y*CELL+1,CELL-2,CELL-2);
-        ctx.fillStyle='rgba(255,255,255,0.15)';
-        ctx.fillRect(x*CELL+1,y*CELL+1,CELL-2,3);
-        ctx.fillRect(x*CELL+1,y*CELL+1,3,CELL-2);
-      }
-    }));
-    // active piece
-    st.piece.shape.forEach((row,y)=>row.forEach((v,x)=>{
-      if(v){
-        ctx.fillStyle=st.piece.color;
-        ctx.fillRect((st.piece.x+x)*CELL+1,(st.piece.y+y)*CELL+1,CELL-2,CELL-2);
-        ctx.fillStyle='rgba(255,255,255,0.25)';
-        ctx.fillRect((st.piece.x+x)*CELL+1,(st.piece.y+y)*CELL+1,CELL-2,3);
-        ctx.fillRect((st.piece.x+x)*CELL+1,(st.piece.y+y)*CELL+1,3,CELL-2);
-      }
-    }));
-  }, []);
-
-  const gameLoop = useCallback((ts) => {
-    const st = stateRef.current; if (!st) return;
-    if (ts - st.lastTime > st.speed) {
-      st.lastTime = ts;
-      if (!collides(st.board,st.piece,0,1)) { st.piece.y++; }
-      else {
-        const nb = merge(st.board,st.piece);
-        const {board,cleared} = clearLines(nb);
-        st.board = board;
-        st.score += cleared * 100 * (cleared > 1 ? cleared : 1);
-        st.speed = Math.max(80, 600 - st.score / 5);
-        setScore(st.score);
-        st.piece = st.next; st.next = newPiece();
-        if (collides(st.board,st.piece)) { setGameOver(true); onScore(st.score); return; }
-      }
-    }
-    drawGame();
-    rafRef.current = requestAnimationFrame(gameLoop);
-  }, [drawGame, onScore]);
-
-  const startGame = () => {
-    resizeCanvas();
-    stateRef.current = initState();
-    setScore(0); setGameOver(false); setStarted(true);
-    rafRef.current = requestAnimationFrame(gameLoop);
+  const drawBlock=(ctx,x,y,color,cell,alpha=1)=>{
+    ctx.globalAlpha=alpha;
+    ctx.fillStyle=color;
+    ctx.fillRect(x*cell+1,y*cell+1,cell-2,cell-2);
+    // top-left shine
+    ctx.fillStyle='rgba(255,255,255,0.3)';
+    ctx.fillRect(x*cell+1,y*cell+1,cell-2,Math.max(2,cell*0.18));
+    ctx.fillRect(x*cell+1,y*cell+1,Math.max(2,cell*0.18),cell-2);
+    // bottom-right shadow
+    ctx.fillStyle='rgba(0,0,0,0.35)';
+    ctx.fillRect(x*cell+1,y*cell+cell-Math.max(2,cell*0.18)-1,cell-2,Math.max(2,cell*0.18));
+    ctx.globalAlpha=1;
   };
 
-  useEffect(() => {
-    resizeCanvas();
-    const ro = new ResizeObserver(resizeCanvas);
-    if (containerRef.current) ro.observe(containerRef.current);
-    return () => { ro.disconnect(); if (rafRef.current) cancelAnimationFrame(rafRef.current); };
-  }, [resizeCanvas]);
+  const drawBoard=useCallback(()=>{
+    const canvas=canvasRef.current; if(!canvas)return;
+    const st=stateRef.current; if(!st)return;
+    const CELL=cellRef.current;
+    const ctx=canvas.getContext('2d');
+    const W=COLS*CELL, H=ROWS*CELL;
+    // dark background with subtle grid
+    ctx.fillStyle='#080c14'; ctx.fillRect(0,0,W,H);
+    for(let x=0;x<=COLS;x++){ctx.strokeStyle='rgba(255,255,255,0.04)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x*CELL,0);ctx.lineTo(x*CELL,H);ctx.stroke();}
+    for(let y=0;y<=ROWS;y++){ctx.beginPath();ctx.moveTo(0,y*CELL);ctx.lineTo(W,y*CELL);ctx.stroke();}
+    // border glow
+    ctx.strokeStyle=st.piece?.glow||'#00e5ff';ctx.lineWidth=2;ctx.strokeRect(0,0,W,H);
+    // ghost
+    let gy=st.piece.y;
+    while(!collides(st.board,{...st.piece,y:gy+1}))gy++;
+    st.piece.shape.forEach((row,y)=>row.forEach((v,x)=>{
+      if(v)drawBlock(ctx,st.piece.x+x,gy+y,st.piece.color,CELL,0.15);
+    }));
+    // board
+    st.board.forEach((row,y)=>row.forEach((v,x)=>{ if(v)drawBlock(ctx,x,y,v,CELL); }));
+    // active piece with glow
+    ctx.shadowColor=st.piece.glow; ctx.shadowBlur=CELL*0.8;
+    st.piece.shape.forEach((row,y)=>row.forEach((v,x)=>{ if(v)drawBlock(ctx,st.piece.x+x,st.piece.y+y,st.piece.color,CELL); }));
+    ctx.shadowBlur=0;
+  },[]);
 
-  const move = (dx) => { const st=stateRef.current;if(!st)return;if(!collides(st.board,st.piece,dx,0))st.piece.x+=dx; };
-  const drop = () => { const st=stateRef.current;if(!st)return;while(!collides(st.board,st.piece,0,1))st.piece.y++; };
-  const rot  = () => { const st=stateRef.current;if(!st)return;const r=rotate(st.piece.shape);const old=st.piece.shape;st.piece.shape=r;if(collides(st.board,st.piece))st.piece.shape=old; };
+  const drawNext=useCallback(()=>{
+    const canvas=nextCanvRef.current; if(!canvas)return;
+    const st=stateRef.current; if(!st)return;
+    const NC=16; const W=4*NC, H=4*NC;
+    canvas.width=W; canvas.height=H;
+    const ctx=canvas.getContext('2d');
+    ctx.fillStyle='#080c14'; ctx.fillRect(0,0,W,H);
+    const p=st.next;
+    const ox=Math.floor((4-p.shape[0].length)/2);
+    const oy=Math.floor((4-p.shape.length)/2);
+    ctx.shadowColor=p.glow; ctx.shadowBlur=NC*0.8;
+    p.shape.forEach((row,y)=>row.forEach((v,x)=>{ if(v)drawBlock(ctx,ox+x,oy+y,p.color,NC); }));
+    ctx.shadowBlur=0;
+  },[]);
 
-  const btnStyle = {background:'#3d1f00',border:'2px solid #6b3a1f',color:'#d4a853',padding:'12px 20px',borderRadius:10,fontSize:20,cursor:'pointer',userSelect:'none',WebkitUserSelect:'none',flexShrink:0};
+  const gameLoop=useCallback((ts)=>{
+    const st=stateRef.current; if(!st)return;
+    if(ts-st.lastTime>st.speed){
+      st.lastTime=ts;
+      if(!collides(st.board,st.piece,0,1)){st.piece.y++;}
+      else{
+        const nb=merge(st.board,st.piece);
+        const{board,cleared}=clearLines(nb);
+        st.board=board;
+        const pts=[0,100,300,500,800][cleared]||0;
+        st.score+=pts*(st.level||1);
+        st.lines+=cleared;
+        st.level=Math.floor(st.lines/10)+1;
+        st.speed=Math.max(60,600-st.level*50);
+        setScore(st.score); setLines(st.lines); setLevel(st.level);
+        st.piece=st.next; st.next=newPiece();
+        if(collides(st.board,st.piece)){setGameOver(true);onScore(st.score);return;}
+      }
+    }
+    drawBoard(); drawNext();
+    rafRef.current=requestAnimationFrame(gameLoop);
+  },[drawBoard,drawNext,onScore]);
 
-  return (
-    <div ref={containerRef} style={{display:'flex',flexDirection:'column',alignItems:'center',height:'100%',background:'#1a0a00',overflow:'hidden'}}>
-      <div style={{color:'#d4a853',fontSize:13,fontWeight:'bold',padding:'4px 0',flexShrink:0}}>{playerName} | Score: {score}</div>
-      <canvas ref={canvasRef} style={{display:'block',flexShrink:0}}/>
-      {!started && !gameOver && <div style={{padding:16}}><button style={{...S.btn(),width:160}} onClick={startGame}>▶ Start</button></div>}
-      {gameOver && <div style={{textAlign:'center',padding:8,flexShrink:0}}><div style={{color:'#ff6b6b',fontSize:16,fontWeight:'bold'}}>Game Over!</div><div style={{color:'#d4a853',marginBottom:6}}>Score: {score}</div><button style={{...S.btn(),width:160}} onClick={startGame}>▶ Again</button></div>}
-      {started && !gameOver && (
-        <div style={{display:'flex',gap:10,padding:'8px',justifyContent:'center',background:'#0a0500',width:'100%',boxSizing:'border-box',flexShrink:0}}>
-          <button style={btnStyle} onPointerDown={e=>{e.preventDefault();move(-1);}}>◀</button>
-          <button style={btnStyle} onPointerDown={e=>{e.preventDefault();rot();}}>↻</button>
-          <button style={btnStyle} onPointerDown={e=>{e.preventDefault();drop();}}>⬇</button>
-          <button style={btnStyle} onPointerDown={e=>{e.preventDefault();move(1);}}>▶</button>
+  const startGame=()=>{
+    const cell=calcCell(); cellRef.current=cell;
+    const canvas=canvasRef.current;
+    if(canvas){canvas.width=COLS*cell;canvas.height=ROWS*cell;}
+    stateRef.current=initState();
+    setScore(0);setLines(0);setLevel(1);setGameOver(false);setStarted(true);
+    rafRef.current=requestAnimationFrame(gameLoop);
+  };
+
+  useEffect(()=>{
+    const ro=new ResizeObserver(()=>{
+      const cell=calcCell(); cellRef.current=cell;
+      const canvas=canvasRef.current;
+      if(canvas){canvas.width=COLS*cell;canvas.height=ROWS*cell;}
+    });
+    if(containerRef.current)ro.observe(containerRef.current);
+    return()=>{ro.disconnect();if(rafRef.current)cancelAnimationFrame(rafRef.current);};
+  },[calcCell]);
+
+  const move=(dx)=>{const st=stateRef.current;if(!st)return;if(!collides(st.board,st.piece,dx,0))st.piece.x+=dx;};
+  const drop=()=>{const st=stateRef.current;if(!st)return;while(!collides(st.board,st.piece,0,1))st.piece.y++;};
+  const rot=()=>{const st=stateRef.current;if(!st)return;const r=rotate(st.piece.shape);const old=st.piece.shape;st.piece.shape=r;if(collides(st.board,st.piece))st.piece.shape=old;};
+
+  const btn=(label,action,color='#1a1a2e')=>({
+    background:color, border:`2px solid ${color==='#1a1a2e'?'#3a3a5e':'#00e5ff'}`,
+    color:'#fff', borderRadius:12, padding:'14px 0', fontSize:22, cursor:'pointer',
+    userSelect:'none', WebkitUserSelect:'none', flex:1,
+    boxShadow:`0 4px 0 rgba(0,0,0,0.4)`, fontWeight:'bold',
+  });
+
+  return(
+    <div ref={containerRef} style={{display:'flex',flexDirection:'column',height:'100%',background:'#050810',overflow:'hidden',fontFamily:"'Arial Black',Arial,sans-serif"}}>
+
+      {/* main area: board + sidebar */}
+      <div style={{flex:1,display:'flex',gap:0,overflow:'hidden',minHeight:0}}>
+
+        {/* board */}
+        <div style={{display:'flex',alignItems:'center',justifyContent:'center',flex:'0 0 auto',padding:'8px 4px 4px 8px'}}>
+          <canvas ref={canvasRef} style={{display:'block',imageRendering:'pixelated'}}/>
+        </div>
+
+        {/* sidebar */}
+        <div style={{flex:1,display:'flex',flexDirection:'column',justifyContent:'flex-start',padding:'10px 8px 4px 4px',gap:10,minWidth:0}}>
+          {/* player */}
+          <div style={{background:'#0d1120',border:'1px solid #1e2a4a',borderRadius:10,padding:'6px 8px'}}>
+            <div style={{fontSize:9,color:'#4a6a9a',textTransform:'uppercase',letterSpacing:1}}>Player</div>
+            <div style={{fontSize:12,color:'#e0e8ff',fontWeight:'bold',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{playerName}</div>
+          </div>
+          {/* score */}
+          <div style={{background:'#0d1120',border:'1px solid #1e2a4a',borderRadius:10,padding:'6px 8px'}}>
+            <div style={{fontSize:9,color:'#4a6a9a',textTransform:'uppercase',letterSpacing:1}}>Score</div>
+            <div style={{fontSize:18,color:'#ffd600',fontWeight:900,textShadow:'0 0 8px #ffd600'}}>{score.toLocaleString()}</div>
+          </div>
+          {/* level + lines */}
+          <div style={{display:'flex',gap:6}}>
+            <div style={{flex:1,background:'#0d1120',border:'1px solid #1e2a4a',borderRadius:10,padding:'6px 8px'}}>
+              <div style={{fontSize:9,color:'#4a6a9a',textTransform:'uppercase',letterSpacing:1}}>Lv</div>
+              <div style={{fontSize:16,color:'#00e5ff',fontWeight:900,textShadow:'0 0 8px #00e5ff'}}>{level}</div>
+            </div>
+            <div style={{flex:1,background:'#0d1120',border:'1px solid #1e2a4a',borderRadius:10,padding:'6px 8px'}}>
+              <div style={{fontSize:9,color:'#4a6a9a',textTransform:'uppercase',letterSpacing:1}}>Lines</div>
+              <div style={{fontSize:16,color:'#00e676',fontWeight:900,textShadow:'0 0 8px #00e676'}}>{lines}</div>
+            </div>
+          </div>
+          {/* next piece */}
+          <div style={{background:'#0d1120',border:'1px solid #1e2a4a',borderRadius:10,padding:'6px 8px'}}>
+            <div style={{fontSize:9,color:'#4a6a9a',textTransform:'uppercase',letterSpacing:1,marginBottom:6}}>Next</div>
+            <canvas ref={nextCanvRef} width={64} height={64} style={{display:'block',imageRendering:'pixelated',margin:'0 auto'}}/>
+          </div>
+        </div>
+      </div>
+
+      {/* game over */}
+      {gameOver&&(
+        <div style={{position:'absolute',inset:0,background:'rgba(5,8,16,0.92)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',zIndex:20}}>
+          <div style={{fontSize:28,fontWeight:900,color:'#ff1744',textShadow:'0 0 20px #ff1744',marginBottom:4}}>GAME OVER</div>
+          <div style={{fontSize:18,color:'#ffd600',marginBottom:20,textShadow:'0 0 10px #ffd600'}}>{score.toLocaleString()} pts</div>
+          <button onClick={startGame} style={{background:'linear-gradient(180deg,#00e5ff,#0077aa)',border:'none',borderRadius:12,padding:'12px 32px',color:'#fff',fontSize:16,fontWeight:900,cursor:'pointer',boxShadow:'0 0 20px #00e5ff44'}}>▶ PLAY AGAIN</button>
         </div>
       )}
+
+      {/* start screen */}
+      {!started&&!gameOver&&(
+        <div style={{position:'absolute',inset:0,background:'rgba(5,8,16,0.92)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',zIndex:20}}>
+          <div style={{fontSize:32,fontWeight:900,color:'#00e5ff',textShadow:'0 0 20px #00e5ff',marginBottom:8,letterSpacing:3}}>TETRIS</div>
+          <div style={{fontSize:13,color:'#4a6a9a',marginBottom:24}}>by {playerName}</div>
+          <button onClick={startGame} style={{background:'linear-gradient(180deg,#00e5ff,#0077aa)',border:'none',borderRadius:12,padding:'14px 40px',color:'#fff',fontSize:18,fontWeight:900,cursor:'pointer',boxShadow:'0 0 24px #00e5ff66',letterSpacing:1}}>▶ START</button>
+        </div>
+      )}
+
+      {/* controls */}
+      <div style={{display:'flex',gap:8,padding:'8px',background:'#08101e',borderTop:'1px solid #1e2a4a',flexShrink:0}}>
+        <button style={btn('◀','',)} onPointerDown={e=>{e.preventDefault();move(-1);}}>◀</button>
+        <button style={btn('↻','',)} onPointerDown={e=>{e.preventDefault();rot();}}>↻</button>
+        <button style={{...btn('⬇','',)}} onPointerDown={e=>{e.preventDefault();drop();}}>⬇</button>
+        <button style={btn('▶','',)} onPointerDown={e=>{e.preventDefault();move(1);}}>▶</button>
+      </div>
+
     </div>
   );
 }
