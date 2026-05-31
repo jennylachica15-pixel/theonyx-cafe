@@ -1,8 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+
+const SLIDES = [
+  '/slides/1.jpg','/slides/2.jpg','/slides/3.jpg','/slides/4.jpg',
+  '/slides/5.jpg','/slides/6.jpg','/slides/7.jpg','/slides/8.jpg',
+  '/slides/9.jpg','/slides/10.jpg','/slides/11.jpg','/slides/12.jpg','/slides/13.jpg',
+];
 
 const MENU_CATEGORIES = [
-  {
-    id: 'espresso', icon: '☕', label: 'Espresso Based',
+  { id: 'espresso', label: 'Espresso Based', count: 10,
     items: [
       { name: 'Coffee Latte', mini: 75, classic: 85, upgrade: 95 },
       { name: 'Caramel Macchiato', mini: 99, classic: 120, upgrade: 150 },
@@ -16,8 +21,7 @@ const MENU_CATEGORIES = [
       { name: 'Brewed', mini: 25, classic: 50, upgrade: 85 },
     ]
   },
-  {
-    id: 'noncoffee', icon: '🍵', label: 'Non-Coffee',
+  { id: 'noncoffee', label: 'Non-Coffee',
     items: [
       { name: 'Dirty Matcha', classic: 120, upgrade: 150 },
       { name: 'Strawberry Latte', classic: 120, upgrade: 150 },
@@ -30,8 +34,7 @@ const MENU_CATEGORIES = [
       { name: 'Frappe Caramel Macchiato', regular: 150 },
     ]
   },
-  {
-    id: 'milktea', icon: '🧋', label: 'Milk Tea',
+  { id: 'milktea', label: 'Milk Tea',
     items: [
       { name: 'M.T. - Hokkaido', regular: 55 },
       { name: 'M.T. - Okinawa', regular: 55 },
@@ -45,8 +48,7 @@ const MENU_CATEGORIES = [
       { name: 'M.T. - Wintermelon', regular: 60 },
     ]
   },
-  {
-    id: 'soda', icon: '🥤', label: 'Soda & Tea',
+  { id: 'soda', label: 'Soda & Tea',
     items: [
       { name: 'Soda - Passion', classic: 50 },
       { name: 'Soda - Strawberry', classic: 50 },
@@ -57,15 +59,13 @@ const MENU_CATEGORIES = [
       { name: 'Tea - Hibiscus', classic: 50 },
     ]
   },
-  {
-    id: 'pasta', icon: '🍝', label: 'Pasta',
+  { id: 'pasta', label: 'Pasta',
     items: [
       { name: 'Pasta - Carbonara', regular: 129 },
       { name: 'Pasta - Bolognese', regular: 129 },
     ]
   },
-  {
-    id: 'rice', icon: '🍚', label: 'Rice Meals',
+  { id: 'rice', label: 'Rice Meals',
     items: [
       { name: 'Tapsilog', regular: 129 },
       { name: 'Cornsilog', regular: 129 },
@@ -81,8 +81,7 @@ const MENU_CATEGORIES = [
       { name: 'Rice Meal - C. Inasal', regular: 180 },
     ]
   },
-  {
-    id: 'pastries', icon: '🥐', label: 'Pastries & Sweets',
+  { id: 'pastries', label: 'Pastries & Sweets',
     items: [
       { name: 'Waffle - Mango', regular: 80 },
       { name: 'Waffle - Chocolate', regular: 80 },
@@ -93,8 +92,7 @@ const MENU_CATEGORIES = [
       { name: 'Grilled Cheese Sandwich', regular: 80 },
     ]
   },
-  {
-    id: 'snacks', icon: '🍟', label: 'Snacks',
+  { id: 'snacks', label: 'Snacks',
     items: [
       { name: 'Cheese Burger', regular: 50 },
       { name: 'Onyx Burger', regular: 150 },
@@ -104,8 +102,7 @@ const MENU_CATEGORIES = [
       { name: 'Fries - Cheese', regular: 30 },
     ]
   },
-  {
-    id: 'addons', icon: '➕', label: 'Add-ons',
+  { id: 'addons', label: 'Add-ons',
     items: [
       { name: 'Pearl', regular: 10 },
       { name: 'Espresso Shot', regular: 10 },
@@ -114,6 +111,19 @@ const MENU_CATEGORIES = [
   },
 ];
 
+// SVG Icons for menu categories
+const CAT_ICONS = {
+  espresso: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 8h1a4 4 0 0 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/><line x1="14" y1="2" x2="14" y2="4"/></svg>,
+  noncoffee: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a10 10 0 0 1 10 10"/><path d="M12 2v4"/><path d="M4.93 4.93l2.83 2.83"/><path d="M2 12h4"/><path d="M4.93 19.07l2.83-2.83"/><path d="M12 22v-4"/><circle cx="12" cy="12" r="4"/></svg>,
+  milktea: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M8 2h8l1 8H7L8 2z"/><path d="M7 10c0 5 1 10 5 10s5-5 5-10"/><line x1="12" y1="2" x2="12" y2="10"/></svg>,
+  soda: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="6" width="12" height="15" rx="2"/><path d="M6 10h12"/><path d="M9 2v4"/><path d="M15 2v4"/></svg>,
+  pasta: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 11h18"/><path d="M12 11V3"/><path d="M8 11c0 4 2 7 4 8 2-1 4-4 4-8"/><path d="M5 21h14"/></svg>,
+  rice: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 11h18v2a9 9 0 0 1-18 0v-2z"/><path d="M12 11V3"/><path d="M8 7l4-4 4 4"/></svg>,
+  pastries: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 11h18v2a9 9 0 0 1-18 0v-2z"/><path d="M12 3c-3 0-6 2-6 8h12c0-6-3-8-6-8z"/></svg>,
+  snacks: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M3 11l3-7h12l3 7"/><line x1="12" y1="11" x2="12" y2="21"/><line x1="7" y1="11" x2="7" y2="21"/><line x1="17" y1="11" x2="17" y2="21"/></svg>,
+  addons: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
+};
+
 const getPriceRange = (item) => {
   const prices = ['mini','classic','upgrade','regular'].map(s => item[s]).filter(Boolean);
   if (prices.length === 0) return '';
@@ -121,100 +131,94 @@ const getPriceRange = (item) => {
   return `₱${Math.min(...prices)} – ₱${Math.max(...prices)}`;
 };
 
-const s = {
-  page: { minHeight: '100vh', background: 'transparent', paddingBottom: 40 },
-  hero: { background: 'var(--brown-dark)', padding: '32px 20px 24px', textAlign: 'center' },
-  logo: { width: 80, height: 80, borderRadius: '50%', objectFit: 'cover', border: '3px solid var(--gold)', marginBottom: 12 },
-  heroTitle: { fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 700, color: 'var(--gold-light)', marginBottom: 4 },
-  heroSub: { fontSize: 13, color: 'var(--brown-light)', marginBottom: 16 },
-  socialRow: { display: 'flex', justifyContent: 'center', gap: 16, marginBottom: 4 },
-  socialBtn: { width: 42, height: 42, borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.15)', textDecoration: 'none' },
-  body: { padding: '20px 16px 0' },
-  welcome: { background: 'rgba(255,255,255,0.08)', borderRadius: 14, padding: '16px', marginBottom: 16, border: '1px solid rgba(255,255,255,0.1)' },
-  welcomeTitle: { fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700, color: '#f0d080', marginBottom: 6 },
-  welcomeText: { fontSize: 13, color: 'rgba(255,255,255,0.75)', lineHeight: 1.6, marginBottom: 0 },
-  sectionTitle: { fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 700, color: '#f0d080', marginBottom: 12 },
-  catCard: { background: 'rgba(253,240,228,0.95)', borderRadius: 14, marginBottom: 8, overflow: 'hidden' },
-  catHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', cursor: 'pointer' },
-  catLeft: { display: 'flex', alignItems: 'center', gap: 10 },
-  catIcon: { fontSize: 22 },
-  catLabel: { fontSize: 15, fontWeight: 600, color: '#1a0a00' },
-  catCount: { fontSize: 11, color: '#c8956c', marginTop: 1 },
-  chevron: (open) => ({ fontSize: 14, color: '#c8956c', transition: 'transform 0.2s', transform: open ? 'rotate(180deg)' : 'rotate(0deg)' }),
-  itemRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 16px', borderTop: '1px solid rgba(200,149,108,0.2)' },
-  itemName: { fontSize: 13, fontWeight: 500, color: '#1a0a00' },
-  itemPrice: { fontSize: 12, color: '#6b3a1f', fontWeight: 600 },
-  photoBtn: { width: '100%', padding: '15px', borderRadius: 14, background: 'var(--brown-dark)', color: 'var(--gold-light)', fontSize: 15, fontWeight: 700, border: 'none', cursor: 'pointer', marginTop: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, fontFamily: 'var(--font-display)' },
-};
-
-export default function GuestLanding({ onTakePhoto }) {
+export default function GuestLanding() {
   const [openCat, setOpenCat] = useState(null);
+  const [slide, setSlide] = useState(0);
 
-  const toggle = (id) => setOpenCat(openCat === id ? null : id);
+  useEffect(() => {
+    const timer = setInterval(() => setSlide(s => (s + 1) % SLIDES.length), 4000);
+    return () => clearInterval(timer);
+  }, []);
 
   return (
-    <div style={s.page}>
-      {/* Hero */}
-      <div style={s.hero}>
-        <img src="/logo.jpg" alt="Theonyx Cafe" style={s.logo} />
-        <div style={s.heroTitle}>THEONYX CAFE</div>
-        <div style={s.heroSub}>Where every sip tells a story ☕</div>
-        <div style={s.socialRow}>
-          <a href="https://www.facebook.com/theonyxs" target="_blank" rel="noreferrer" style={s.socialBtn} aria-label="Facebook">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/>
-            </svg>
-          </a>
-          <a href="https://www.instagram.com/theonyx.cafe" target="_blank" rel="noreferrer" style={s.socialBtn} aria-label="Instagram">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
-              <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
-              <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/>
-            </svg>
-          </a>
-          <a href="https://www.tiktok.com/@theonyx.cafe" target="_blank" rel="noreferrer" style={s.socialBtn} aria-label="TikTok">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
-              <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.33-6.34V9.05a8.16 8.16 0 0 0 4.78 1.52V7.12a4.85 4.85 0 0 1-1.01-.43z"/>
-            </svg>
-          </a>
+    <div style={{ minHeight: '100vh', background: 'transparent', paddingBottom: 40 }}>
+      {/* Hero with slideshow */}
+      <div style={{ position: 'relative', height: 280, overflow: 'hidden' }}>
+        {SLIDES.map((src, i) => (
+          <div key={i} style={{
+            position: 'absolute', inset: 0, backgroundImage: `url(${src})`,
+            backgroundSize: 'cover', backgroundPosition: 'center',
+            opacity: slide === i ? 1 : 0, transition: 'opacity 1.2s ease',
+          }} />
+        ))}
+        {/* Dark overlay — less transparent so text is readable */}
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(20,8,0,0.55) 0%, rgba(20,8,0,0.70) 60%, rgba(20,8,0,0.88) 100%)' }} />
+        {/* Hero content */}
+        <div style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', padding: '0 20px' }}>
+          <img src="/logo.jpg" alt="Theonyx Cafe" style={{ width: 72, height: 72, borderRadius: '50%', objectFit: 'cover', border: '2.5px solid #d4a853', marginBottom: 10 }} />
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 700, color: '#f0d080', letterSpacing: 2, textAlign: 'center', textShadow: '0 2px 8px rgba(0,0,0,0.6)' }}>THEONYX CAFE</div>
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)', marginTop: 4, letterSpacing: 1.5, textAlign: 'center', textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>COFFEE · PASTRY · STEAK · WINE</div>
+          {/* Social + Map icons */}
+          <div style={{ display: 'flex', gap: 14, marginTop: 16 }}>
+            {[
+              { href: 'https://www.facebook.com/theonyxs', label: 'Facebook', svg: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg> },
+              { href: 'https://www.instagram.com/theonyx.cafe', label: 'Instagram', svg: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg> },
+              { href: 'https://www.tiktok.com/@theonyx.cafe', label: 'TikTok', svg: <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.34 6.34 0 0 0-6.33 6.34 6.34 6.34 0 0 0 6.33 6.34 6.34 6.34 0 0 0 6.33-6.34V9.05a8.16 8.16 0 0 0 4.78 1.52V7.12a4.85 4.85 0 0 1-1.01-.43z"/></svg> },
+              { href: 'https://maps.app.goo.gl/wZTLY5BWJavdjoni6', label: 'Location', svg: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg> },
+            ].map(({ href, label, svg }) => (
+              <a key={label} href={href} target="_blank" rel="noreferrer" aria-label={label}
+                style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,0.25)', textDecoration: 'none', backdropFilter: 'blur(4px)' }}>
+                {svg}
+              </a>
+            ))}
+          </div>
+          {/* Slide dots */}
+          <div style={{ display: 'flex', gap: 5, marginTop: 12 }}>
+            {SLIDES.map((_, i) => (
+              <div key={i} onClick={() => setSlide(i)} style={{ width: slide === i ? 16 : 5, height: 5, borderRadius: 3, background: slide === i ? '#d4a853' : 'rgba(255,255,255,0.4)', cursor: 'pointer', transition: 'all 0.3s' }} />
+            ))}
+          </div>
         </div>
       </div>
 
-      <div style={s.body}>
-        {/* Welcome */}
-        <div style={s.welcome}>
-          <div style={s.welcomeTitle}>Welcome to Theonyx Cafe! 🖤</div>
-          <div style={s.welcomeText}>
-            We're glad you're here. Browse our menu below, take a photo of your visit, and follow us on social media for updates and promos!
+      {/* Body */}
+      <div style={{ padding: '18px 16px 0' }}>
+        {/* Welcome card */}
+        <div style={{ background: 'rgba(20,8,0,0.55)', borderRadius: 14, padding: '16px 18px', marginBottom: 16, border: '1px solid rgba(212,168,83,0.25)', backdropFilter: 'blur(8px)' }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 15, fontWeight: 700, color: '#f0d080', marginBottom: 6 }}>Welcome to Theonyx Cafe</div>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.85)', lineHeight: 1.7 }}>
+            We are glad to have you here. Browse our menu below and follow us on social media for updates and promos.
           </div>
+          <div style={{ fontSize: 12, color: '#d4a853', marginTop: 8, fontWeight: 500 }}>Open everyday · 10:00 AM – 11:00 PM</div>
         </div>
 
         {/* Menu */}
-        <div style={s.sectionTitle}>Our Menu</div>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: 17, fontWeight: 700, color: '#f0d080', marginBottom: 12 }}>Our Menu</div>
+
         {MENU_CATEGORIES.map(cat => (
-          <div key={cat.id} style={s.catCard}>
-            <div style={s.catHeader} onClick={() => toggle(cat.id)}>
-              <div style={s.catLeft}>
-                <span style={s.catIcon}>{cat.icon}</span>
+          <div key={cat.id} style={{ background: 'rgba(20,8,0,0.55)', borderRadius: 14, marginBottom: 8, overflow: 'hidden', border: '1px solid rgba(212,168,83,0.2)', backdropFilter: 'blur(8px)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 16px', cursor: 'pointer' }} onClick={() => setOpenCat(openCat === cat.id ? null : cat.id)}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ color: '#d4a853', display: 'flex', alignItems: 'center' }}>{CAT_ICONS[cat.id]}</div>
                 <div>
-                  <div style={s.catLabel}>{cat.label}</div>
-                  <div style={s.catCount}>{cat.items.length} items</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'white' }}>{cat.label}</div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 1 }}>{cat.items.length} items</div>
                 </div>
               </div>
-              <span style={s.chevron(openCat === cat.id)}>▼</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d4a853" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: openCat === cat.id ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', flexShrink: 0 }}>
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
             </div>
             {openCat === cat.id && cat.items.map((item, i) => (
-              <div key={i} style={s.itemRow}>
-                <span style={s.itemName}>{item.name}</span>
-                <span style={s.itemPrice}>{getPriceRange(item)}</span>
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 16px', borderTop: '1px solid rgba(212,168,83,0.1)' }}>
+                <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.85)' }}>{item.name}</span>
+                <span style={{ fontSize: 12, color: '#d4a853', fontWeight: 600 }}>{getPriceRange(item)}</span>
               </div>
             ))}
           </div>
         ))}
-
-        {/* Photo CTA */}
-
       </div>
+      <div style={{ height: 80 }} />
     </div>
   );
 }
