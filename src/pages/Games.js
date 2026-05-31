@@ -313,12 +313,13 @@ function SnakeGame({ playerName, onScore }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 function TetrisGame({ playerName, onScore }) {
   const canvasRef = useRef(null);
+  const containerRef = useRef(null);
   const stateRef = useRef(null);
   const rafRef = useRef(null);
   const [score, setScore] = useState(0);
   const [gameOver, setGameOver] = useState(false);
   const [started, setStarted] = useState(false);
-  const CELL=16,COLS=14,ROWS=24;
+  const COLS=12,ROWS=30;
   const PIECES=[
     {shape:[[1,1,1,1]],color:'#00bcd4'},
     {shape:[[1,1],[1,1]],color:'#d4a853'},
@@ -362,19 +363,19 @@ function TetrisGame({ playerName, onScore }) {
   const move=(dx)=>{const st=stateRef.current;if(!st)return;if(!collides(st.board,st.piece,dx,0))st.piece.x+=dx;};
   const drop=()=>{const st=stateRef.current;if(!st)return;while(!collides(st.board,st.piece,0,1))st.piece.y++;};
   const rot=()=>{const st=stateRef.current;if(!st)return;const r=rotate(st.piece.shape);const old=st.piece.shape;st.piece.shape=r;if(collides(st.board,st.piece))st.piece.shape=old;};
-  const btnStyle={background:'#3d1f00',border:'2px solid #6b3a1f',color:'#d4a853',padding:'10px 16px',borderRadius:10,fontSize:16,cursor:'pointer'};
+  const btnStyle={background:'#3d1f00',border:'2px solid #6b3a1f',color:'#d4a853',padding:'14px 22px',borderRadius:10,fontSize:20,cursor:'pointer',userSelect:'none',WebkitUserSelect:'none'};
   return(
-    <div style={{display:'flex',flexDirection:'column',alignItems:'center',height:'100%',paddingTop:4}}>
-      <div style={{color:'#d4a853',fontSize:14,fontWeight:'bold',marginBottom:4}}>{playerName} | Score: {score}</div>
-      <canvas ref={canvasRef} width={COLS*CELL} height={ROWS*CELL} style={{border:'2px solid #6b3a1f',borderRadius:8,width:'100%',maxWidth:COLS*CELL}}/>
-      {!started&&!gameOver&&<button style={{...S.btn(),marginTop:12,width:160}} onClick={startGame}>▶ Start</button>}
-      {gameOver&&<div style={{textAlign:'center',marginTop:8}}><div style={{color:'#ff6b6b',fontSize:16,fontWeight:'bold'}}>Game Over!</div><div style={{color:'#d4a853',marginBottom:6}}>Score: {score}</div><button style={{...S.btn(),width:160}} onClick={startGame}>▶ Again</button></div>}
+    <div ref={containerRef} style={{display:'flex',flexDirection:'column',height:'100%',background:'#1a0a00'}}>
+      <div style={{color:'#d4a853',fontSize:13,fontWeight:'bold',textAlign:'center',padding:'3px 0',flexShrink:0}}>{playerName} | Score: {score}</div>
+      <canvas ref={canvasRef} style={{width:'100%',flex:1,display:'block'}}/>
+      {!started&&!gameOver&&<div style={{textAlign:'center',padding:12}}><button style={{...S.btn(),width:160}} onClick={startGame}>▶ Start</button></div>}
+      {gameOver&&<div style={{textAlign:'center',padding:8,flexShrink:0}}><div style={{color:'#ff6b6b',fontSize:16,fontWeight:'bold'}}>Game Over!</div><div style={{color:'#d4a853',marginBottom:6}}>Score: {score}</div><button style={{...S.btn(),width:160}} onClick={startGame}>▶ Again</button></div>}
       {started&&!gameOver&&(
-        <div style={{display:'flex',gap:8,marginTop:10}}>
-          <button style={btnStyle} onClick={()=>move(-1)}>◀</button>
-          <button style={btnStyle} onClick={rot}>↻</button>
-          <button style={btnStyle} onClick={drop}>⬇</button>
-          <button style={btnStyle} onClick={()=>move(1)}>▶</button>
+        <div style={{display:'flex',gap:8,padding:'6px 8px',justifyContent:'center',background:'#0a0500',flexShrink:0}}>
+          <button style={btnStyle} onPointerDown={e=>{e.preventDefault();move(-1);}}>◀</button>
+          <button style={btnStyle} onPointerDown={e=>{e.preventDefault();rot();}}>↻</button>
+          <button style={btnStyle} onPointerDown={e=>{e.preventDefault();drop();}}>⬇</button>
+          <button style={btnStyle} onPointerDown={e=>{e.preventDefault();move(1);}}>▶</button>
         </div>
       )}
     </div>
@@ -702,8 +703,9 @@ function RacingGame({ playerName, onScore }) {
   const startGame=()=>{stateRef.current=initState();setScore(0);setGameOver(false);setStarted(true);rafRef.current=requestAnimationFrame(gameLoop);};
   useEffect(()=>()=>{if(rafRef.current)cancelAnimationFrame(rafRef.current);},[]);
 
-  const moveLeft=()=>{const st=stateRef.current;if(!st)return;const nl=Math.max(0,st.car.lane-1);st.car.lane=nl;st.targetX=laneX(nl);};
-  const moveRight=()=>{const st=stateRef.current;if(!st)return;const nl=Math.min(LANES-1,st.car.lane+1);st.car.lane=nl;st.targetX=laneX(nl);};
+  const lastMoveRef=useRef(0);
+  const moveLeft=()=>{const now=Date.now();if(now-lastMoveRef.current<220)return;lastMoveRef.current=now;const st=stateRef.current;if(!st)return;const nl=Math.max(0,st.car.lane-1);st.car.lane=nl;st.targetX=laneX(nl);};
+  const moveRight=()=>{const now=Date.now();if(now-lastMoveRef.current<220)return;lastMoveRef.current=now;const st=stateRef.current;if(!st)return;const nl=Math.min(LANES-1,st.car.lane+1);st.car.lane=nl;st.targetX=laneX(nl);};
 
   const btnStyle={background:'linear-gradient(180deg,#555,#333)',border:'2px solid #888',color:'#fff',
     padding:'18px 36px',borderRadius:14,fontSize:26,cursor:'pointer',
