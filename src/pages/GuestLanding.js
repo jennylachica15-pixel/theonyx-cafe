@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 
 const SLIDES = [
-  '/slides/1.jpg','/slides/2.jpg','/slides/3.jpg','/slides/4.jpg',
-  '/slides/5.jpg','/slides/6.jpg','/slides/7.jpg','/slides/8.jpg',
-  '/slides/9.jpg','/slides/10.jpg','/slides/11.jpg','/slides/12.jpg','/slides/13.jpg',
+  '/1.jpg','/2.jpg','/3.jpg','/4.jpg','/5.jpg','/6.jpg',
+  '/7.jpg','/8.jpg','/9.jpg','/10.jpg','/11.jpg','/12.jpg','/13.jpg',
 ];
 
 const MENU_CATEGORIES = [
