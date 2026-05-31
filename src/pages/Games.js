@@ -558,78 +558,111 @@ function RacingGame({ playerName, onScore }) {
   const [score, setScore] = useState(0);
   const [gameOver, setGameOver] = useState(false);
   const [started, setStarted] = useState(false);
-  const W=300, H=420;
+  const W=300, H=440;
+  const GRASS_W=30;
+  const ROAD_X=GRASS_W, ROAD_W=W-GRASS_W*2;
+  const LANES=4;
+  const LANE_W=ROAD_W/LANES;
+  const laneX=(l)=>ROAD_X+l*LANE_W+LANE_W/2;
 
-  const ROAD_W=200;
-  const ROAD_X=(W-ROAD_W)/2;
+  const CAR_COLORS=['#ff3333','#3399ff','#ffcc00','#44cc44','#cc44ff','#ff8800','#00cccc','#ff66aa'];
+  const drawCar=(ctx,x,y,color,isPlayer=false)=>{
+    const w=22,h=34;
+    // shadow
+    ctx.fillStyle='rgba(0,0,0,0.3)';
+    ctx.beginPath();ctx.ellipse(x,y+h*0.4,w*0.45,h*0.12,0,0,Math.PI*2);ctx.fill();
+    // body
+    ctx.fillStyle=color;
+    ctx.beginPath();ctx.roundRect(x-w/2,y-h/2,w,h,5);ctx.fill();
+    // windshield
+    ctx.fillStyle='rgba(200,240,255,0.85)';
+    ctx.beginPath();ctx.roundRect(x-w*0.35,y-h*0.38,w*0.7,h*0.22,3);ctx.fill();
+    // rear window
+    ctx.fillStyle='rgba(200,240,255,0.7)';
+    ctx.beginPath();ctx.roundRect(x-w*0.32,y+h*0.12,w*0.64,h*0.18,3);ctx.fill();
+    // wheels
+    ctx.fillStyle='#222';
+    [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([sx,sy])=>{
+      ctx.beginPath();ctx.roundRect(x+sx*(w*0.42)-4,y+sy*(h*0.3)-5,8,10,2);ctx.fill();
+      ctx.fillStyle='#555';ctx.beginPath();ctx.roundRect(x+sx*(w*0.42)-2.5,y+sy*(h*0.3)-3.5,5,7,1);ctx.fill();
+      ctx.fillStyle='#222';
+    });
+    // headlights (player only)
+    if(isPlayer){
+      ctx.fillStyle='#ffffaa';
+      ctx.beginPath();ctx.ellipse(x-w*0.28,y-h*0.46,3,2,0,0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.ellipse(x+w*0.28,y-h*0.46,3,2,0,0,Math.PI*2);ctx.fill();
+    }
+    // roof stripe
+    ctx.fillStyle='rgba(255,255,255,0.25)';
+    ctx.beginPath();ctx.roundRect(x-w*0.15,y-h*0.35,w*0.3,h*0.6,3);ctx.fill();
+  };
 
   const initState=()=>({
-    car:{x:W/2-18,y:H-100,w:36,h:56},
-    barriers:[],score:0,speed:4,lastTime:0,spawnTimer:0,
-    roadOffset:0,
+    car:{lane:1,x:laneX(1),y:H-70},
+    traffic:[],score:0,speed:3,lastTime:0,spawnTimer:0,
+    lineOffset:0, targetX:laneX(1),
   });
 
   const drawGame=useCallback(()=>{
-    const canvas=canvasRef.current;if(!canvas)return;const ctx=canvas.getContext('2d');const st=stateRef.current;
-    // sky/background
-    const grad=ctx.createLinearGradient(0,0,0,H);grad.addColorStop(0,'#0a0a1a');grad.addColorStop(1,'#1a0a00');
-    ctx.fillStyle=grad;ctx.fillRect(0,0,W,H);
-    // road
-    ctx.fillStyle='#2a2a2a';ctx.fillRect(ROAD_X,0,ROAD_W,H);
-    // road lines (scrolling)
-    ctx.strokeStyle='#d4a853';ctx.lineWidth=3;ctx.setLineDash([30,20]);
-    ctx.lineDashOffset=-st.roadOffset;
-    ctx.beginPath();ctx.moveTo(W/2,0);ctx.lineTo(W/2,H);ctx.stroke();
+    const canvas=canvasRef.current;if(!canvas)return;
+    const ctx=canvas.getContext('2d');const st=stateRef.current;
+    // grass
+    ctx.fillStyle='#2d7a2d';ctx.fillRect(0,0,W,H);
+    // grass texture
+    ctx.fillStyle='#267026';
+    for(let i=0;i<H;i+=12){ctx.fillRect(0,i,GRASS_W,6);ctx.fillRect(W-GRASS_W,i,GRASS_W,6);}
+    // grass edge decoration
+    ctx.fillStyle='#1a5c1a';
+    ctx.fillRect(GRASS_W-4,0,4,H);ctx.fillRect(W-GRASS_W,0,4,H);
+    // road base
+    ctx.fillStyle='#404040';ctx.fillRect(ROAD_X,0,ROAD_W,H);
+    // road texture
+    ctx.fillStyle='#383838';
+    for(let i=0;i<H;i+=20){ctx.fillRect(ROAD_X,i,ROAD_W,10);}
+    // lane dividers (dashed, scrolling)
+    ctx.strokeStyle='#ffffff';ctx.lineWidth=2;ctx.setLineDash([25,18]);
+    ctx.lineDashOffset=-st.lineOffset;
+    for(let l=1;l<LANES;l++){
+      ctx.strokeStyle= l===LANES/2 ? '#ffff00':'#ffffff';
+      ctx.lineWidth= l===LANES/2 ? 3:1.5;
+      ctx.beginPath();ctx.moveTo(ROAD_X+l*LANE_W,0);ctx.lineTo(ROAD_X+l*LANE_W,H);ctx.stroke();
+    }
     ctx.setLineDash([]);
-    // road edges
-    ctx.strokeStyle='#ffffff';ctx.lineWidth=4;
+    // road edges white line
+    ctx.strokeStyle='#ffffff';ctx.lineWidth=3;ctx.setLineDash([]);
     ctx.beginPath();ctx.moveTo(ROAD_X,0);ctx.lineTo(ROAD_X,H);ctx.stroke();
     ctx.beginPath();ctx.moveTo(ROAD_X+ROAD_W,0);ctx.lineTo(ROAD_X+ROAD_W,H);ctx.stroke();
-    // barriers
-    st.barriers.forEach(b=>{
-      ctx.fillStyle=b.color;ctx.fillRect(b.x,b.y,b.w,b.h);
-      ctx.fillStyle='rgba(0,0,0,0.3)';ctx.fillRect(b.x+4,b.y+4,b.w-4,b.h-4);
-      ctx.fillStyle='#fff';ctx.font='20px serif';ctx.textAlign='center';
-      ctx.fillText(b.emoji,b.x+b.w/2,b.y+b.h/2+7);
-    });
-    // player car (drawn as emoji for charm)
-    ctx.font='50px serif';ctx.textAlign='center';
-    ctx.fillText('🚗',st.car.x+st.car.w/2,st.car.y+st.car.h-4);
-    // score
-    ctx.fillStyle='#d4a853';ctx.font='bold 16px Georgia';ctx.textAlign='left';
-    ctx.fillText(`Score: ${st.score}`,8,24);
-    const spd=Math.floor(60+st.speed*15);
-    ctx.fillStyle='#a07850';ctx.font='12px Georgia';
-    ctx.fillText(`${spd} km/h`,8,42);
+    // traffic cars
+    st.traffic.forEach(t=>drawCar(ctx,t.x,t.y,t.color));
+    // player car (smooth x)
+    st.car.x+=(st.targetX-st.car.x)*0.18;
+    drawCar(ctx,st.car.x,st.car.y,'#ff3333',true);
+    // speed overlay
+    ctx.fillStyle='rgba(0,0,0,0.45)';ctx.fillRect(ROAD_X,0,60,32);
+    ctx.fillStyle='#ffff00';ctx.font='bold 12px Arial';ctx.textAlign='left';
+    const spd=Math.floor(80+st.speed*20);
+    ctx.fillText(`${spd}km/h`,ROAD_X+5,20);
   },[]);
-
-  const BARRIERS=[
-    {emoji:'🧱',color:'#8b4513',w:60,h:40},
-    {emoji:'🚧',color:'#ff9800',w:70,h:36},
-    {emoji:'☕',color:'#3d1f00',w:44,h:44},
-    {emoji:'🍰',color:'#f5e6d0',w:44,h:44},
-    {emoji:'🪣',color:'#2196f3',w:44,h:44},
-  ];
 
   const gameLoop=useCallback((ts)=>{
     const st=stateRef.current;if(!st)return;
     const dt=Math.min(ts-st.lastTime,50);st.lastTime=ts;
-    st.roadOffset=(st.roadOffset+st.speed*2)%50;
-    st.score+=1;st.speed=4+st.score/800;
+    st.lineOffset=(st.lineOffset+st.speed*1.5)%(25+18);
+    st.score+=1;st.speed=3+st.score/600;
     setScore(st.score);
     st.spawnTimer+=dt;
-    const spawnInterval=Math.max(400,1200-st.score*0.3);
-    if(st.spawnTimer>spawnInterval){
+    const interval=Math.max(350,1100-st.score*0.25);
+    if(st.spawnTimer>interval){
       st.spawnTimer=0;
-      const bType=BARRIERS[Math.floor(Math.random()*BARRIERS.length)];
-      // spawn in left or right lane
-      const lane=Math.random()<0.5?ROAD_X+10:ROAD_X+ROAD_W/2+10;
-      st.barriers.push({...bType,x:lane,y:-60});
+      const lane=Math.floor(Math.random()*LANES);
+      const color=CAR_COLORS[Math.floor(Math.random()*CAR_COLORS.length)];
+      st.traffic.push({x:laneX(lane),y:-40,lane,color});
     }
-    st.barriers=st.barriers.map(b=>({...b,y:b.y+st.speed*2})).filter(b=>b.y<H+60);
+    st.traffic=st.traffic.map(t=>({...t,y:t.y+st.speed*2.2})).filter(t=>t.y<H+60);
     // collision
     const c=st.car;
-    const hit=st.barriers.some(b=>c.x+6<b.x+b.w&&c.x+c.w-6>b.x&&c.y+10<b.y+b.h&&c.y+c.h-10>b.y);
+    const hit=st.traffic.some(t=>Math.abs(t.x-c.x)<20&&Math.abs(t.y-c.y)<32);
     if(hit){setGameOver(true);onScore(st.score);return;}
     drawGame();rafRef.current=requestAnimationFrame(gameLoop);
   },[drawGame,onScore]);
@@ -637,22 +670,29 @@ function RacingGame({ playerName, onScore }) {
   const startGame=()=>{stateRef.current=initState();setScore(0);setGameOver(false);setStarted(true);rafRef.current=requestAnimationFrame(gameLoop);};
   useEffect(()=>()=>{if(rafRef.current)cancelAnimationFrame(rafRef.current);},[]);
 
-  const moveLeft=()=>{const st=stateRef.current;if(!st)return;st.car.x=Math.max(ROAD_X+4,st.car.x-50);};
-  const moveRight=()=>{const st=stateRef.current;if(!st)return;st.car.x=Math.min(ROAD_X+ROAD_W-st.car.w-4,st.car.x+50);};
+  const moveLeft=()=>{const st=stateRef.current;if(!st)return;const nl=Math.max(0,st.car.lane-1);st.car.lane=nl;st.targetX=laneX(nl);};
+  const moveRight=()=>{const st=stateRef.current;if(!st)return;const nl=Math.min(LANES-1,st.car.lane+1);st.car.lane=nl;st.targetX=laneX(nl);};
 
-  const btnStyle={background:'#3d1f00',border:'2px solid #d4a853',color:'#d4a853',
-    padding:'18px 32px',borderRadius:14,fontSize:28,cursor:'pointer',userSelect:'none',WebkitUserSelect:'none'};
+  const btnStyle={background:'linear-gradient(180deg,#555,#333)',border:'2px solid #888',color:'#fff',
+    padding:'18px 36px',borderRadius:14,fontSize:26,cursor:'pointer',
+    userSelect:'none',WebkitUserSelect:'none',boxShadow:'0 4px 0 #111',fontFamily:"'Arial Black',Arial,sans-serif"};
 
   return(
-    <div style={{display:'flex',flexDirection:'column',alignItems:'center',height:'100%',paddingTop:8}}>
-      <div style={{color:'#d4a853',fontSize:16,fontWeight:'bold',marginBottom:8}}>{playerName}</div>
-      <canvas ref={canvasRef} width={W} height={H} style={{border:'2px solid #6b3a1f',borderRadius:8,maxWidth:'100%'}}/>
+    <div style={{display:'flex',flexDirection:'column',alignItems:'center',height:'100%',background:'#1a1a1a'}}>
+      <div style={{color:'#d4a853',fontSize:14,fontWeight:'bold',padding:'6px 0'}}>{playerName} — Score: {score}</div>
+      <canvas ref={canvasRef} width={W} height={H} style={{maxWidth:'100%',display:'block'}}/>
       {!started&&!gameOver&&<button style={{...S.btn(),marginTop:16,width:160}} onClick={startGame}>▶ Start</button>}
-      {gameOver&&<div style={{textAlign:'center',marginTop:12}}><div style={{color:'#ff6b6b',fontSize:18,fontWeight:'bold'}}>Crash! 💥</div><div style={{color:'#d4a853',marginBottom:8}}>Score: {score}</div><button style={{...S.btn(),width:160}} onClick={startGame}>▶ Again</button></div>}
+      {gameOver&&(
+        <div style={{textAlign:'center',marginTop:12}}>
+          <div style={{color:'#ff6b6b',fontSize:20,fontWeight:'bold'}}>CRASH! 💥</div>
+          <div style={{color:'#d4a853',marginBottom:8}}>Score: {score}</div>
+          <button style={{...S.btn(),width:160}} onClick={startGame}>▶ Again</button>
+        </div>
+      )}
       {started&&!gameOver&&(
-        <div style={{display:'flex',gap:24,marginTop:16}}>
-          <button style={btnStyle} onPointerDown={moveLeft} onPointerUp={()=>{}} onTouchStart={e=>{e.preventDefault();moveLeft();}}>◀</button>
-          <button style={btnStyle} onPointerDown={moveRight} onPointerUp={()=>{}} onTouchStart={e=>{e.preventDefault();moveRight();}}>▶</button>
+        <div style={{display:'flex',gap:20,padding:'10px 0'}}>
+          <button style={btnStyle} onPointerDown={e=>{e.preventDefault();moveLeft();}} onTouchStart={e=>{e.preventDefault();moveLeft();}}>◀</button>
+          <button style={btnStyle} onPointerDown={e=>{e.preventDefault();moveRight();}} onTouchStart={e=>{e.preventDefault();moveRight();}}>▶</button>
         </div>
       )}
     </div>
