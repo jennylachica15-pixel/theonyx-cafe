@@ -267,7 +267,7 @@ function GameEngine({ roomCode, myName, myAvatar, isHost, roomData, onGameOver, 
       player: { x: 8*TILE, y: 10*TILE, hp: 100 },
       others: {},
       zombies: [],
-      barriers: { '7,9':BARRIER_HP,'8,9':BARRIER_HP,'7,10':BARRIER_HP,'8,10':BARRIER_HP,'9,10':BARRIER_HP,'9,9':BARRIER_HP },
+      barriers: {},
       phase: 'day', day: 1,
     };
     phaseStartRef.current = Date.now();
@@ -336,13 +336,10 @@ function GameEngine({ roomCode, myName, myAvatar, isHost, roomData, onGameOver, 
       st.day = dayRef.current;
     }
 
-    // movement
-    let dx=0,dy=0;
-    if(keysRef.current.up)    dy=-PLAYER_SPEED;
-    if(keysRef.current.down)  dy= PLAYER_SPEED;
-    if(keysRef.current.left)  dx=-PLAYER_SPEED;
-    if(keysRef.current.right) dx= PLAYER_SPEED;
-    if(dx&&dy){dx*=0.707;dy*=0.707;}
+    // movement from joystick vector
+    const jv = keysRef.current.joystick || {x:0,y:0};
+    let dx = jv.x * PLAYER_SPEED;
+    let dy = jv.y * PLAYER_SPEED;
 
     const nx=st.player.x+dx, ny=st.player.y+dy;
     const margin=TILE*0.45;
@@ -454,7 +451,52 @@ function GameEngine({ roomCode, myName, myAvatar, isHost, roomData, onGameOver, 
     }
   };
 
-  const handleDPad = useCallback((dir,down)=>{ keysRef.current[dir]=down; },[]);
+  // ── Mobile Legends joystick ──
+  const joystickRef = useRef(null); // {baseX, baseY, active}
+  const joystickStateRef = useRef({knobX:0, knobY:0, active:false});
+  const [joystickVis, setJoystickVis] = useState({baseX:80,baseY:80,knobX:80,knobY:80,active:false});
+  const JOYSTICK_RADIUS = 50;
+
+  const onJoyStart = useCallback((e) => {
+    e.preventDefault();
+    const touch = e.touches ? e.touches[0] : e;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const bx = touch.clientX - rect.left;
+    const by = touch.clientY - rect.top;
+    joystickRef.current = {baseX:bx, baseY:by};
+    joystickStateRef.current = {knobX:bx, knobY:by, active:true};
+    setJoystickVis({baseX:bx, baseY:by, knobX:bx, knobY:by, active:true});
+    keysRef.current.joystick = {x:0,y:0};
+  }, []);
+
+  const onJoyMove = useCallback((e) => {
+    e.preventDefault();
+    if (!joystickRef.current) return;
+    const touch = e.touches ? e.touches[0] : e;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const mx = touch.clientX - rect.left;
+    const my = touch.clientY - rect.top;
+    const {baseX, baseY} = joystickRef.current;
+    const rawDx = mx - baseX, rawDy = my - baseY;
+    const dist = Math.hypot(rawDx, rawDy);
+    const clamped = Math.min(dist, JOYSTICK_RADIUS);
+    const angle = Math.atan2(rawDy, rawDx);
+    const knobX = baseX + Math.cos(angle)*clamped;
+    const knobY = baseY + Math.sin(angle)*clamped;
+    const nx = dist > 8 ? Math.cos(angle) : 0;
+    const ny = dist > 8 ? Math.sin(angle) : 0;
+    keysRef.current.joystick = {x:nx, y:ny};
+    joystickStateRef.current = {knobX, knobY, active:true};
+    setJoystickVis({baseX, baseY, knobX, knobY, active:true});
+  }, []);
+
+  const onJoyEnd = useCallback((e) => {
+    e.preventDefault();
+    joystickRef.current = null;
+    keysRef.current.joystick = {x:0,y:0};
+    joystickStateRef.current = {active:false};
+    setJoystickVis(v=>({...v, active:false}));
+  }, []);
 
   const handleBuild = () => {
     const st=stateRef.current; if(!st) return;
@@ -490,20 +532,20 @@ function GameEngine({ roomCode, myName, myAvatar, isHost, roomData, onGameOver, 
     <div style={{width:'100%',height:'100%',display:'flex',flexDirection:'column',background:'#000',fontFamily:"'Arial Black',Arial,sans-serif",overflow:'hidden'}}>
 
       {/* TOP HUD */}
-      <div style={{background: isNight?'linear-gradient(90deg,#200000,#100010,#200000)':'linear-gradient(90deg,#003300,#001a00,#003300)', padding:'6px 10px', display:'flex', alignItems:'center', gap:8, borderBottom:`3px solid ${isNight?'#ff0000':'#44aa00'}`, position:'relative'}}>
+      <div style={{background: isNight?'linear-gradient(90deg,#200000,#100010,#200000)':'linear-gradient(90deg,#003300,#001a00,#003300)', padding:'6px 10px', display:'flex', alignItems:'center', gap:8, borderBottom:`3px solid ${isNight?'#ff0000':'#44aa00'}`}}>
+        {/* EXIT top left */}
+        <button onClick={onBack} style={{background:'#1a1a1a',border:'2px solid #444',borderRadius:8,padding:'4px 10px',color:'#aaa',fontSize:11,cursor:'pointer',fontWeight:900,textTransform:'uppercase',flexShrink:0}}>✕ EXIT</button>
         {/* phase badge */}
-        <div style={{background: isNight?'linear-gradient(180deg,#ff3300,#880000)':'linear-gradient(180deg,#ffcc00,#aa7700)', borderRadius:8, padding:'3px 10px', boxShadow:`0 3px 0 ${isNight?'#550000':'#665500'}`, border:`2px solid ${isNight?'#ff6600':'#ffee00'}`}}>
+        <div style={{background: isNight?'linear-gradient(180deg,#ff3300,#880000)':'linear-gradient(180deg,#ffcc00,#aa7700)', borderRadius:8, padding:'3px 8px', boxShadow:`0 3px 0 ${isNight?'#550000':'#665500'}`, border:`2px solid ${isNight?'#ff6600':'#ffee00'}`}}>
           <div style={{fontSize:11, fontWeight:900, color:'#fff', textShadow:'1px 1px 0 rgba(0,0,0,0.5)', lineHeight:1}}>{isNight?'🌙 NIGHT':'☀️ DAY'} {day}</div>
         </div>
         {/* timer */}
         <div style={{background:'rgba(0,0,0,0.5)', borderRadius:8, padding:'3px 8px', border:'2px solid rgba(255,255,255,0.2)'}}>
           <span style={{fontSize:12, fontWeight:900, color: phaseTimer<10?'#ff4444':'#fff'}}>⏱ {phaseTimer}s</span>
         </div>
-        {/* zombie count */}
         {isNight && <div style={{background:'rgba(200,0,0,0.4)', borderRadius:8, padding:'3px 8px', border:'2px solid #ff4444'}}>
           <span style={{fontSize:11, fontWeight:900, color:'#ff8888'}}>🧟 {zombieCount}</span>
         </div>}
-        {/* score */}
         <div style={{marginLeft:'auto', background:'rgba(255,200,0,0.15)', borderRadius:8, padding:'3px 8px', border:'2px solid rgba(255,200,0,0.3)'}}>
           <span style={{fontSize:11, fontWeight:900, color:'#ffcc00'}}>⭐ {score}</span>
         </div>
@@ -512,17 +554,15 @@ function GameEngine({ roomCode, myName, myAvatar, isHost, roomData, onGameOver, 
       {/* HP BAR */}
       <div style={{background:'rgba(0,0,0,0.8)', padding:'4px 10px', display:'flex', alignItems:'center', gap:8}}>
         <span style={{fontSize:11, fontWeight:900, color:hpColor, minWidth:28}}>❤️ {hp}</span>
-        <div style={{flex:1, height:10, background:'#330000', borderRadius:5, border:'2px solid #550000', overflow:'hidden', boxShadow:'inset 0 1px 3px rgba(0,0,0,0.5)'}}>
-          <div style={{width:`${hp}%`, height:'100%', background:`linear-gradient(90deg,${hpColor},${hpColor}aa)`, borderRadius:5, transition:'width 0.3s', boxShadow:`0 0 6px ${hpColor}`}}/>
+        <div style={{flex:1, height:10, background:'#330000', borderRadius:5, border:'2px solid #550000', overflow:'hidden'}}>
+          <div style={{width:`${hp}%`, height:'100%', background:`linear-gradient(90deg,${hpColor},${hpColor}aa)`, borderRadius:5, transition:'width 0.3s'}}/>
         </div>
         <span style={{fontSize:10, color:'#666', minWidth:30}}>{myAvatar.name}</span>
       </div>
 
       {/* CANVAS */}
-      <div style={{flex:'0 0 auto', display:'flex', justifyContent:'center', background:'#000', position:'relative'}}>
+      <div style={{flex:'0 0 auto', display:'flex', justifyContent:'center', background:'#000'}}>
         <canvas ref={canvasRef} width={MAP_W} height={MAP_H} style={{display:'block', maxWidth:'100%'}}/>
-        {/* phase flash overlay */}
-        <div style={{position:'absolute',top:0,left:0,right:0,bottom:0,pointerEvents:'none',background: isNight?'rgba(80,0,0,0.0)':'rgba(255,220,0,0.0)',transition:'background 2s'}}/>
       </div>
 
       {/* LOG */}
@@ -530,47 +570,58 @@ function GameEngine({ roomCode, myName, myAvatar, isHost, roomData, onGameOver, 
         {log}
       </div>
 
-      {/* CONTROLS */}
-      <div style={{background:'linear-gradient(180deg,#111,#0a0a0a)', borderTop:'3px solid #222', flex:1, display:'flex', alignItems:'center'}}>
-        {/* DPAD */}
-        <div style={{display:'grid', gridTemplateColumns:'repeat(3,52px)', gridTemplateRows:'repeat(3,52px)', gap:3, padding:'6px 8px', flexShrink:0}}>
-          {[['','up',''],['left','','right'],['','down','']].map((row,ri)=>row.map((dir,ci)=>(
-            <div key={`${ri}-${ci}`} style={dir?{
-              background:'linear-gradient(180deg,#444,#222)',
-              border:'2px solid #555',
-              borderRadius:10,
-              display:'flex', alignItems:'center', justifyContent:'center',
-              fontSize:20, color:'#fff', cursor:'pointer',
-              boxShadow:'0 4px 0 #111',
-              userSelect:'none', WebkitUserSelect:'none', touchAction:'none',
-            }:{}} 
-            onPointerDown={dir?e=>{e.preventDefault();handleDPad(dir,true);}:undefined}
-            onPointerUp={dir?e=>{e.preventDefault();handleDPad(dir,false);}:undefined}
-            onPointerLeave={dir?()=>handleDPad(dir,false):undefined}>
-              {dir==='up'?'▲':dir==='down'?'▼':dir==='left'?'◀':dir==='right'?'▶':''}
-            </div>
-          )))}
+      {/* CONTROLS — joystick left, action buttons right */}
+      <div style={{flex:1, background:'linear-gradient(180deg,#111,#0a0a0a)', borderTop:'3px solid #222', position:'relative', minHeight:140, display:'flex', alignItems:'center'}}>
+
+        {/* JOYSTICK ZONE — left half */}
+        <div
+          style={{position:'absolute', left:0, top:0, width:'55%', height:'100%', touchAction:'none', userSelect:'none', WebkitUserSelect:'none'}}
+          onTouchStart={onJoyStart} onTouchMove={onJoyMove} onTouchEnd={onJoyEnd}
+          onPointerDown={onJoyStart} onPointerMove={e=>{if(e.buttons)onJoyMove(e);}} onPointerUp={onJoyEnd}>
+          {/* joystick SVG drawn on top */}
+          <svg style={{position:'absolute',top:0,left:0,width:'100%',height:'100%',pointerEvents:'none'}}>
+            {joystickVis.active && <>
+              {/* outer ring */}
+              <circle cx={joystickVis.baseX} cy={joystickVis.baseY} r={JOYSTICK_RADIUS}
+                fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.25)" strokeWidth={2}/>
+              {/* direction arrows hint */}
+              <circle cx={joystickVis.baseX} cy={joystickVis.baseY} r={JOYSTICK_RADIUS*0.25}
+                fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.1)" strokeWidth={1}/>
+              {/* knob */}
+              <circle cx={joystickVis.knobX} cy={joystickVis.knobY} r={28}
+                fill="rgba(255,255,255,0.18)" stroke="rgba(255,255,255,0.5)" strokeWidth={2.5}/>
+              <circle cx={joystickVis.knobX} cy={joystickVis.knobY} r={12}
+                fill="rgba(255,255,255,0.35)"/>
+            </>}
+            {!joystickVis.active && <>
+              {/* idle hint */}
+              <circle cx={80} cy="50%" r={JOYSTICK_RADIUS}
+                fill="rgba(255,255,255,0.03)" stroke="rgba(255,255,255,0.1)" strokeWidth={1.5} strokeDasharray="6,4"/>
+              <circle cx={80} cy="50%" r={24}
+                fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.15)" strokeWidth={1.5}/>
+              <text x={80} y="52%" textAnchor="middle" dominantBaseline="middle" fill="rgba(255,255,255,0.2)" fontSize={10} fontWeight="bold">MOVE</text>
+            </>}
+          </svg>
         </div>
 
-        {/* ACTION BUTTONS */}
-        <div style={{display:'flex', flexDirection:'column', gap:8, padding:'6px 8px', flex:1}}>
+        {/* ACTION BUTTONS — right side */}
+        <div style={{position:'absolute', right:12, top:'50%', transform:'translateY(-50%)', display:'flex', flexDirection:'column', gap:10}}>
           <button onClick={handleAttack} style={{
-            background: isNight?'linear-gradient(180deg,#ff3333,#aa0000)':'linear-gradient(180deg,#555,#333)',
+            background: isNight?'linear-gradient(180deg,#ff3333,#aa0000)':'rgba(80,80,80,0.4)',
             border:`2px solid ${isNight?'#ff6666':'#444'}`,
-            borderRadius:10, padding:'11px 8px', color:'#fff', fontSize:13, fontWeight:900,
+            borderRadius:12, width:72, height:54, color:'#fff', fontSize:12, fontWeight:900,
             cursor:'pointer', boxShadow:`0 4px 0 ${isNight?'#660000':'#111'}`,
-            opacity: isNight?1:0.5, textShadow:'1px 1px 0 rgba(0,0,0,0.5)',
-            textTransform:'uppercase', letterSpacing:0.5,
-          }}>⚔️ ATTACK</button>
+            opacity: isNight?1:0.45, textShadow:'1px 1px 0 rgba(0,0,0,0.5)',
+            textTransform:'uppercase', letterSpacing:0.5, lineHeight:1.2,
+          }}>⚔️<br/>ATTACK</button>
           <button onClick={handleBuild} style={{
-            background: !isNight?'linear-gradient(180deg,#886633,#553311)':'linear-gradient(180deg,#444,#222)',
-            border:`2px solid ${!isNight?'#ddaa55':'#333'}`,
-            borderRadius:10, padding:'11px 8px', color:'#fff', fontSize:13, fontWeight:900,
+            background: !isNight?'linear-gradient(180deg,#886633,#553311)':'rgba(80,80,80,0.4)',
+            border:`2px solid ${!isNight?'#ddaa55':'#444'}`,
+            borderRadius:12, width:72, height:54, color:'#fff', fontSize:12, fontWeight:900,
             cursor:'pointer', boxShadow:`0 4px 0 ${!isNight?'#332200':'#111'}`,
-            opacity: !isNight?1:0.5, textShadow:'1px 1px 0 rgba(0,0,0,0.5)',
-            textTransform:'uppercase', letterSpacing:0.5,
-          }}>🧱 BUILD</button>
-          <button onClick={onBack} style={{background:'#1a1a1a', border:'1px solid #333', borderRadius:8, padding:'6px', color:'#666', fontSize:11, cursor:'pointer', textTransform:'uppercase'}}>← EXIT</button>
+            opacity: !isNight?1:0.45, textShadow:'1px 1px 0 rgba(0,0,0,0.5)',
+            textTransform:'uppercase', letterSpacing:0.5, lineHeight:1.2,
+          }}>🧱<br/>BUILD</button>
         </div>
       </div>
 
