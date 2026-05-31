@@ -196,10 +196,11 @@ export default function Gallery() {
       {/* Guest Snapshots title + grid toggle */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
         <div style={{ fontFamily: 'var(--font-display)', fontSize: 15, fontWeight: 700, color: 'white' }}>Guest Snapshots</div>
-        <div style={{ display: 'flex', gap: 4, background: 'rgba(20,8,0,0.5)', borderRadius: 8, padding: 3, border: '1px solid rgba(212,168,83,0.2)' }}>
-          {[1,2,3].map(n => (
-            <button key={n} onClick={() => setCols(n)} style={{ width: 26, height: 26, borderRadius: 5, background: cols === n ? '#d4a853' : 'transparent', color: cols === n ? '#1a0a00' : 'rgba(255,255,255,0.4)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
-              {n === 1 ? <GridIcon1 /> : n === 2 ? <GridIcon2 /> : <GridIcon3 />}
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginRight: 2 }}>View:</span>
+          {[1,2,3,4,5].map(n => (
+            <button key={n} onClick={() => setCols(n)} style={{ width: 24, height: 24, borderRadius: 5, background: cols === n ? '#d4a853' : 'rgba(107,58,31,0.4)', color: cols === n ? '#1a0a00' : 'rgba(255,255,255,0.6)', border: cols === n ? 'none' : '1px solid rgba(212,168,83,0.2)', cursor: 'pointer', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
+              {n}
             </button>
           ))}
         </div>
@@ -215,7 +216,7 @@ export default function Gallery() {
           const photoComments = comments[p.id] || [];
 
           return (
-            <div key={p.id} style={{ borderRadius: cols === 3 ? 8 : 12, overflow: 'hidden', background: 'rgba(20,8,0,0.5)', border: '1px solid rgba(212,168,83,0.1)' }}>
+            <div key={p.id} style={{ borderRadius: cols >= 3 ? 6 : 12, overflow: 'hidden', background: 'rgba(20,8,0,0.5)', border: '1px solid rgba(212,168,83,0.1)' }}>
               {/* Photo with overlay */}
               <div style={{ position: 'relative', cursor: 'pointer', aspectRatio: '1', overflow: 'hidden' }} onClick={() => cols > 1 ? setSelected(p) : null}>
                 {p.thumb
@@ -223,7 +224,7 @@ export default function Gallery() {
                   : <div style={{ width: '100%', height: '100%', background: 'rgba(107,58,31,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>📷</div>
                 }
                 {/* Overlay — hearts & comments inside photo */}
-                <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(to top, rgba(20,8,0,0.65) 0%, transparent 100%)', padding: cols === 3 ? '12px 6px 5px' : '18px 10px 7px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+                <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(to top, rgba(20,8,0,0.65) 0%, transparent 100%)', padding: cols >= 3 ? '10px 4px 4px' : '18px 10px 7px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
                   <div style={{ display: 'flex', gap: cols === 3 ? 6 : 10, alignItems: 'center' }}>
                     {/* Heart */}
                     <button onClick={e => toggleHeart(e, p.id, p.hearts)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3, padding: 0 }}>
