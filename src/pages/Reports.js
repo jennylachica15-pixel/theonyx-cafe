@@ -44,12 +44,14 @@ const s = {
 export default function Reports() {
   const [orders, setOrders] = useState([]);
   const [items, setItems] = useState([]);
+  const [feedbacks, setFeedbacks] = useState([]);
   const [activeTab, setActiveTab] = useState('daily');
 
   useEffect(() => {
     const unsub1 = onSnapshot(query(collection(db, 'orders'), orderBy('createdAt', 'desc')), snap => setOrders(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsub2 = onSnapshot(query(collection(db, 'inventory'), orderBy('createdAt', 'desc')), snap => setItems(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-    return () => { unsub1(); unsub2(); };
+    const unsub3 = onSnapshot(collection(db, 'feedbacks'), snap => setFeedbacks(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    return () => { unsub1(); unsub2(); unsub3(); };
   }, []);
 
   const now = new Date();
@@ -224,6 +226,34 @@ export default function Reports() {
           })}
         </div>
       )}
+      {/* Feedback Summary */}
+      {feedbacks.length > 0 && (() => {
+        const avg = (key) => {
+          const vals = feedbacks.map(f => Number(f[key])).filter(v => v > 0);
+          return vals.length ? (vals.reduce((a,b) => a+b, 0) / vals.length).toFixed(1) : 'N/A';
+        };
+        const avgStaff = avg('staffRating');
+        const avgPlace = avg('placeRating');
+        const avgDrink = avg('drinkOverall');
+        return (
+          <div style={s.card}>
+            <div style={s.cardTitle}>📝 Customer Feedback Summary</div>
+            <div style={s.statGrid}>
+              <div style={s.statBox}><div style={s.statNum('var(--gold)')}>{feedbacks.length}</div><div style={s.statLabel}>Total Responses</div></div>
+              <div style={s.statBox}><div style={s.statNum('var(--brown-dark)')}>{avgStaff} ★</div><div style={s.statLabel}>Staff Rating</div></div>
+              <div style={s.statBox}><div style={s.statNum('var(--brown-dark)')}>{avgPlace} ★</div><div style={s.statLabel}>Place Rating</div></div>
+              <div style={s.statBox}><div style={s.statNum('var(--brown-dark)')}>{avgDrink} ★</div><div style={s.statLabel}>Drink Rating</div></div>
+            </div>
+            <div style={s.cardTitle}>Recent Comments</div>
+            {feedbacks.slice(0, 3).map((f, i) => f.overallComment ? (
+              <div key={i} style={{ padding: '8px 0', borderBottom: '1px solid #f5ede4', fontSize: 12, color: 'var(--brown-mid)', fontStyle: 'italic' }}>
+                "{f.overallComment}" — <span style={{ fontStyle: 'normal', fontWeight: 600 }}>{f.customerName}</span>
+              </div>
+            ) : null)}
+          </div>
+        );
+      })()}
+
       <div style={{ height: 80 }} />
     </div>
   );
