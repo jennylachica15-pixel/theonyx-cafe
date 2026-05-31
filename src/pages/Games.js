@@ -17,14 +17,14 @@ const T = {
 
 // ─── LEADERBOARD HELPERS ──────────────────────────────────────────────────────
 const LS_KEY = 'theonyx_leaderboard';
-const getBoard = () => { try { return JSON.parse(localStorage.getItem(LS_KEY)) || {}; } catch { return {}; } };
+const getBoard = () => { try { const d = localStorage.getItem(LS_KEY); return d ? JSON.parse(d) : {}; } catch { return {}; } };
 const saveScore = (game, name, score) => {
   const board = getBoard();
   if (!board[game]) board[game] = [];
   board[game].push({ name, score, date: new Date().toLocaleDateString() });
   board[game].sort((a, b) => b.score - a.score);
   board[game] = board[game].slice(0, 10);
-  localStorage.setItem(LS_KEY, JSON.stringify(board));
+  try { localStorage.setItem(LS_KEY, JSON.stringify(board)); } catch { }
 };
 const getTop = (game) => (getBoard()[game] || []).slice(0, 10);
 
@@ -417,6 +417,14 @@ function TetrisGame({ playerName, onGameOver }) {
 // ═══════════════════════════════════════════════════════════════════
 // SPOT THE DIFFERENCE
 // ═══════════════════════════════════════════════════════════════════
+const SPOT_DIFFS = [
+  { id: 0, x: 222, y: 30, r: 16 },
+  { id: 1, x: 58, y: 102, r: 15 },
+  { id: 2, x: 157, y: 147, r: 14 },
+  { id: 3, x: 252, y: 138, r: 13 },
+  { id: 4, x: 110, y: 55, r: 13 },
+];
+
 function SpotDiffGame({ playerName, onGameOver }) {
   const [found, setFound] = useState([]);
   const [flash, setFlash] = useState(null);
@@ -424,14 +432,6 @@ function SpotDiffGame({ playerName, onGameOver }) {
   const [done, setDone] = useState(false);
   const canvasA = useRef(null), canvasB = useRef(null);
   const W = 290, H = 210;
-
-  const DIFFS = [
-    { id: 0, x: 222, y: 30, r: 16 },
-    { id: 1, x: 58, y: 102, r: 15 },
-    { id: 2, x: 157, y: 147, r: 14 },
-    { id: 3, x: 252, y: 138, r: 13 },
-    { id: 4, x: 110, y: 55, r: 13 },
-  ];
 
   const draw = useCallback((ctx, isB, foundIds, fl) => {
     const GROUND = H - 48;
@@ -469,7 +469,7 @@ function SpotDiffGame({ playerName, onGameOver }) {
     ctx.fillStyle = isB ? '#8a3030' : '#2a5020';
     ctx.fillRect(143, GROUND - 30, 28, 20); ctx.strokeStyle = '#6b3d11'; ctx.lineWidth = 2; ctx.strokeRect(143, GROUND - 30, 28, 20);
     ctx.fillStyle = '#f5e6c8'; ctx.font = 'bold 6px Georgia'; ctx.textAlign = 'center'; ctx.fillText('OPEN', 157, GROUND - 20); ctx.fillText('10-11', 157, GROUND - 13);
-    if (foundIds?.length) { foundIds.forEach(id => { const d = DIFFS[id]; ctx.strokeStyle = T.success; ctx.lineWidth = 2.5; ctx.setLineDash([4, 2]); ctx.beginPath(); ctx.arc(d.x, d.y, d.r + 4, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }); }
+    if (foundIds?.length) { foundIds.forEach(id => { const d = SPOT_DIFFS[id]; ctx.strokeStyle = T.success; ctx.lineWidth = 2.5; ctx.setLineDash([4, 2]); ctx.beginPath(); ctx.arc(d.x, d.y, d.r + 4, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }); }
     if (fl && fl.canvas === (isB ? 'b' : 'a')) { ctx.strokeStyle = T.danger; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(fl.x, fl.y, 12, 0, Math.PI * 2); ctx.stroke(); }
   }, [H, DIFFS]);
 
@@ -491,11 +491,11 @@ function SpotDiffGame({ playerName, onGameOver }) {
     const canvas = isB ? canvasB.current : canvasA.current;
     const rect = canvas.getBoundingClientRect();
     const x = (e.clientX - rect.left) * (W / rect.width), y = (e.clientY - rect.top) * (H / rect.height);
-    for (const d of DIFFS) {
+    for (const d of SPOT_DIFFS) {
       if (found.includes(d.id)) continue;
       if (Math.sqrt((x - d.x) ** 2 + (y - d.y) ** 2) < d.r + 8) {
         const nf = [...found, d.id]; setFound(nf);
-        if (nf.length === DIFFS.length) { const sc = nf.length * 20 + timeLeft * 2; saveScore('spot', playerName, sc); setDone(true); onGameOver(sc); } return;
+        if (nf.length === SPOT_DIFFS.length) { const sc = nf.length * 20 + timeLeft * 2; saveScore('spot', playerName, sc); setDone(true); onGameOver(sc); } return;
       }
     }
     setFlash({ x, y, canvas: isB ? 'b' : 'a' }); setTimeout(() => setFlash(null), 500);
@@ -518,7 +518,7 @@ function SpotDiffGame({ playerName, onGameOver }) {
         ))}
       </div>
       <div style={{ display: 'flex', justifyContent: 'center', gap: 6, flexWrap: 'wrap', padding: '0 10px' }}>
-        {DIFFS.map(d => <span key={d.id} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: found.includes(d.id) ? T.success + '33' : T.cardLight, color: found.includes(d.id) ? T.success : T.dim, border: `1px solid ${found.includes(d.id) ? T.success : T.brown + '44'}` }}>{found.includes(d.id) ? '✓' : '?'} #{d.id + 1}</span>)}
+        {SPOT_DIFFS.map(d => <span key={d.id} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: found.includes(d.id) ? T.success + '33' : T.cardLight, color: found.includes(d.id) ? T.success : T.dim, border: `1px solid ${found.includes(d.id) ? T.success : T.brown + '44'}` }}>{found.includes(d.id) ? '✓' : '?'} #{d.id + 1}</span>)}
       </div>
     </div>
   );
@@ -528,6 +528,12 @@ function SpotDiffGame({ playerName, onGameOver }) {
 // MAIN GAMES PAGE
 // ═══════════════════════════════════════════════════════════════════
 const GAME_LABELS = { snake: '🐍 Snake', mario: '🏃 Café Runner', tetris: '🟦 Tetris', spot: '🔍 Spot the Diff' };
+const GAME_LIST = [
+  { id: 'snake', icon: '🐍', name: 'Snake', desc: 'Eat the beans!' },
+  { id: 'mario', icon: '🏃', name: 'Café Runner', desc: 'Jump over cups!' },
+  { id: 'tetris', icon: '🟦', name: 'Tetris', desc: 'Stack blocks!' },
+  { id: 'spot', icon: '🔍', name: 'Spot Diff', desc: 'Find 5 differences!' },
+];
 
 export default function GamesPage() {
   const [activeGame, setActiveGame] = useState(null);
