@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import CafeGame from './CafeGame';
 
 // ─── THEME ───────────────────────────────────────────────────────────────────
 const T = {
@@ -533,6 +534,7 @@ const GAME_LIST = [
   { id: 'mario', icon: '🏃', name: 'Café Runner', desc: 'Jump over cups!' },
   { id: 'tetris', icon: '🟦', name: 'Tetris', desc: 'Stack blocks!' },
   { id: 'spot', icon: '🔍', name: 'Spot Diff', desc: 'Find 5 differences!' },
+  { id: 'cafemystery', icon: '☕', name: 'Café Mystery', desc: 'Multiplayer · 3-10 players!' },
 ];
 
 export default function GamesPage() {
@@ -545,7 +547,13 @@ export default function GamesPage() {
 
   const pickGame = (id) => {
     setActiveGame(null); setGameOver(null); setPlayerName(null);
-    setPendingGame(id); setShowName(true);
+    setPendingGame(id);
+    if (id === 'cafemystery') {
+      setActiveGame('cafemystery');
+      setPlayerName('multiplayer');
+    } else {
+      setShowName(true);
+    }
   };
 
   const handleName = (name) => {
@@ -582,6 +590,7 @@ export default function GamesPage() {
           {activeGame === 'mario' && <MarioGame key={'mario' + playerName} playerName={playerName} onGameOver={handleGameOver} />}
           {activeGame === 'tetris' && <TetrisGame key={'tetris' + playerName} playerName={playerName} onGameOver={handleGameOver} />}
           {activeGame === 'spot' && <SpotDiffGame key={'spot' + playerName} playerName={playerName} onGameOver={handleGameOver} />}
+          {activeGame === 'cafemystery' && <CafeGame onExit={exitGame} />}
         </div>
         {gameOver && (
           <GameOverModal
