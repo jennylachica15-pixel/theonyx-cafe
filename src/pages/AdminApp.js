@@ -7,6 +7,7 @@ import Orders from './Orders';
 import Inventory from './Inventory';
 import Reports from './Reports';
 import MenuManager from './MenuManager';
+import Approvals from './Approvals';
 
 const styles = {
   container: { display: 'flex', flexDirection: 'column', height: '100vh', background: 'linear-gradient(160deg, #1a0a00 0%, #6b3a1f 70%, #c8956c 100%)', maxWidth: 480, margin: '0 auto' },
@@ -39,11 +40,12 @@ export default function AdminApp({ user, onSignOut }) {
   const handleSignOut = async () => { await signOut(auth); onSignOut(); };
 
   const tabs = [
-    { id: 'attendance', label: 'Clock In', icon: '🕐' },
-    { id: 'orders', label: 'Orders', icon: '🧾' },
-    { id: 'inventory', label: 'Stocks', icon: '📦' },
-    { id: 'reports', label: 'Reports', icon: '📊' },
-    ...(role === 'manager' ? [{ id: 'menu', label: 'Menu', icon: '📋' }] : []),
+    { id: 'attendance', label: 'Clock In', icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> },
+    { id: 'orders', label: 'Orders', icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> },
+    { id: 'inventory', label: 'Stocks', icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg> },
+    { id: 'approvals', label: 'Approvals', icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> },
+    { id: 'reports', label: 'Reports', icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> },
+    ...(role === 'manager' ? [{ id: 'menu', label: 'Menu', icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg> }] : []),
   ];
 
   return (
@@ -63,6 +65,7 @@ export default function AdminApp({ user, onSignOut }) {
         {activeTab === 'attendance' && <Attendance role={role} userName={userName} />}
         {activeTab === 'orders' && <Orders userName={userName} />}
         {activeTab === 'inventory' && <Inventory />}
+        {activeTab === 'approvals' && <Approvals />}
         {activeTab === 'reports' && <Reports />}
         {activeTab === 'menu' && role === 'manager' && <MenuManager />}
       </div>
@@ -70,7 +73,7 @@ export default function AdminApp({ user, onSignOut }) {
       <div style={styles.bottomNav}>
         {tabs.map(tab => (
           <div key={tab.id} style={styles.navItem(activeTab === tab.id)} onClick={() => setActiveTab(tab.id)}>
-            <span style={styles.navIcon}>{tab.icon}</span>
+            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{tab.icon}</span>
             <span style={styles.navLabel(activeTab === tab.id)}>{tab.label}</span>
           </div>
         ))}
