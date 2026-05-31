@@ -42,10 +42,10 @@ const s = {
   page: { padding: '16px 16px 0', minHeight: '100vh', background: 'transparent' },
   title: { fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: 'white', marginBottom: 4 },
   sub: { fontSize: 13, color: 'rgba(255,255,255,0.6)', marginBottom: 16 },
-  uploadBox: { background: 'rgba(253,240,228,0.95)', borderRadius: 16, padding: 24, textAlign: 'center', border: '2px dashed rgba(200,149,108,0.5)', marginBottom: 14, cursor: 'pointer' },
+  uploadBox: { background: 'rgba(253,240,228,0.95)', borderRadius: 14, padding: '14px 16px', textAlign: 'center', border: '1.5px dashed rgba(200,149,108,0.5)', marginBottom: 14, cursor: 'pointer' },
   previewImg: { width: '100%', borderRadius: 12, maxHeight: 220, objectFit: 'cover', marginBottom: 14 },
-  connectBtn: { width: '100%', padding: '13px', borderRadius: 12, background: '#1a73e8', color: 'white', fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 14, border: 'none', cursor: 'pointer' },
-  connectedBadge: { background: 'rgba(216,243,220,0.9)', color: '#2d6a4f', borderRadius: 10, padding: '10px 14px', fontSize: 13, fontWeight: 500, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 },
+  connectBtn: { padding: '8px 16px', borderRadius: 10, background: '#6b3a1f', color: '#f0d080', fontSize: 12, fontWeight: 600, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 14, border: '1px solid rgba(212,168,83,0.3)', cursor: 'pointer' },
+  connectedBadge: { background: 'rgba(216,243,220,0.9)', color: '#2d6a4f', borderRadius: 10, padding: '8px 12px', fontSize: 12, fontWeight: 500, marginBottom: 14, display: 'inline-flex', alignItems: 'center', gap: 6 },
   progressBar: { height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.2)', marginBottom: 14, overflow: 'hidden' },
   albumGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, paddingBottom: 80 },
   albumCell: { background: 'rgba(253,240,228,0.95)', borderRadius: 12, overflow: 'hidden', cursor: 'pointer' },
@@ -128,11 +128,11 @@ export default function Gallery() {
 
   return (
     <div style={s.page}>
-      <div style={s.title}>Gallery</div>
-      <div style={s.sub}>Take a photo at Theonyx Cafe!</div>
+      <div style={s.title}>Snapshots</div>
+      <div style={s.sub}>Share your experience at Theonyx Cafe</div>
 
       {!accessToken
-        ? <button style={s.connectBtn} onClick={() => tokenClientRef.current?.requestAccessToken()}>🔗 Connect to Upload Photos</button>
+        ? <button style={s.connectBtn} onClick={() => tokenClientRef.current?.requestAccessToken()}>🔗 Connect to Upload</button>
         : <div style={s.connectedBadge}>✅ Ready to upload</div>
       }
 
@@ -140,9 +140,9 @@ export default function Gallery() {
 
       {!photo && !uploading && (
         <div style={s.uploadBox} onClick={() => fileRef.current.click()}>
-          <div style={{ fontSize: 44, marginBottom: 8 }}>📷</div>
-          <div style={{ fontSize: 14, color: '#6b3a1f', fontWeight: 500 }}>Tap to take your photo</div>
-          <div style={{ fontSize: 12, color: '#c8956c', marginTop: 4 }}>Camera or gallery</div>
+              <div style={{ fontSize: 32, marginBottom: 6 }}>📷</div>
+              <div style={{ fontSize: 13, color: '#6b3a1f', fontWeight: 500 }}>Capture the moment here!</div>
+              <div style={{ fontSize: 11, color: '#c8956c', marginTop: 3 }}>Camera or gallery</div>
         </div>
       )}
       <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handleFile} />
