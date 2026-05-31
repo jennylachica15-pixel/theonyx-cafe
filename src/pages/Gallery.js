@@ -48,7 +48,7 @@ const s = {
   connectedBadge: { background: 'rgba(216,243,220,0.9)', color: '#2d6a4f', borderRadius: 10, padding: '8px 12px', fontSize: 12, fontWeight: 500, marginBottom: 14, display: 'inline-flex', alignItems: 'center', gap: 6 },
   progressBar: { height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.2)', marginBottom: 14, overflow: 'hidden' },
   albumGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, paddingBottom: 80 },
-  albumCell: { background: 'rgba(253,240,228,0.95)', borderRadius: 12, overflow: 'hidden', cursor: 'pointer' },
+  albumCell: { background: 'rgba(107,58,31,0.4)', borderRadius: 12, overflow: 'hidden', cursor: 'pointer', border: '1px solid rgba(212,168,83,0.15)' },
   consentModal: { position: 'fixed', inset: 0, background: 'rgba(26,10,0,0.75)', zIndex: 300, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' },
   consentCard: { background: '#fdf6ee', borderRadius: '20px 20px 0 0', padding: '28px 24px 40px', width: '100%', maxWidth: 480, animation: 'slideUp 0.3s ease' },
   agreeBtn: { width: '100%', padding: '13px', borderRadius: 12, background: '#1a0a00', color: '#f0d080', fontSize: 14, fontWeight: 600, marginBottom: 8, border: 'none', cursor: 'pointer' },
@@ -73,7 +73,7 @@ export default function Gallery() {
   const tokenClientRef = useRef(null);
 
   useEffect(() => {
-    const q = query(collection(db, 'guestPhotos'), where('public', '==', true));
+    const q = query(collection(db, 'guestPhotos'), where('public', '==', true), where('approved', '==', true));
     return onSnapshot(q, snap => {
       const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       docs.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
@@ -131,36 +131,44 @@ export default function Gallery() {
       <div style={s.title}>Snapshots</div>
       <div style={s.sub}>Share your experience at Theonyx Cafe</div>
 
-      {!accessToken
-        ? <button style={s.connectBtn} onClick={() => tokenClientRef.current?.requestAccessToken()}>🔗 Connect to Upload</button>
-        : <div style={s.connectedBadge}>✅ Ready to upload</div>
-      }
-
-      {success && <div style={{ background: success.includes('⚠️') ? '#ffe0e0' : '#d8f3dc', color: success.includes('⚠️') ? '#c1121f' : '#2d6a4f', borderRadius: 10, padding: '10px 14px', fontSize: 13, marginBottom: 12 }}>{success}</div>}
-
-      {!photo && !uploading && (
-        <div style={s.uploadBox} onClick={() => fileRef.current.click()}>
-              <div style={{ fontSize: 32, marginBottom: 6 }}>📷</div>
-              <div style={{ fontSize: 13, color: '#6b3a1f', fontWeight: 500 }}>Capture the moment here!</div>
-              <div style={{ fontSize: 11, color: '#c8956c', marginTop: 3 }}>Camera or gallery</div>
+      {/* Connect + Capture in one row */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'stretch' }}>
+        {!accessToken
+          ? <button style={{ ...s.connectBtn, marginBottom: 0, flex: '0 0 auto' }} onClick={() => tokenClientRef.current?.requestAccessToken()}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+              Connect to Upload
+            </button>
+          : <div style={{ ...s.connectedBadge, marginBottom: 0, flex: '0 0 auto' }}>✅ Ready</div>
+        }
+        <div style={{ flex: 1, background: 'rgba(107,58,31,0.35)', borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', border: '1px solid rgba(212,168,83,0.25)' }} onClick={() => fileRef.current.click()}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#d4a853" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#f0d080' }}>Capture the moment here!</div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginTop: 1 }}>Camera or gallery</div>
+          </div>
         </div>
+      </div>
+
+      {/* Photo preview */}
+      {photo && !uploading && (
+        <img src={photo} alt="preview" style={{ width: '100%', borderRadius: 12, maxHeight: 200, objectFit: 'cover', marginBottom: 14 }} />
       )}
       <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handleFile} />
 
       {uploading && <div style={s.progressBar}><div style={{ height: '100%', borderRadius: 3, background: '#1a73e8', width: `${progress}%`, transition: 'width 0.3s' }} /></div>}
 
       {/* Public gallery grid */}
-      <div style={s.galleryTitle}>Public Gallery</div>
-      {photos.length === 0 && <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.6)', padding: '20px 0', fontSize: 13 }}>No public photos yet. Be the first!</div>}
+      <div style={s.galleryTitle}>Guest Snapshots</div>
+      {photos.length === 0 && <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.6)', padding: '20px 0', fontSize: 13 }}>No approved photos yet. Be the first to share!</div>}
       <div style={s.albumGrid}>
         {photos.map(p => (
           <div key={p.id} style={s.albumCell} onClick={() => setSelected(selected?.id === p.id ? null : p)}>
             <div style={{ aspectRatio: '1', overflow: 'hidden', background: '#fdf6ee', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {p.thumb ? <img src={p.thumb} alt="guest" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 24 }}>📷</span>}
             </div>
-            <div style={{ padding: '6px 8px' }}>
-              <div style={{ fontSize: 10, color: '#c8956c' }}>{p.createdAt?.toDate ? p.createdAt.toDate().toLocaleDateString('en-PH', { month: 'short', day: 'numeric' }) : 'Just now'}</div>
-              {p.feedback && <div style={{ fontSize: 10, color: '#6b3a1f', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontStyle: 'italic' }}>"{p.feedback}"</div>}
+            <div style={{ padding: '6px 8px', background: 'rgba(107,58,31,0.4)' }}>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>{p.createdAt?.toDate ? p.createdAt.toDate().toLocaleDateString('en-PH', { month: 'short', day: 'numeric' }) : 'Just now'}</div>
+              {p.feedback && <div style={{ fontSize: 10, color: '#f0d080', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontStyle: 'italic' }}>"{p.feedback}"</div>}
             </div>
           </div>
         ))}
