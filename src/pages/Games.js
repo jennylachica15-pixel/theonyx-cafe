@@ -1215,7 +1215,6 @@ export default function GamesPage() {
         ))}
       </div>
 
-    </div>
       <style>{`
         @keyframes logoGlow {
           from { filter: drop-shadow(0 0 6px #ff8800) drop-shadow(0 0 14px #ff4400); }
@@ -1227,6 +1226,7 @@ export default function GamesPage() {
           90%  { opacity:0.4; }
           100% { transform:translateY(-40px) scale(1.5); opacity:0; }
         }
-      \`}</style>
+      `}</style>
+    </div>
   );
 }
