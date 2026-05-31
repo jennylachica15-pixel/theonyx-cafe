@@ -659,169 +659,264 @@ function RacingGame({ playerName, onScore }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// GUESS THE WORD (unchanged from your version)
+// GUESS THE WORD — Wordle-style UI
 // ═══════════════════════════════════════════════════════════════════════════════
 const WORD_LIST = [
-  { word:'ESPRESSO', desc:'A strong concentrated coffee shot brewed under pressure', clue:'Type of coffee ☕', category:'Drinks' },
-  { word:'LATTE',    desc:'A coffee drink made with steamed milk and a shot of espresso', clue:'Has the word "milk" in Italian', category:'Drinks' },
-  { word:'CAPPUCCINO',desc:'An espresso-based drink with equal parts espresso, steamed milk, and foam', clue:'Named after Italian friars 🇮🇹', category:'Drinks' },
-  { word:'MATCHA',   desc:'A finely ground powder of specially grown green tea leaves', clue:'Bright green color 🍵', category:'Drinks' },
-  { word:'FRAPPE',   desc:'A blended iced coffee drink topped with whipped cream', clue:'Cold and blended with ice 🧊', category:'Drinks' },
-  { word:'MACCHIATO',desc:'An espresso coffee drink with a small amount of milk', clue:'Means "stained" in Italian', category:'Drinks' },
-  { word:'MOCHA',    desc:'A chocolate-flavored variant of a latte', clue:'Has chocolate in it 🍫', category:'Drinks' },
-  { word:'CROISSANT',desc:'A buttery, flaky viennoiserie pastry shaped like a crescent', clue:'French pastry, crescent shaped 🥐', category:'Food' },
-  { word:'TIRAMISU', desc:'An Italian dessert made of ladyfingers dipped in coffee', clue:'Italian dessert, means "pick me up"', category:'Food' },
-  { word:'BARISTA',  desc:'A person who makes and serves coffee in a café', clue:'The person who makes your coffee ☕', category:'Café' },
-  { word:'AFFOGATO', desc:'A coffee-based dessert: a scoop of ice cream drowned in hot espresso', clue:'Ice cream + espresso 🍨', category:'Drinks' },
-  { word:'AMERICANO',desc:'A style of coffee prepared by diluting an espresso with hot water', clue:'Named after Americans in WWII 🇺🇸', category:'Drinks' },
-  { word:'MUFFIN',   desc:'A small domed spongy cake baked in a cup-shaped pan', clue:'Common café baked treat 🧁', category:'Food' },
-  { word:'WAFFLE',   desc:'A batter-based food cooked in a waffle iron with a grid pattern', clue:'Has a grid pattern, often with syrup 🧇', category:'Food' },
-  { word:'CHEESECAKE',desc:'A sweet dessert with a smooth creamy filling on a biscuit base', clue:'A dessert with cream cheese 🍰', category:'Food' },
-  { word:'BROWNIE',  desc:'A flat baked chocolate dessert square, denser than cake', clue:'Chocolate square dessert 🍫', category:'Food' },
-  { word:'SMOOTHIE', desc:'A thick blended drink made from fresh fruits and vegetables', clue:'Blended fruits in a cup 🍓', category:'Drinks' },
-  { word:'PANCAKE',  desc:'A flat round cake made from batter and cooked on a griddle', clue:'Flat, round, served with syrup 🥞', category:'Food' },
-  { word:'SANDWICH', desc:'Two slices of bread with a filling between them', clue:'Bread with something in the middle 🥪', category:'Food' },
-  { word:'CINNAMON', desc:'A spice made from the inner bark of trees, used in baking', clue:'Common spice sprinkled on lattes 🌿', category:'Food' },
-  { word:'VANILLA',  desc:'A flavoring derived from orchid plants, used in many desserts', clue:'Popular ice cream flavor 🍦', category:'Food' },
-  { word:'CARAMEL',  desc:'A confection made by heating sugar until it browns', clue:'Sweet brown sauce drizzled on drinks 🍯', category:'Food' },
-  { word:'ALMOND',   desc:'A tree nut used to make plant-based milk alternative for coffee', clue:'Nut used in non-dairy milk 🌰', category:'Food' },
-  { word:'COCONUT',  desc:'A tropical fruit used to make a sweet creamy milk', clue:'Tropical nut with white flesh 🥥', category:'Food' },
-  { word:'WIFI',     desc:'A wireless networking technology that allows internet connection', clue:'Free in most cafés 📶', category:'Café' },
-  { word:'MENU',     desc:'A list of food and drinks available at a restaurant or café', clue:'You read this to order 📋', category:'Café' },
-  { word:'COASTER',  desc:'A small mat placed under a cup or glass to protect the table', clue:'Goes under your cup ☕', category:'Café' },
-  { word:'JOURNAL',  desc:'A book used for writing personal entries or notes daily', clue:'Many café visitors write in one 📓', category:'Café' },
+  { word:'LATTE',    hint:'Espresso + steamed milk' },
+  { word:'MOCHA',    hint:'Coffee with chocolate' },
+  { word:'FRAPPE',   hint:'Blended iced coffee' },
+  { word:'MATCHA',   hint:'Green tea powder' },
+  { word:'BROWNIE',  hint:'Dense chocolate square' },
+  { word:'WAFFLE',   hint:'Grid-patterned cake' },
+  { word:'BARISTA',  hint:'Coffee maker' },
+  { word:'ALMOND',   hint:'Nut milk source' },
+  { word:'MUFFIN',   hint:'Domed baked treat' },
+  { word:'CARAMEL',  hint:'Brown sugar sauce' },
+  { word:'VANILLA',  hint:'White flavoring pod' },
+  { word:'COCONUT',  hint:'Tropical white nut' },
+  { word:'CINNAMON', hint:'Bark spice for lattes' },
+  { word:'ESPRESSO', hint:'Strong short coffee' },
+  { word:'MACCHIATO',hint:'Stained espresso' },
+  { word:'TIRAMISU', hint:'Pick-me-up dessert' },
+  { word:'SMOOTHIE', hint:'Blended fruit drink' },
+  { word:'SANDWICH', hint:'Two slices of bread' },
+  { word:'PANCAKE',  hint:'Flat griddle cake' },
+  { word:'CHEESECAKE',hint:'Cream cheese dessert'},
+  { word:'CROISSANT',hint:'Crescent French pastry'},
+  { word:'AFFOGATO', hint:'Ice cream + espresso' },
+  { word:'AMERICANO',hint:'Diluted espresso' },
+  { word:'JOURNAL',  hint:'Café writing book' },
+  { word:'COASTER',  hint:'Cup protector mat' },
 ];
+
+// Pick words by length 4-8 for playability
+const PLAYABLE = WORD_LIST.filter(w => w.word.length >= 4 && w.word.length <= 8);
+
+const KEYBOARD_ROWS = ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'];
+const MAX_GUESSES = 6;
 
 function GuessWordGame({ playerName, onScore }) {
   const [wordData, setWordData] = useState(null);
-  const [guessed, setGuessed] = useState([]);
-  const [wrong, setWrong] = useState([]);
-  const [showClue, setShowClue] = useState(false);
-  const [result, setResult] = useState(null);
+  const [guesses, setGuesses] = useState([]); // array of strings
+  const [current, setCurrent] = useState('');
+  const [gameState, setGameState] = useState('playing'); // playing | won | lost
   const [score, setScore] = useState(0);
-  const [streak, setStreak] = useState(0);
   const [round, setRound] = useState(1);
+  const [streak, setStreak] = useState(0);
+  const [shake, setShake] = useState(false);
   const [usedWords, setUsedWords] = useState([]);
-  const MAX_WRONG = 6;
+  const [showHint, setShowHint] = useState(false);
+  const inputRef = useRef(null);
 
-  const pickWord = useCallback((used=[]) => {
-    const available = WORD_LIST.filter(w => !used.includes(w.word));
-    const list = available.length > 0 ? available : WORD_LIST;
-    const w = list[Math.floor(Math.random()*list.length)];
-    setWordData(w); setGuessed([]); setWrong([]); setShowClue(false); setResult(null);
+  const pickWord = useCallback((used = []) => {
+    const avail = PLAYABLE.filter(w => !used.includes(w.word));
+    const list = avail.length > 0 ? avail : PLAYABLE;
+    setWordData(list[Math.floor(Math.random() * list.length)]);
+    setGuesses([]); setCurrent(''); setGameState('playing'); setShowHint(false);
   }, []);
 
   useEffect(() => { pickWord([]); }, []);
 
-  const guess = (letter) => {
-    if (!wordData || result) return;
-    if (guessed.includes(letter) || wrong.includes(letter)) return;
-    if (wordData.word.includes(letter)) {
-      const ng = [...guessed, letter]; setGuessed(ng);
-      const won = wordData.word.split('').every(l => ng.includes(l));
-      if (won) {
-        const pts = (MAX_WRONG - wrong.length) * 20 + (showClue ? 0 : 30) + streak * 10;
-        const ns = score + pts; setScore(ns); setStreak(s => s + 1); setResult('win'); onScore(ns);
+  const word = wordData?.word || '';
+  const WL = word.length;
+
+  // Get tile color for a letter at position in a guess
+  const getTileState = (guess, pos) => {
+    if (!guess || pos >= guess.length) return 'empty';
+    const letter = guess[pos];
+    if (letter === word[pos]) return 'correct';       // green
+    if (word.includes(letter)) return 'present';      // yellow
+    return 'absent';                                   // gray
+  };
+
+  // Keyboard letter state (best state across all guesses)
+  const getKeyState = (letter) => {
+    let best = 'unused';
+    for (const g of guesses) {
+      for (let i = 0; i < g.length; i++) {
+        if (g[i] !== letter) continue;
+        const s = getTileState(g, i);
+        if (s === 'correct') return 'correct';
+        if (s === 'present') best = 'present';
+        else if (best === 'unused') best = 'absent';
       }
-    } else {
-      const nw = [...wrong, letter]; setWrong(nw);
-      if (nw.length >= MAX_WRONG) { setStreak(0); setResult('lose'); onScore(score); }
+    }
+    return best;
+  };
+
+  const submitGuess = () => {
+    if (current.length !== WL) { setShake(true); setTimeout(() => setShake(false), 500); return; }
+    const newGuesses = [...guesses, current];
+    setGuesses(newGuesses);
+    setCurrent('');
+    if (current === word) {
+      const pts = (MAX_GUESSES - newGuesses.length + 1) * 50 + streak * 20 + (showHint ? 0 : 30);
+      const ns = score + pts;
+      setScore(ns); setStreak(s => s + 1); setGameState('won'); onScore(ns);
+    } else if (newGuesses.length >= MAX_GUESSES) {
+      setStreak(0); setGameState('lost'); onScore(score);
     }
   };
 
-  const next = () => {
-    const nu = [...usedWords, wordData?.word]; setUsedWords(nu); setRound(r => r + 1); pickWord(nu);
+  const pressKey = (key) => {
+    if (gameState !== 'playing') return;
+    if (key === 'ENTER') { submitGuess(); return; }
+    if (key === 'DEL') { setCurrent(c => c.slice(0, -1)); return; }
+    if (current.length < WL) setCurrent(c => c + key);
   };
+
+  useEffect(() => {
+    const k = (e) => {
+      if (gameState !== 'playing') return;
+      if (e.key === 'Enter') { e.preventDefault(); submitGuess(); }
+      else if (e.key === 'Backspace') setCurrent(c => c.slice(0, -1));
+      else if (/^[a-zA-Z]$/.test(e.key)) { if (current.length < WL) setCurrent(c => c + e.key.toUpperCase()); }
+    };
+    window.addEventListener('keydown', k);
+    return () => window.removeEventListener('keydown', k);
+  }, [current, gameState, word]);
+
+  const nextRound = () => {
+    const nu = [...usedWords, word];
+    setUsedWords(nu); setRound(r => r + 1); pickWord(nu);
+  };
+
+  const tileColors = {
+    correct: { bg: '#538d4e', border: '#538d4e', color: '#fff' },
+    present: { bg: '#b59f3b', border: '#b59f3b', color: '#fff' },
+    absent:  { bg: '#3a3a3c', border: '#3a3a3c', color: '#fff' },
+    empty:   { bg: '#1e1e1e', border: '#565656', color: '#fff' },
+    active:  { bg: '#1e1e1e', border: '#999',    color: '#fff' },
+  };
+
+  const keyColors = {
+    correct: { bg: '#538d4e', color: '#fff' },
+    present: { bg: '#b59f3b', color: '#fff' },
+    absent:  { bg: '#3a3a3c', color: '#fff' },
+    unused:  { bg: '#6b3a1f', color: '#d4a853' },
+  };
+
+  const TILE_SIZE = Math.min(52, Math.floor((Math.min(window.innerWidth, 400) - 40) / WL));
 
   if (!wordData) return <div style={{color:'#d4a853',textAlign:'center',padding:40}}>Loading...</div>;
 
-  const word = wordData.word;
-  const hpPct = ((MAX_WRONG - wrong.length) / MAX_WRONG) * 100;
-  const hpColor = hpPct > 60 ? '#44dd44' : hpPct > 30 ? '#ffcc00' : '#ff4444';
-
-  const HangmanSVG = ({ wrong }) => (
-    <svg width="110" height="100" viewBox="0 0 120 110">
-      <line x1="10" y1="105" x2="80" y2="105" stroke="#8b5a2b" strokeWidth="3" strokeLinecap="round"/>
-      <line x1="30" y1="105" x2="30" y2="10" stroke="#8b5a2b" strokeWidth="3" strokeLinecap="round"/>
-      <line x1="30" y1="10" x2="70" y2="10" stroke="#8b5a2b" strokeWidth="3" strokeLinecap="round"/>
-      <line x1="70" y1="10" x2="70" y2="22" stroke="#8b5a2b" strokeWidth="2" strokeLinecap="round"/>
-      {wrong>=1&&<circle cx="70" cy="32" r="10" stroke={wrong>=6?"#ff4444":"#d4a853"} strokeWidth="2.5" fill="none"/>}
-      {wrong>=6&&<><line x1="65" y1="28" x2="68" y2="31" stroke="#ff4444" strokeWidth="2"/><line x1="68" y1="28" x2="65" y2="31" stroke="#ff4444" strokeWidth="2"/><line x1="72" y1="28" x2="75" y2="31" stroke="#ff4444" strokeWidth="2"/><line x1="75" y1="28" x2="72" y2="31" stroke="#ff4444" strokeWidth="2"/></>}
-      {wrong>=2&&<line x1="70" y1="42" x2="70" y2="72" stroke="#d4a853" strokeWidth="2.5" strokeLinecap="round"/>}
-      {wrong>=3&&<line x1="70" y1="50" x2="52" y2="62" stroke="#d4a853" strokeWidth="2.5" strokeLinecap="round"/>}
-      {wrong>=4&&<line x1="70" y1="50" x2="88" y2="62" stroke="#d4a853" strokeWidth="2.5" strokeLinecap="round"/>}
-      {wrong>=5&&<line x1="70" y1="72" x2="54" y2="90" stroke="#d4a853" strokeWidth="2.5" strokeLinecap="round"/>}
-      {wrong>=6&&<line x1="70" y1="72" x2="86" y2="90" stroke="#d4a853" strokeWidth="2.5" strokeLinecap="round"/>}
-    </svg>
-  );
-
   return (
-    <div style={{height:'100%',background:'#1a0a00',color:'#f5e6d0',display:'flex',flexDirection:'column',fontFamily:"'Georgia',serif",overflowY:'auto'}}>
-      <div style={{background:'#2a1000',borderBottom:'2px solid #6b3a1f',padding:'8px 14px',display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0}}>
-        <div style={{fontSize:12,color:'#a07850'}}>Round <b style={{color:'#d4a853'}}>{round}</b></div>
-        <div style={{fontSize:12,color:'#a07850'}}>⭐ <b style={{color:'#d4a853'}}>{score}</b></div>
-        <div style={{fontSize:12,color:'#a07850'}}>🔥 <b style={{color:'#ff8800'}}>{streak}</b></div>
-        <div style={{fontSize:11,color:'#6b3a1f',background:'#3d1f00',borderRadius:6,padding:'2px 8px'}}>{wordData.category}</div>
+    <div style={{height:'100%',background:'#121213',color:'#fff',display:'flex',flexDirection:'column',fontFamily:"'Arial',sans-serif",overflow:'hidden'}}>
+
+      {/* Top bar */}
+      <div style={{background:'#1a1a1b',borderBottom:'1px solid #3a3a3c',padding:'8px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0}}>
+        <div style={{fontSize:11,color:'#818384'}}>Round <b style={{color:'#d4a853'}}>{round}</b></div>
+        <div style={{fontSize:13,fontWeight:'bold',color:'#d4a853',letterSpacing:2}}>GUESS THE WORD</div>
+        <div style={{fontSize:11,color:'#818384'}}>⭐ <b style={{color:'#d4a853'}}>{score}</b> {streak>0&&<span>🔥{streak}</span>}</div>
       </div>
-      <div style={{flex:1,padding:'12px 16px',display:'flex',flexDirection:'column',gap:10}}>
-        <div style={{display:'flex',alignItems:'center',gap:12,background:'#2a1000',borderRadius:14,padding:'10px 14px',border:'1px solid #3d1f00'}}>
-          <HangmanSVG wrong={wrong.length}/>
-          <div style={{flex:1}}>
-            <div style={{fontSize:12,color:'#a07850',marginBottom:4}}>Lives remaining</div>
-            <div style={{height:10,background:'#3d1f00',borderRadius:5,overflow:'hidden',marginBottom:6}}>
-              <div style={{width:`${hpPct}%`,height:'100%',background:hpColor,transition:'width 0.4s',borderRadius:5}}/>
-            </div>
-            <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
-              {wrong.map(l=><span key={l} style={{background:'#5a0000',color:'#ff8888',borderRadius:6,padding:'2px 7px',fontSize:13,fontWeight:'bold'}}>{l}</span>)}
-              {wrong.length===0&&<span style={{color:'#6b3a1f',fontSize:12}}>No wrong guesses yet!</span>}
-            </div>
-          </div>
-        </div>
-        <div style={{background:'linear-gradient(135deg,#2a1800,#3d2400)',border:'1px solid #6b3a1f',borderRadius:12,padding:'12px 14px'}}>
-          <div style={{fontSize:11,color:'#a07850',marginBottom:4,textTransform:'uppercase',letterSpacing:1}}>Description</div>
-          <div style={{fontSize:14,color:'#f5e6d0',lineHeight:1.6}}>{wordData.desc}</div>
-        </div>
-        {!showClue
-          ? <button onClick={()=>setShowClue(true)} style={{background:'transparent',border:'1px dashed #6b3a1f',borderRadius:10,padding:'8px',color:'#a07850',fontSize:13,cursor:'pointer'}}>💡 Show Clue (costs 30 pts bonus)</button>
-          : <div style={{background:'rgba(212,168,83,0.1)',border:'1px solid #d4a853',borderRadius:10,padding:'8px 14px',fontSize:13,color:'#d4a853',textAlign:'center'}}>💡 <b>Clue:</b> {wordData.clue}</div>
+
+      {/* Hint */}
+      <div style={{textAlign:'center',padding:'6px 16px',flexShrink:0}}>
+        <div style={{fontSize:11,color:'#818384',marginBottom:3}}>{WL}-letter word · {wordData.hint}</div>
+        {!showHint
+          ? <button onClick={()=>setShowHint(true)} style={{background:'transparent',border:'1px solid #3a3a3c',borderRadius:6,padding:'3px 12px',color:'#818384',fontSize:11,cursor:'pointer'}}>💡 Reveal hint (−30 pts)</button>
+          : <div style={{fontSize:12,color:'#b59f3b',fontWeight:'bold'}}>💡 {wordData.hint}</div>
         }
-        <div style={{textAlign:'center',padding:'4px 0'}}>
-          <div style={{display:'flex',justifyContent:'center',flexWrap:'wrap',gap:6}}>
-            {word.split('').map((l,i)=>(
-              <div key={i} style={{width:28,height:36,display:'flex',alignItems:'center',justifyContent:'center',borderBottom:`3px solid ${guessed.includes(l)?'#d4a853':'#6b3a1f'}`,fontSize:19,fontWeight:'bold',color:result==='lose'&&!guessed.includes(l)?'#ff6b6b':'#d4a853'}}>
-                {guessed.includes(l)?l:result==='lose'?l:''}
-              </div>
-            ))}
-          </div>
-          <div style={{fontSize:12,color:'#6b3a1f',marginTop:4}}>{word.length} letters</div>
-        </div>
-        {result&&(
-          <div style={{background:result==='win'?'rgba(68,220,68,0.12)':'rgba(255,68,68,0.12)',border:`2px solid ${result==='win'?'#44dd44':'#ff4444'}`,borderRadius:14,padding:'14px',textAlign:'center'}}>
-            <div style={{fontSize:26,marginBottom:4}}>{result==='win'?'🎉':'💀'}</div>
-            <div style={{fontSize:17,fontWeight:'bold',color:result==='win'?'#44dd44':'#ff4444',marginBottom:4}}>{result==='win'?'Correct!':'Game Over!'}</div>
-            {result==='lose'&&<div style={{fontSize:13,color:'#f5e6d0',marginBottom:8}}>The word was <b style={{color:'#d4a853'}}>{word}</b></div>}
-            <button onClick={next} style={{background:'#d4a853',border:'none',borderRadius:10,padding:'10px 24px',color:'#1a0a00',fontWeight:'bold',fontSize:14,cursor:'pointer'}}>Next Word →</button>
-          </div>
-        )}
-        {!result&&(
-          <div style={{paddingBottom:8}}>
-            {['QWERTYUIOP','ASDFGHJKL','ZXCVBNM'].map((row,ri)=>(
-              <div key={ri} style={{display:'flex',justifyContent:'center',gap:4,marginBottom:4}}>
-                {row.split('').map(l=>{
-                  const isG=guessed.includes(l),isW=wrong.includes(l);
-                  return(<button key={l} onClick={()=>guess(l)} disabled={isG||isW} style={{width:30,height:36,borderRadius:7,border:'none',fontSize:13,fontWeight:'bold',cursor:isG||isW?'default':'pointer',background:isG?'#44aa22':isW?'#5a0000':'#3d1f00',color:isG?'#8bc34a':isW?'#ff6666':'#d4a853',opacity:isG||isW?0.7:1,boxShadow:isG||isW?'none':'0 2px 0 #1a0800'}}>{l}</button>);
-                })}
-              </div>
-            ))}
-          </div>
-        )}
       </div>
+
+      {/* Tile grid */}
+      <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'4px 0',gap:5,overflowY:'auto'}}>
+        {Array.from({length:MAX_GUESSES}).map((_,rowIdx) => {
+          const guess = guesses[rowIdx];
+          const isActive = rowIdx === guesses.length && gameState === 'playing';
+          const displayWord = isActive ? current : (guess || '');
+          const isShaking = isActive && shake;
+
+          return (
+            <div key={rowIdx} style={{display:'flex',gap:5,animation:isShaking?'shake 0.4s ease':'none'}}>
+              {Array.from({length:WL}).map((_,colIdx) => {
+                const letter = displayWord[colIdx] || '';
+                let state = 'empty';
+                if (guess) state = getTileState(guess, colIdx);
+                else if (isActive && letter) state = 'active';
+                const c = tileColors[state];
+                const isFlipping = !!guess;
+                return (
+                  <div key={colIdx} style={{
+                    width: TILE_SIZE, height: TILE_SIZE,
+                    background: c.bg,
+                    border: `2px solid ${c.border}`,
+                    borderRadius: 4,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: Math.round(TILE_SIZE * 0.46),
+                    fontWeight: 'bold',
+                    color: c.color,
+                    transition: isFlipping ? `background 0.3s ${colIdx * 0.1}s` : 'border-color 0.1s',
+                    transform: isActive && letter && colIdx === current.length - 1 ? 'scale(1.08)' : 'scale(1)',
+                    textTransform: 'uppercase',
+                    userSelect: 'none',
+                  }}>
+                    {letter}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Result banner */}
+      {gameState !== 'playing' && (
+        <div style={{textAlign:'center',padding:'10px 16px',background:gameState==='won'?'#538d4e22':'#ff444422',borderTop:`1px solid ${gameState==='won'?'#538d4e':'#ff4444'}`,flexShrink:0}}>
+          <div style={{fontSize:gameState==='won'?18:15,fontWeight:'bold',color:gameState==='won'?'#538d4e':'#ff6b6b',marginBottom:4}}>
+            {gameState==='won' ? `🎉 ${guesses.length === 1 ? 'Genius!' : guesses.length <= 3 ? 'Great!' : 'Got it!'}` : `😔 The word was ${word}`}
+          </div>
+          <button onClick={nextRound} style={{background:'#d4a853',border:'none',borderRadius:8,padding:'8px 24px',color:'#1a0a00',fontWeight:'bold',fontSize:13,cursor:'pointer'}}>
+            Next Word →
+          </button>
+        </div>
+      )}
+
+      {/* Keyboard */}
+      <div style={{background:'#1a1a1b',borderTop:'1px solid #3a3a3c',padding:'8px 6px 12px',flexShrink:0}}>
+        {KEYBOARD_ROWS.map((row, ri) => (
+          <div key={ri} style={{display:'flex',justifyContent:'center',gap:5,marginBottom:5}}>
+            {ri === 2 && (
+              <button onPointerDown={e=>{e.preventDefault();pressKey('ENTER');}}
+                style={{background:'#818384',border:'none',borderRadius:4,padding:'14px 8px',color:'#fff',fontSize:11,fontWeight:'bold',cursor:'pointer',minWidth:44,userSelect:'none'}}>
+                ENTER
+              </button>
+            )}
+            {row.split('').map(l => {
+              const ks = keyColors[getKeyState(l)];
+              return (
+                <button key={l} onPointerDown={e=>{e.preventDefault();pressKey(l);}}
+                  style={{background:ks.bg,border:'none',borderRadius:4,padding:'14px 0',color:ks.color,fontSize:13,fontWeight:'bold',cursor:'pointer',width:30,userSelect:'none',transition:'background 0.2s'}}>
+                  {l}
+                </button>
+              );
+            })}
+            {ri === 2 && (
+              <button onPointerDown={e=>{e.preventDefault();pressKey('DEL');}}
+                style={{background:'#818384',border:'none',borderRadius:4,padding:'14px 8px',color:'#fff',fontSize:11,fontWeight:'bold',cursor:'pointer',minWidth:44,userSelect:'none'}}>
+                ⌫
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <style>{`
+        @keyframes shake {
+          0%,100%{transform:translateX(0)}
+          20%{transform:translateX(-6px)}
+          40%{transform:translateX(6px)}
+          60%{transform:translateX(-4px)}
+          80%{transform:translateX(4px)}
+        }
+      `}</style>
     </div>
   );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // MAIN GAMES PAGE
+
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function GamesPage() {
   const [activeGame, setActiveGame] = useState(null);
