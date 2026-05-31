@@ -722,7 +722,7 @@ function ChibiBarista({ faceImg, state, flip }) {
       </div>
 
       {/* Face - square crop showing face centered */}
-      <div style={{ width:54, height:54, borderRadius:'50%', overflow:'hidden', border:'2px solid #c8943a', flexShrink:0 }}>
+      <div style={{ width:54, height:54, borderRadius:'50%', overflow:'hidden', border:'none', flexShrink:0 }}>
         <img
           src={faceImg}
           style={{
@@ -895,15 +895,29 @@ function GuessWordGame({ playerName, onScore }) {
 
         <div style={{flex:0,textAlign:'center',padding:'0 8px',paddingBottom:4,minWidth:130}}>
           {/* State message */}
-          <div style={{fontSize:13,fontWeight:'bold',minHeight:18,color:
-            baristaState==='fight'?'#ff4444':
-            baristaState==='cheer'?'#538d4e':
-            baristaState==='sad'?'#818384':'#d4a853'}}>
+          <div style={{
+            fontSize:20,
+            fontWeight:'bold',
+            minHeight:28,
+            textAlign:'center',
+            animation: baristaState==='wave' ? 'neonPulse 1.5s ease-in-out infinite' :
+                       baristaState==='cheer' ? 'neonPulseGreen 0.6s ease-in-out infinite' :
+                       baristaState==='fight' ? 'neonPulseRed 0.3s ease-in-out infinite' : 'none',
+            color:
+              baristaState==='fight'?'#ff4444':
+              baristaState==='cheer'?'#44ff88':
+              baristaState==='sad'?'#888':'#ffd700',
+            textShadow:
+              baristaState==='fight'?'0 0 8px #ff4444, 0 0 20px #ff0000, 0 0 40px #ff0000':
+              baristaState==='cheer'?'0 0 8px #44ff88, 0 0 20px #00ff66, 0 0 40px #00ff44':
+              baristaState==='sad'?'none':
+              '0 0 8px #ffd700, 0 0 20px #ffaa00, 0 0 40px #ff8800',
+          }}>
             {baristaState==='wave'  && `👋 Hi ${playerName}!`}
-            {baristaState==='fight' && '💥 Wrong!'}
-            {baristaState==='cheer' && '🎉 Correct!'}
+            {baristaState==='fight' && '💥 WRONG!'}
+            {baristaState==='cheer' && '🎉 CORRECT!'}
             {baristaState==='sad'   && '😢 Aww...'}
-            {showEffect && <span style={{marginLeft:6,fontSize:16}}>💢</span>}
+            {showEffect && <span style={{marginLeft:6,fontSize:20}}>💢</span>}
           </div>
 
           {/* Life dots */}
@@ -993,6 +1007,23 @@ function GuessWordGame({ playerName, onScore }) {
         @keyframes chibiJump{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
         @keyframes chibiShake{0%,100%{transform:translateX(0)}25%{transform:translateX(4px)}75%{transform:translateX(-4px)}}
         @keyframes chibiSad{0%,100%{transform:translateY(0) rotate(0deg)}50%{transform:translateY(2px) rotate(-2deg)}}
+        @keyframes neonPulse{
+          0%,100%{text-shadow:0 0 6px #ffd700,0 0 14px #ffaa00,0 0 28px #ff8800;opacity:1}
+          50%{text-shadow:0 0 12px #ffd700,0 0 28px #ffaa00,0 0 55px #ff6600,0 0 80px #ff4400;opacity:0.9}
+        }
+        @keyframes neonPulseGreen{
+          0%,100%{text-shadow:0 0 6px #44ff88,0 0 14px #00ff66,0 0 28px #00ff44;opacity:1}
+          50%{text-shadow:0 0 14px #44ff88,0 0 30px #00ff66,0 0 60px #00ff44;opacity:0.85}
+        }
+        @keyframes neonPulseRed{
+          0%,100%{text-shadow:0 0 6px #ff4444,0 0 14px #ff0000,0 0 28px #cc0000;opacity:1}
+          50%{text-shadow:0 0 14px #ff4444,0 0 30px #ff0000,0 0 60px #cc0000;opacity:0.85}
+        }
+        @keyframes sparkle{
+          0%,100%{opacity:1;transform:scale(1)}
+          25%{opacity:0.6;transform:scale(1.08) rotate(3deg)}
+          75%{opacity:0.8;transform:scale(0.95) rotate(-2deg)}
+        }
       `}</style>
     </div>
   );
