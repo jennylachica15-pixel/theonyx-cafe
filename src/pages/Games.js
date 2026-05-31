@@ -777,12 +777,23 @@ function GuessWordGame({ playerName, onScore }) {
 
   return (
     <div style={{ height: '100%', background: '#121213', color: '#fff', display: 'flex', flexDirection: 'column', fontFamily: "'Arial',sans-serif", overflow: 'hidden' }}>
+
+      {/* Top bar */}
       <div style={{ background: '#1a1a1b', borderBottom: '1px solid #3a3a3c', padding: '7px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
         <div style={{ fontSize: 11, color: '#818384' }}>Round <b style={{ color: '#d4a853' }}>{round}</b></div>
         <div style={{ fontSize: 13, fontWeight: 'bold', color: '#d4a853', letterSpacing: 2 }}>GUESS THE WORD</div>
         <div style={{ fontSize: 11, color: '#818384' }}>⭐<b style={{ color: '#d4a853' }}>{score}</b> {streak > 0 && <span>🔥{streak}</span>}</div>
       </div>
-      <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', padding: '0 12px', background: 'linear-gradient(180deg,#2c1400,#1a0800)', borderBottom: '2px solid #3d1f00', flexShrink: 0, height: 120, overflow: 'visible' }}>
+
+      {/* Description — always visible on top */}
+      <div style={{ background: 'linear-gradient(135deg,#2a1800,#1a0e00)', borderBottom: '1px solid #3d1f00', padding: '10px 16px', flexShrink: 0, textAlign: 'center' }}>
+        <div style={{ fontSize: 11, color: '#818384', marginBottom: 3, textTransform: 'uppercase', letterSpacing: 1 }}>Description</div>
+        <div style={{ fontSize: 15, color: '#f5e6d0', fontStyle: 'italic', lineHeight: 1.4 }}>"{wordData.hint}"</div>
+        <div style={{ fontSize: 10, color: '#555', marginTop: 4 }}>{wordData.category} · {WL} letters</div>
+      </div>
+
+      {/* Barista stage */}
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', padding: '0 12px', background: 'linear-gradient(180deg,#2c1400,#1a0800)', borderBottom: '2px solid #3d1f00', flexShrink: 0, height: 110, overflow: 'visible' }}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <BaristaLeft state={baristaState} />
           <div style={{ fontSize: 9, color: '#d4a853', marginTop: 2, letterSpacing: 1 }}>KELLY</div>
@@ -797,9 +808,7 @@ function GuessWordGame({ playerName, onScore }) {
               <div key={i} style={{ width: 10, height: 10, borderRadius: '50%', background: i < (MAX_GUESSES - guesses.filter(g => g !== word || gameState !== 'playing').length) ? '#538d4e' : '#3a3a3c', border: '1px solid #555', transition: 'background 0.3s' }}/>
             ))}
           </div>
-          <div style={{ fontSize: 9, color: '#555', marginTop: 4 }}>{wordData.category} · {WL} letters</div>
-          {!showHint ? <button onClick={() => setShowHint(true)} style={{ background: 'transparent', border: '1px solid #3a3a3c', borderRadius: 6, padding: '2px 8px', color: '#818384', fontSize: 9, cursor: 'pointer', marginTop: 3 }}>💡 Hint −30pts</button>
-            : <div style={{ fontSize: 10, color: '#b59f3b', marginTop: 3 }}>💡 {wordData.hint}</div>}
+          <div style={{ fontSize: 9, color: '#555', marginTop: 2 }}>{wordData.category} · {WL} letters</div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <BaristaRight state={baristaState} />
@@ -807,25 +816,32 @@ function GuessWordGame({ playerName, onScore }) {
         </div>
         <FightEffect show={showEffect} />
       </div>
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '6px 0', gap: 4, overflowY: 'auto', background: wrongFlash ? 'rgba(255,50,50,0.05)' : 'transparent', transition: 'background 0.3s' }}>
-        {Array.from({ length: MAX_GUESSES }).map((_, rowIdx) => {
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '8px 0', gap: 5, overflowY: 'auto', background: wrongFlash ? 'rgba(255,50,50,0.05)' : 'transparent', transition: 'background 0.3s' }}>
+        {/* Only show guessed rows + 1 active row */}
+        {Array.from({ length: gameState === 'playing' ? guesses.length + 1 : guesses.length }).map((_, rowIdx) => {
           const guess = guesses[rowIdx];
           const isActive = rowIdx === guesses.length && gameState === 'playing';
           const displayWord = isActive ? current : (guess || '');
           const isShaking = isActive && shake;
           return (
-            <div key={rowIdx} style={{ display: 'flex', gap: 4, animation: isShaking ? 'shake 0.4s ease' : 'none' }}>
+            <div key={rowIdx} style={{ display: 'flex', gap: 5, animation: isShaking ? 'shake 0.4s ease' : 'none' }}>
               {Array.from({ length: WL }).map((_, colIdx) => {
                 const letter = displayWord[colIdx] || '';
                 let state = 'empty';
                 if (guess) state = getTileState(guess, colIdx);
                 else if (isActive && letter) state = 'active';
                 const c = tileColors[state];
-                return (<div key={colIdx} style={{ width: TILE_SIZE, height: TILE_SIZE, background: c.bg, border: `2px solid ${c.border}`, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: Math.round(TILE_SIZE * 0.46), fontWeight: 'bold', color: c.color, transition: guess ? `background 0.3s ${colIdx * 0.1}s, border-color 0.3s ${colIdx * 0.1}s` : 'border-color 0.1s', transform: isActive && letter && colIdx === current.length - 1 ? 'scale(1.1)' : 'scale(1)', userSelect: 'none', textTransform: 'uppercase' }}>{letter}</div>);
+                return (<div key={colIdx} style={{ width: TILE_SIZE, height: TILE_SIZE, background: c.bg, border: `2px solid ${c.border}`, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: Math.round(TILE_SIZE * 0.46), fontWeight: 'bold', color: c.color, transition: guess ? `background 0.3s ${colIdx * 0.1}s, border-color 0.3s ${colIdx * 0.1}s` : 'border-color 0.1s', transform: isActive && letter && colIdx === current.length - 1 ? 'scale(1.12)' : 'scale(1)', userSelect: 'none', textTransform: 'uppercase' }}>{letter}</div>);
               })}
             </div>
           );
         })}
+        {/* Remaining attempts indicator */}
+        {gameState === 'playing' && (
+          <div style={{ fontSize: 10, color: '#555', marginTop: 4 }}>
+            {MAX_GUESSES - guesses.length - 1} attempts remaining
+          </div>
+        )}
       </div>
       {gameState !== 'playing' && (
         <div style={{ textAlign: 'center', padding: '8px 14px', background: gameState === 'won' ? '#538d4e22' : '#ff444422', borderTop: `1px solid ${gameState === 'won' ? '#538d4e' : '#ff4444'}`, flexShrink: 0 }}>
@@ -833,12 +849,12 @@ function GuessWordGame({ playerName, onScore }) {
           <button onClick={nextRound} style={{ background: '#d4a853', border: 'none', borderRadius: 8, padding: '8px 28px', color: '#1a0a00', fontWeight: 'bold', fontSize: 13, cursor: 'pointer' }}>Next Word →</button>
         </div>
       )}
-      <div style={{ background: '#1a1a1b', borderTop: '1px solid #3a3a3c', padding: '6px 4px 10px', flexShrink: 0 }}>
+      <div style={{ background: '#1a1a1b', borderTop: '1px solid #3a3a3c', padding: '8px 4px 14px', flexShrink: 0 }}>
         {KEYBOARD_ROWS.map((row, ri) => (
-          <div key={ri} style={{ display: 'flex', justifyContent: 'center', gap: 4, marginBottom: 4 }}>
-            {ri === 2 && <button onPointerDown={e => { e.preventDefault(); pressKey('ENTER'); }} style={{ background: '#818384', border: 'none', borderRadius: 4, padding: '12px 6px', color: '#fff', fontSize: 10, fontWeight: 'bold', cursor: 'pointer', minWidth: 40, userSelect: 'none' }}>ENTER</button>}
-            {row.split('').map(l => { const ks = keyColors[getKeyState(l)]; return (<button key={l} onPointerDown={e => { e.preventDefault(); pressKey(l); }} style={{ background: ks.bg, border: 'none', borderRadius: 4, padding: '12px 0', color: ks.color, fontSize: 13, fontWeight: 'bold', cursor: 'pointer', width: 28, userSelect: 'none', transition: 'background 0.2s' }}>{l}</button>); })}
-            {ri === 2 && <button onPointerDown={e => { e.preventDefault(); pressKey('DEL'); }} style={{ background: '#818384', border: 'none', borderRadius: 4, padding: '12px 6px', color: '#fff', fontSize: 11, fontWeight: 'bold', cursor: 'pointer', minWidth: 40, userSelect: 'none' }}>⌫</button>}
+          <div key={ri} style={{ display: 'flex', justifyContent: 'center', gap: 5, marginBottom: 6 }}>
+            {ri === 2 && <button onPointerDown={e => { e.preventDefault(); pressKey('ENTER'); }} style={{ background: '#818384', border: 'none', borderRadius: 6, padding: '16px 8px', color: '#fff', fontSize: 11, fontWeight: 'bold', cursor: 'pointer', minWidth: 44, userSelect: 'none' }}>ENTER</button>}
+            {row.split('').map(l => { const ks = keyColors[getKeyState(l)]; return (<button key={l} onPointerDown={e => { e.preventDefault(); pressKey(l); }} style={{ background: ks.bg, border: 'none', borderRadius: 6, padding: '16px 0', color: ks.color, fontSize: 15, fontWeight: 'bold', cursor: 'pointer', width: 30, userSelect: 'none', transition: 'background 0.2s' }}>{l}</button>); })}
+            {ri === 2 && <button onPointerDown={e => { e.preventDefault(); pressKey('DEL'); }} style={{ background: '#818384', border: 'none', borderRadius: 6, padding: '16px 8px', color: '#fff', fontSize: 13, fontWeight: 'bold', cursor: 'pointer', minWidth: 44, userSelect: 'none' }}>⌫</button>}
           </div>
         ))}
       </div>
