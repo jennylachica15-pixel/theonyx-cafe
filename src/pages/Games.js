@@ -351,7 +351,7 @@ function SnakeGame({ playerName, onScore }) {
       }
       g.snake.unshift(head);
       if (head.x===g.food.x && head.y===g.food.y) {
-        g.score+=10; setScore(g.score); g.food=placeFood(g.snake,COLS,ROWS); for(let k=0;k<2;k++) g.snake.push({...g.snake[g.snake.length-1]});
+        g.score+=10; setScore(g.score); g.food=placeFood(g.snake,COLS,ROWS);
       } else g.snake.pop();
     }, Math.max(90, 220 - Math.floor((stateRef.current?.score||0)/50)*15));
     return () => clearInterval(interval);
@@ -399,20 +399,7 @@ function SnakeGame({ playerName, onScore }) {
         // Bounce off edges
         if(o.x < 10 || o.x > W-10) o.vx *= -1;
         if(o.y < 10 || o.y > H-10) o.vy *= -1;
-        // Check if snake ate this orb
-        if(g && g.snake.length > 0) {
-          const head = g.snake[0];
-          const hx = head.x*CELL+CELL/2, hy = head.y*CELL+CELL/2;
-          if(Math.sqrt((o.x-hx)**2+(o.y-hy)**2) < CELL*0.9) {
-            // Respawn orb at random position, give score bonus
-            o.x = 20+Math.random()*(W-40); o.y = 20+Math.random()*(H-40);
-            o.color = ORB_COLORS[Math.floor(Math.random()*ORB_COLORS.length)];
-            o.vx = (Math.random()-0.5)*0.4; o.vy = (Math.random()-0.5)*0.4;
-            // Grow snake by 3 segments
-            for(let k=0;k<3;k++) g.snake.push({...g.snake[g.snake.length-1]});
-            g.score += 5; setScore(g.score);
-          }
-        }
+        // Orbs are decoration only
         const pulse=0.7+0.3*Math.sin(fn*o.speed+o.phase);
         const r=o.size*pulse;
         // Glow ring
