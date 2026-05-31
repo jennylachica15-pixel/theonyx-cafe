@@ -168,16 +168,8 @@ export default function Gallery() {
   return (
     <div style={{ padding: '16px 16px 0', minHeight: '100vh', background: 'transparent' }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+      <div style={{ marginBottom: 4 }}>
         <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: 'white' }}>Snapshots</div>
-        {/* Grid toggle */}
-        <div style={{ display: 'flex', gap: 4, background: 'rgba(20,8,0,0.5)', borderRadius: 8, padding: 3, border: '1px solid rgba(212,168,83,0.2)' }}>
-          {[1,2,3].map(n => (
-            <button key={n} onClick={() => setCols(n)} style={{ width: 28, height: 28, borderRadius: 6, background: cols === n ? '#d4a853' : 'transparent', color: cols === n ? '#1a0a00' : 'rgba(255,255,255,0.4)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
-              {n === 1 ? <GridIcon1 /> : n === 2 ? <GridIcon2 /> : <GridIcon3 />}
-            </button>
-          ))}
-        </div>
       </div>
       <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginBottom: 14 }}>Share your experience at Theonyx Cafe</div>
 
@@ -201,8 +193,17 @@ export default function Gallery() {
       {uploading && <div style={{ height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.1)', marginBottom: 12, overflow: 'hidden' }}><div style={{ height: '100%', borderRadius: 2, background: '#d4a853', width: `${progress}%`, transition: 'width 0.3s' }} /></div>}
       {success && <div style={{ fontSize: 12, color: success.includes('⚠️') ? '#ff6b6b' : '#6fcf97', marginBottom: 10, padding: '7px 12px', background: 'rgba(0,0,0,0.25)', borderRadius: 8 }}>{success}</div>}
 
-      {/* Guest Snapshots title */}
-      <div style={{ fontFamily: 'var(--font-display)', fontSize: 15, fontWeight: 700, color: 'white', marginBottom: 10 }}>Guest Snapshots</div>
+      {/* Guest Snapshots title + grid toggle */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: 15, fontWeight: 700, color: 'white' }}>Guest Snapshots</div>
+        <div style={{ display: 'flex', gap: 4, background: 'rgba(20,8,0,0.5)', borderRadius: 8, padding: 3, border: '1px solid rgba(212,168,83,0.2)' }}>
+          {[1,2,3].map(n => (
+            <button key={n} onClick={() => setCols(n)} style={{ width: 26, height: 26, borderRadius: 5, background: cols === n ? '#d4a853' : 'transparent', color: cols === n ? '#1a0a00' : 'rgba(255,255,255,0.4)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
+              {n === 1 ? <GridIcon1 /> : n === 2 ? <GridIcon2 /> : <GridIcon3 />}
+            </button>
+          ))}
+        </div>
+      </div>
       {photos.length === 0 && <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.35)', padding: '30px 0', fontSize: 13 }}>No photos yet. Be the first to share!</div>}
 
       {/* Photo grid */}
