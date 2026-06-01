@@ -8,6 +8,7 @@ import Inventory from './Inventory';
 import Reports from './Reports';
 import MenuManager from './MenuManager';
 import Approvals from './Approvals';
+import FeedbackPanel from './FeedbackPanel';
 
 // ─── CLEANLINESS CHECK ───────────────────────────────────────────────────────
 const CHECKLIST_ITEMS = [
@@ -233,6 +234,7 @@ export default function AdminApp({ user, onSignOut }) {
 
   const morePanels = [
     { id: 'cleanliness', label: 'Cleanliness', desc: 'Daily check', icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#c8943a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> },
+    { id: 'feedback', label: 'Feedback', desc: 'Customer reviews', icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#c8943a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> },
     ...(role === 'manager' ? [{ id: 'menu', label: 'Menu', desc: 'Edit items', icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#c8943a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg> }] : []),
     { id: 'approvals', label: 'Approvals', desc: 'Guest photos', icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#c8943a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> },
   ];
@@ -340,6 +342,7 @@ export default function AdminApp({ user, onSignOut }) {
               {activeTab === 'reports'     && <Reports />}
               {activeTab === 'menu'        && role === 'manager' && <MenuManager />}
               {activeTab === 'cleanliness' && <CleanlinessCheck userName={userName} />}
+              {activeTab === 'feedback'    && <FeedbackPanel />}
             </div>
           </div>
         )}
