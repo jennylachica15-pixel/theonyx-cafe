@@ -7,7 +7,7 @@ import {
 } from 'firebase/firestore';
 import ZombieGame from './ZombieGame';
 
-// ─── THEME ───────────────────────────────────────────────────────────────────
+// - THEME -
 const S = {
   wrap: { minHeight: '100vh', background: '#0a0400', color: '#f5e6d0', fontFamily: "'Georgia', serif", position:'relative', overflow:'hidden' },
   header: { position:'relative', zIndex:2, background: 'linear-gradient(180deg, #3d1500 0%, #1a0800 100%)', padding: '20px 16px 14px', textAlign: 'center', borderBottom: '2px solid #8b4a00', overflow:'hidden' },
@@ -47,10 +47,10 @@ const MENU_NAMES = ['Latte','Matcha','Americano','Espresso','Cappuccino','Frappe
 const GAME_LIST = [
   { id: 'snake',       title: 'Snake',           sub: 'Collect coffee beans' },
   { id: 'tetris',      title: 'Tetris',           sub: 'Classic stacking' },
-  { id: 'racing',      title: 'Café Racer',       sub: 'Dodge the barriers' },
+  { id: 'racing',      title: 'Cafe Racer',       sub: 'Dodge the barriers' },
   { id: 'zombie',      title: 'Zombie Barista',   sub: 'Multiplayer survival' },
   { id: 'guessword',   title: 'Guess the Word',   sub: 'Clues & letters' },
-  { id: 'cafemystery', title: 'Café Mystery',     sub: 'Social deduction' },
+  { id: 'cafemystery', title: 'Cafe Mystery',     sub: 'Social deduction' },
 ];
 
 async function registerUser(username, password) {
@@ -105,8 +105,8 @@ function AuthModal({ onAuth, onClose }) {
     <div style={S.overlay}>
       <div style={S.modal}>
         <div style={{fontSize:36,marginBottom:8}}>☕</div>
-        <div style={{fontSize:20,fontWeight:'bold',color:'#d4a853',marginBottom:4}}>{mode === 'login' ? 'Welcome Back!' : 'Join the Café'}</div>
-        <div style={{fontSize:12,color:'#a07850',marginBottom:20}}>{mode === 'login' ? 'Sign in to track your scores' : 'Create a unique café name'}</div>
+        <div style={{fontSize:20,fontWeight:'bold',color:'#d4a853',marginBottom:4}}>{mode === 'login' ? 'Welcome Back!' : 'Join the Cafe'}</div>
+        <div style={{fontSize:12,color:'#a07850',marginBottom:20}}>{mode === 'login' ? 'Sign in to track your scores' : 'Create a unique cafe name'}</div>
         <input style={S.input} placeholder="Username (e.g. Latte)" value={username} onChange={e=>setUsername(e.target.value)} autoCapitalize="none" />
         <input style={S.input} placeholder="Password" type="password" value={password} onChange={e=>setPassword(e.target.value)} />
         {error && <div style={{color:'#ff6b6b',fontSize:13,marginBottom:8}}>{error}</div>}
@@ -128,7 +128,7 @@ function NameModal({ gameTitle, username, onStart, onClose }) {
         <div style={{fontSize:13,color:'#a07850',marginBottom:16}}>Enter your player name</div>
         <input style={S.input} placeholder="Your name..." value={name} onChange={e=>setName(e.target.value)} />
         <div style={{marginBottom:16}}>{MENU_NAMES.map(n=>(<span key={n} style={S.chip} onClick={()=>setName(n)}>{n}</span>))}</div>
-        <button style={S.btn()} onClick={()=>name.trim()&&onStart(name.trim())}>▶ Start Game</button>
+        <button style={S.btn()} onClick={()=>name.trim()&&onStart(name.trim())}>Start Game</button>
         <button style={S.btn('#6b3a1f')} onClick={onClose}>Cancel</button>
       </div>
     </div>
@@ -152,7 +152,7 @@ function LeaderboardModal({ onClose, username }) {
           {GAME_LIST.map(g=>(<button key={g.id} onClick={()=>setTab(g.id)} style={{background: tab===g.id ? '#d4a853':'#3d1f00', color: tab===g.id ? '#1a0a00':'#d4a853', border:'1px solid #6b3a1f', borderRadius:20, padding:'6px 12px', fontSize:12, cursor:'pointer'}}>{g.title}</button>))}
         </div>
         {loading ? <div style={{color:'#a07850'}}>Loading...</div> : rows.length === 0 ?
-          <div style={{color:'#a07850',padding:20}}>No scores yet — be the first!</div> :
+          <div style={{color:'#a07850',padding:20}}>No scores yet - be the first!</div> :
           rows.map((r,i)=>(<div key={i} style={{...S.lbRow(i), background: r.username===username ? 'rgba(212,168,83,0.15)' : S.lbRow(i).background}}><span style={{width:28,fontSize:18}}>{S.medal(i)}</span><span style={{flex:1,fontWeight:'bold',color: r.username===username ? '#d4a853':'#f5e6d0'}}>{r.username}</span><span style={{color:'#8bc34a',fontWeight:'bold'}}>{r.score.toLocaleString()}</span>{r.username===username && <span style={{marginLeft:6,fontSize:11,color:'#d4a853'}}>YOU</span>}</div>))
         }
         <button style={{...S.btn('#6b3a1f'),marginTop:16}} onClick={onClose}>Close</button>
@@ -450,7 +450,7 @@ function SnakeGame({ playerName, onScore }) {
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 14px',background:'#08060e',borderBottom:'1px solid #1e2530',flexShrink:0}}>
         <span style={{fontSize:13,color:'#ffd700',fontWeight:'bold',textShadow:'0 0 8px #ff8800'}}>☕ {score}</span>
         <span style={{fontSize:11,color:'#888'}}>{playerName}</span>
-        <button style={{background:'linear-gradient(180deg,#1a0e00,#0d0700)',border:'1px solid #d4a85366',borderRadius:8,color:'#ffd700',fontSize:12,padding:'5px 12px',cursor:'pointer'}} onClick={startGame}>↺ Restart</button>
+        <button style={{background:'linear-gradient(180deg,#1a0e00,#0d0700)',border:'1px solid #d4a85366',borderRadius:8,color:'#ffd700',fontSize:12,padding:'5px 12px',cursor:'pointer'}} onClick={startGame}>Restart</button>
       </div>
       <div ref={containerRef} style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',background:'#0d1117'}}>
         <canvas ref={canvasRef} width={W} height={H} style={{display:'block',maxWidth:'100%'}}/>
@@ -459,9 +459,9 @@ function SnakeGame({ playerName, onScore }) {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
+// =
 // TETRIS
-// ═══════════════════════════════════════════════════════════════════════════════
+// =
 function TetrisGame({ playerName, onScore }) {
   const canvasRef=useRef(null),nextCanvRef=useRef(null),containerRef=useRef(null),stateRef=useRef(null),rafRef=useRef(null),cellRef=useRef(24);
   const COLS=10,ROWS=20;
@@ -500,21 +500,21 @@ function TetrisGame({ playerName, onScore }) {
           <div style={{background:'#0d1120',border:'1px solid #1e2a4a',borderRadius:10,padding:'6px 8px'}}><div style={{fontSize:9,color:'#4a6a9a',textTransform:'uppercase',letterSpacing:1,marginBottom:6}}>Next</div><canvas ref={nextCanvRef} width={64} height={64} style={{display:'block',imageRendering:'pixelated',margin:'0 auto'}}/></div>
         </div>
       </div>
-      {gameOver&&(<div style={{position:'absolute',inset:0,background:'rgba(5,8,16,0.92)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',zIndex:20}}><div style={{fontSize:28,fontWeight:900,color:'#ff1744',textShadow:'0 0 20px #ff1744',marginBottom:4}}>GAME OVER</div><div style={{fontSize:18,color:'#ffd600',marginBottom:20,textShadow:'0 0 10px #ffd600'}}>{score.toLocaleString()} pts</div><button onClick={startGame} style={{background:'linear-gradient(180deg,#00e5ff,#0077aa)',border:'none',borderRadius:12,padding:'12px 32px',color:'#fff',fontSize:16,fontWeight:900,cursor:'pointer'}}>▶ PLAY AGAIN</button></div>)}
-      {!started&&!gameOver&&(<div style={{position:'absolute',inset:0,background:'rgba(5,8,16,0.92)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',zIndex:20}}><div style={{fontSize:32,fontWeight:900,color:'#00e5ff',textShadow:'0 0 20px #00e5ff',marginBottom:8,letterSpacing:3}}>TETRIS</div><div style={{fontSize:13,color:'#4a6a9a',marginBottom:24}}>by {playerName}</div><button onClick={startGame} style={{background:'linear-gradient(180deg,#00e5ff,#0077aa)',border:'none',borderRadius:12,padding:'14px 40px',color:'#fff',fontSize:18,fontWeight:900,cursor:'pointer',letterSpacing:1}}>▶ START</button></div>)}
+      {gameOver&&(<div style={{position:'absolute',inset:0,background:'rgba(5,8,16,0.92)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',zIndex:20}}><div style={{fontSize:28,fontWeight:900,color:'#ff1744',textShadow:'0 0 20px #ff1744',marginBottom:4}}>GAME OVER</div><div style={{fontSize:18,color:'#ffd600',marginBottom:20,textShadow:'0 0 10px #ffd600'}}>{score.toLocaleString()} pts</div><button onClick={startGame} style={{background:'linear-gradient(180deg,#00e5ff,#0077aa)',border:'none',borderRadius:12,padding:'12px 32px',color:'#fff',fontSize:16,fontWeight:900,cursor:'pointer'}}>PLAY AGAIN</button></div>)}
+      {!started&&!gameOver&&(<div style={{position:'absolute',inset:0,background:'rgba(5,8,16,0.92)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',zIndex:20}}><div style={{fontSize:32,fontWeight:900,color:'#00e5ff',textShadow:'0 0 20px #00e5ff',marginBottom:8,letterSpacing:3}}>TETRIS</div><div style={{fontSize:13,color:'#4a6a9a',marginBottom:24}}>by {playerName}</div><button onClick={startGame} style={{background:'linear-gradient(180deg,#00e5ff,#0077aa)',border:'none',borderRadius:12,padding:'14px 40px',color:'#fff',fontSize:18,fontWeight:900,cursor:'pointer',letterSpacing:1}}>START</button></div>)}
       <div style={{display:'flex',gap:8,padding:'8px',background:'#08101e',borderTop:'1px solid #1e2a4a',flexShrink:0}}>
-        <button style={ctrlBtn} onPointerDown={e=>{e.preventDefault();move(-1);}}>◀</button>
-        <button style={ctrlBtn} onPointerDown={e=>{e.preventDefault();rot();}}>↻</button>
-        <button style={ctrlBtn} onPointerDown={e=>{e.preventDefault();drop();}}>⬇</button>
-        <button style={ctrlBtn} onPointerDown={e=>{e.preventDefault();move(1);}}>▶</button>
+        <button style={ctrlBtn} onPointerDown={e=>{e.preventDefault();move(-1);}}><</button>
+        <button style={ctrlBtn} onPointerDown={e=>{e.preventDefault();rot();}}>Rot</button>
+        <button style={ctrlBtn} onPointerDown={e=>{e.preventDefault();drop();}}>Drop</button>
+        <button style={ctrlBtn} onPointerDown={e=>{e.preventDefault();move(1);}}>></button>
       </div>
     </div>
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// CAFÉ RACER
-// ═══════════════════════════════════════════════════════════════════════════════
+// =
+// CAFE RACER
+// =
 function RacingGame({ playerName, onScore }) {
   const canvasRef=useRef(null),containerRef=useRef(null),stateRef=useRef(null),rafRef=useRef(null);
   const [score,setScore]=useState(0),[gameOver,setGameOver]=useState(false),[started,setStarted]=useState(false),[collected,setCollected]=useState(0),[canvasSize,setCanvasSize]=useState({w:320,h:480});
@@ -524,7 +524,7 @@ function RacingGame({ playerName, onScore }) {
   const CAR_COLORS=['#ff3333','#3399ff','#ffcc00','#44cc44','#cc44ff','#ff8800','#00cccc','#ff66aa'];
   const drawCar=(ctx,x,y,color,isPlayer=false)=>{const w=Math.round(W*0.07),h=Math.round(H*0.075);ctx.fillStyle='rgba(0,0,0,0.3)';ctx.beginPath();ctx.ellipse(x,y+h*0.4,w*0.45,h*0.12,0,0,Math.PI*2);ctx.fill();ctx.fillStyle=color;ctx.beginPath();ctx.roundRect(x-w/2,y-h/2,w,h,5);ctx.fill();ctx.fillStyle='rgba(200,240,255,0.85)';ctx.beginPath();ctx.roundRect(x-w*0.35,y-h*0.38,w*0.7,h*0.22,3);ctx.fill();ctx.fillStyle='rgba(200,240,255,0.7)';ctx.beginPath();ctx.roundRect(x-w*0.32,y+h*0.12,w*0.64,h*0.18,3);ctx.fill();ctx.fillStyle='#222';[[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([sx,sy])=>{ctx.beginPath();ctx.roundRect(x+sx*(w*0.42)-4,y+sy*(h*0.3)-5,8,10,2);ctx.fill();ctx.fillStyle='#555';ctx.beginPath();ctx.roundRect(x+sx*(w*0.42)-2.5,y+sy*(h*0.3)-3.5,5,7,1);ctx.fill();ctx.fillStyle='#222';});if(isPlayer){ctx.fillStyle='#ffffaa';ctx.beginPath();ctx.ellipse(x-w*0.28,y-h*0.46,3,2,0,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.ellipse(x+w*0.28,y-h*0.46,3,2,0,0,Math.PI*2);ctx.fill();}};
   const initState=()=>({car:{lane:1,x:laneX(1),y:H-Math.round(H*0.15)},traffic:[],coffees:[],score:0,speed:1.5,lastTime:0,spawnTimer:0,coffeeTimer:0,lineOffset:0,targetX:laneX(1)});
-  const drawGame=useCallback(()=>{const canvas=canvasRef.current;if(!canvas)return;const ctx=canvas.getContext('2d');const st=stateRef.current;ctx.fillStyle='#2d7a2d';ctx.fillRect(0,0,W,H);ctx.fillStyle='#267026';for(let i=0;i<H;i+=12){ctx.fillRect(0,i,GRASS_W,6);ctx.fillRect(W-GRASS_W,i,GRASS_W,6);}ctx.fillStyle='#1a5c1a';ctx.fillRect(GRASS_W-4,0,4,H);ctx.fillRect(W-GRASS_W,0,4,H);ctx.fillStyle='#404040';ctx.fillRect(ROAD_X,0,ROAD_W,H);// No stripes — solid road color onlyctx.strokeStyle='#ffffff';ctx.lineWidth=2;ctx.setLineDash([25,18]);ctx.lineDashOffset=-st.lineOffset;for(let l=1;l<LANES;l++){ctx.strokeStyle=l===LANES/2?'#ffff00':'#ffffff';ctx.lineWidth=l===LANES/2?3:1.5;ctx.beginPath();ctx.moveTo(ROAD_X+l*LANE_W,0);ctx.lineTo(ROAD_X+l*LANE_W,H);ctx.stroke();}ctx.setLineDash([]);ctx.strokeStyle='#ffffff';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(ROAD_X,0);ctx.lineTo(ROAD_X,H);ctx.stroke();ctx.beginPath();ctx.moveTo(ROAD_X+ROAD_W,0);ctx.lineTo(ROAD_X+ROAD_W,H);ctx.stroke();st.traffic.forEach(t=>drawCar(ctx,t.x,t.y,t.color));(st.coffees||[]).forEach(c=>{const pulse=0.8+0.2*Math.sin(Date.now()/300+c.id);ctx.save();ctx.shadowColor='#ffcc00';ctx.shadowBlur=10*pulse;ctx.font='18px serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('☕',c.x,c.y);ctx.restore();ctx.strokeStyle=`rgba(255,200,0,${0.4*pulse})`;ctx.lineWidth=2;ctx.beginPath();ctx.arc(c.x,c.y,14*pulse,0,Math.PI*2);ctx.stroke();});st.car.x+=(st.targetX-st.car.x)*0.18;drawCar(ctx,st.car.x,st.car.y,'#ff3333',true);ctx.fillStyle='rgba(0,0,0,0.45)';ctx.fillRect(ROAD_X,0,70,36);ctx.fillStyle='#ffff00';ctx.font='bold 13px Arial';ctx.textAlign='left';ctx.fillText(`${Math.floor(80+st.speed*20)}km/h`,ROAD_X+6,22);},[W,H,GRASS_W,ROAD_X,ROAD_W,LANES,LANE_W]);
+  const drawGame=useCallback(()=>{const canvas=canvasRef.current;if(!canvas)return;const ctx=canvas.getContext('2d');const st=stateRef.current;ctx.fillStyle='#2d7a2d';ctx.fillRect(0,0,W,H);ctx.fillStyle='#267026';for(let i=0;i<H;i+=12){ctx.fillRect(0,i,GRASS_W,6);ctx.fillRect(W-GRASS_W,i,GRASS_W,6);}ctx.fillStyle='#1a5c1a';ctx.fillRect(GRASS_W-4,0,4,H);ctx.fillRect(W-GRASS_W,0,4,H);ctx.fillStyle='#404040';ctx.fillRect(ROAD_X,0,ROAD_W,H);// No stripes - solid road color onlyctx.strokeStyle='#ffffff';ctx.lineWidth=2;ctx.setLineDash([25,18]);ctx.lineDashOffset=-st.lineOffset;for(let l=1;l<LANES;l++){ctx.strokeStyle=l===LANES/2?'#ffff00':'#ffffff';ctx.lineWidth=l===LANES/2?3:1.5;ctx.beginPath();ctx.moveTo(ROAD_X+l*LANE_W,0);ctx.lineTo(ROAD_X+l*LANE_W,H);ctx.stroke();}ctx.setLineDash([]);ctx.strokeStyle='#ffffff';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(ROAD_X,0);ctx.lineTo(ROAD_X,H);ctx.stroke();ctx.beginPath();ctx.moveTo(ROAD_X+ROAD_W,0);ctx.lineTo(ROAD_X+ROAD_W,H);ctx.stroke();st.traffic.forEach(t=>drawCar(ctx,t.x,t.y,t.color));(st.coffees||[]).forEach(c=>{const pulse=0.8+0.2*Math.sin(Date.now()/300+c.id);ctx.save();ctx.shadowColor='#ffcc00';ctx.shadowBlur=10*pulse;ctx.font='18px serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('☕',c.x,c.y);ctx.restore();ctx.strokeStyle=`rgba(255,200,0,${0.4*pulse})`;ctx.lineWidth=2;ctx.beginPath();ctx.arc(c.x,c.y,14*pulse,0,Math.PI*2);ctx.stroke();});st.car.x+=(st.targetX-st.car.x)*0.18;drawCar(ctx,st.car.x,st.car.y,'#ff3333',true);ctx.fillStyle='rgba(0,0,0,0.45)';ctx.fillRect(ROAD_X,0,70,36);ctx.fillStyle='#ffff00';ctx.font='bold 13px Arial';ctx.textAlign='left';ctx.fillText(`${Math.floor(80+st.speed*20)}km/h`,ROAD_X+6,22);},[W,H,GRASS_W,ROAD_X,ROAD_W,LANES,LANE_W]);
   const gameLoop=useCallback((ts)=>{const st=stateRef.current;if(!st)return;const dt=Math.min(ts-st.lastTime,50);st.lastTime=ts;st.lineOffset=(st.lineOffset+st.speed*1.5)%(43);st.score+=1;st.speed=1.5+st.score/900;setScore(st.score);st.spawnTimer+=dt;const interval=Math.max(350,1100-st.score*0.25);if(st.spawnTimer>interval){st.spawnTimer=0;const lane=Math.floor(Math.random()*LANES);st.traffic.push({x:laneX(lane),y:-40,lane,color:CAR_COLORS[Math.floor(Math.random()*CAR_COLORS.length)]});}st.coffeeTimer=(st.coffeeTimer||0)+dt;if(st.coffeeTimer>2200){st.coffeeTimer=0;const lane=Math.floor(Math.random()*LANES);st.coffees=[...(st.coffees||[]),{x:laneX(lane),y:-30,id:Math.random()}];}st.traffic=st.traffic.map(t=>({...t,y:t.y+st.speed*2.2})).filter(t=>t.y<H+60);const c=st.car;st.coffees=(st.coffees||[]).map(cf=>({...cf,y:cf.y+st.speed*2.2})).filter(cf=>{if(cf.y>H+40)return false;if(Math.abs(cf.x-c.x)<22&&Math.abs(cf.y-c.y)<22){st.score+=50;setScore(st.score);setCollected(n=>n+1);return false;}return true;});const cw=Math.round(W*0.07),ch=Math.round(H*0.075);const hit=st.traffic.some(t=>Math.abs(t.x-c.x)<cw*0.9&&Math.abs(t.y-c.y)<ch*0.9);if(hit){setGameOver(true);onScore(st.score);return;}drawGame();rafRef.current=requestAnimationFrame(gameLoop);},[drawGame,onScore,H,W,LANES,laneX]);
   const startGame=()=>{stateRef.current=initState();setScore(0);setCollected(0);setGameOver(false);setStarted(true);rafRef.current=requestAnimationFrame(gameLoop);};
   useEffect(()=>()=>{if(rafRef.current)cancelAnimationFrame(rafRef.current);},[]);
@@ -532,19 +532,19 @@ function RacingGame({ playerName, onScore }) {
   const moveLeft=()=>{const now=Date.now();if(now-lastMoveRef.current<220)return;lastMoveRef.current=now;const st=stateRef.current;if(!st)return;const nl=Math.max(0,st.car.lane-1);st.car.lane=nl;st.targetX=laneX(nl);};
   const moveRight=()=>{const now=Date.now();if(now-lastMoveRef.current<220)return;lastMoveRef.current=now;const st=stateRef.current;if(!st)return;const nl=Math.min(LANES-1,st.car.lane+1);st.car.lane=nl;st.targetX=laneX(nl);};
   const btnStyle={background:'linear-gradient(180deg,#555,#333)',border:'2px solid #888',color:'#fff',padding:'18px 36px',borderRadius:14,fontSize:26,cursor:'pointer',userSelect:'none',WebkitUserSelect:'none',boxShadow:'0 4px 0 #111'};
-  return(<div ref={containerRef} style={{display:'flex',flexDirection:'column',alignItems:'center',height:'100%',background:'#1a1a1a',overflow:'hidden'}}><div style={{color:'#d4a853',fontSize:14,fontWeight:'bold',padding:'4px 0',flexShrink:0}}>{playerName} — Score: {score} ☕×{collected}</div><canvas ref={canvasRef} width={W} height={H} style={{display:'block',flex:1,maxWidth:'100%'}}/>{!started&&!gameOver&&<button style={{width:160,background:'#d4a853',border:'none',borderRadius:10,padding:'12px',color:'#1a0a00',fontSize:15,fontWeight:'bold',cursor:'pointer',flexShrink:0}} onClick={startGame}>▶ Start</button>}{gameOver&&(<div style={{textAlign:'center',flexShrink:0}}><div style={{color:'#ff6b6b',fontSize:20,fontWeight:'bold'}}>CRASH! 💥</div><div style={{color:'#d4a853',marginBottom:8}}>Score: {score}</div><button style={{width:160,background:'#d4a853',border:'none',borderRadius:10,padding:'12px',color:'#1a0a00',fontSize:15,fontWeight:'bold',cursor:'pointer'}} onClick={startGame}>▶ Again</button></div>)}{started&&!gameOver&&(<div style={{display:'flex',gap:20,padding:'8px 0',flexShrink:0}}><button style={btnStyle} onPointerDown={e=>{e.preventDefault();moveLeft();}} onTouchStart={e=>{e.preventDefault();moveLeft();}}>◀</button><button style={btnStyle} onPointerDown={e=>{e.preventDefault();moveRight();}} onTouchStart={e=>{e.preventDefault();moveRight();}}>▶</button></div>)}</div>);
+  return(<div ref={containerRef} style={{display:'flex',flexDirection:'column',alignItems:'center',height:'100%',background:'#1a1a1a',overflow:'hidden'}}><div style={{color:'#d4a853',fontSize:14,fontWeight:'bold',padding:'4px 0',flexShrink:0}}>{playerName} - Score: {score} ☕x{collected}</div><canvas ref={canvasRef} width={W} height={H} style={{display:'block',flex:1,maxWidth:'100%'}}/>{!started&&!gameOver&&<button style={{width:160,background:'#d4a853',border:'none',borderRadius:10,padding:'12px',color:'#1a0a00',fontSize:15,fontWeight:'bold',cursor:'pointer',flexShrink:0}} onClick={startGame}>Start</button>}{gameOver&&(<div style={{textAlign:'center',flexShrink:0}}><div style={{color:'#ff6b6b',fontSize:20,fontWeight:'bold'}}>CRASH! 💥</div><div style={{color:'#d4a853',marginBottom:8}}>Score: {score}</div><button style={{width:160,background:'#d4a853',border:'none',borderRadius:10,padding:'12px',color:'#1a0a00',fontSize:15,fontWeight:'bold',cursor:'pointer'}} onClick={startGame}>Again</button></div>)}{started&&!gameOver&&(<div style={{display:'flex',gap:20,padding:'8px 0',flexShrink:0}}><button style={btnStyle} onPointerDown={e=>{e.preventDefault();moveLeft();}} onTouchStart={e=>{e.preventDefault();moveLeft();}}><</button><button style={btnStyle} onPointerDown={e=>{e.preventDefault();moveRight();}} onTouchStart={e=>{e.preventDefault();moveRight();}}>></button></div>)}</div>);
 }
 
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// GUESS THE WORD — Wordle-style with animated barista characters
-// ═══════════════════════════════════════════════════════════════════════════════
+// =
+// GUESS THE WORD - Wordle-style with animated barista characters
+// =
 const WORD_LIST = [
   { word:'LATTE',     hint:'Espresso + steamed milk',           category:'Drinks' },
   { word:'MOCHA',     hint:'Coffee with chocolate syrup',       category:'Drinks' },
   { word:'FRAPPE',    hint:'Blended iced coffee drink',         category:'Drinks' },
   { word:'MATCHA',    hint:'Finely ground green tea powder',    category:'Drinks' },
-  { word:'BARISTA',   hint:'The person who makes your coffee',  category:'Café' },
+  { word:'BARISTA',   hint:'The person who makes your coffee',  category:'Cafe' },
   { word:'ALMOND',    hint:'Nut used for plant-based milk',     category:'Food' },
   { word:'MUFFIN',    hint:'Domed cup-baked treat',             category:'Food' },
   { word:'CARAMEL',   hint:'Sweet golden-brown sauce',          category:'Food' },
@@ -561,8 +561,8 @@ const WORD_LIST = [
   { word:'AFFOGATO',  hint:'Ice cream drowned in espresso',     category:'Drinks' },
   { word:'CROISSANT', hint:'Buttery crescent French pastry',    category:'Food' },
   { word:'MACCHIATO', hint:'Espresso stained with milk',        category:'Drinks' },
-  { word:'COASTER',   hint:'Small mat placed under your cup',   category:'Café' },
-  { word:'JOURNAL',   hint:'Notebook café visitors write in',   category:'Café' },
+  { word:'COASTER',   hint:'Small mat placed under your cup',   category:'Cafe' },
+  { word:'JOURNAL',   hint:'Notebook cafe visitors write in',   category:'Cafe' },
   { word:'CHEESECAKE',hint:'Creamy dessert on biscuit base',    category:'Food' },
   { word:'SANDWICH',  hint:'Two bread slices with filling',     category:'Food' },
   { word:'SAMPAGUITA', hint:'National flower of the Philippines, white and fragrant', category:'PH Plants' },
@@ -788,14 +788,14 @@ function GuessWordGame({ playerName, onScore }) {
       <div style={{ background: '#1a1a1b', borderBottom: '1px solid #3a3a3c', padding: '7px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
         <div style={{ fontSize: 11, color: '#818384' }}>Round <b style={{ color: '#d4a853' }}>{round}</b></div>
         <div style={{ fontSize: 13, fontWeight: 'bold', color: '#d4a853', letterSpacing: 2 }}>GUESS THE WORD</div>
-        <div style={{ fontSize: 11, color: '#818384' }}>⭐<b style={{ color: '#d4a853' }}>{score}</b> {streak > 0 && <span>🔥{streak}</span>}</div>
+        <div style={{ fontSize: 11, color: '#818384' }}>*<b style={{ color: '#d4a853' }}>{score}</b> {streak > 0 && <span>🔥{streak}</span>}</div>
       </div>
 
-      {/* Description — always visible on top */}
+      {/* Description - always visible on top */}
       <div style={{ background: 'linear-gradient(135deg,#2a1800,#1a0e00)', borderBottom: '1px solid #3d1f00', padding: '10px 16px', flexShrink: 0, textAlign: 'center' }}>
         <div style={{ fontSize: 11, color: '#818384', marginBottom: 3, textTransform: 'uppercase', letterSpacing: 1 }}>Description</div>
         <div style={{ fontSize: 15, color: '#f5e6d0', fontStyle: 'italic', lineHeight: 1.4 }}>"{wordData.hint}"</div>
-        <div style={{ fontSize: 10, color: '#555', marginTop: 4 }}>{wordData.category} · {WL} letters</div>
+        <div style={{ fontSize: 10, color: '#555', marginTop: 4 }}>{wordData.category} - {WL} letters</div>
       </div>
 
       {/* Barista stage */}
@@ -814,7 +814,7 @@ function GuessWordGame({ playerName, onScore }) {
               <div key={i} style={{ width: 10, height: 10, borderRadius: '50%', background: i < (MAX_GUESSES - guesses.filter(g => g !== word || gameState !== 'playing').length) ? '#538d4e' : '#3a3a3c', border: '1px solid #555', transition: 'background 0.3s' }}/>
             ))}
           </div>
-          <div style={{ fontSize: 9, color: '#555', marginTop: 2 }}>{wordData.category} · {WL} letters</div>
+          <div style={{ fontSize: 9, color: '#555', marginTop: 2 }}>{wordData.category} - {WL} letters</div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <BaristaRight state={baristaState} />
@@ -880,7 +880,7 @@ function GuessWordGame({ playerName, onScore }) {
           </div>
           {gameState === 'won' && (
             <div style={{ fontSize: 14, color: '#ffd700', marginBottom: 12, textShadow: '0 0 8px #ffaa00', animation: 'fadeIn 0.5s' }}>
-              +{(MAX_GUESSES - guesses.length + 1) * 50} pts {streak > 1 ? `· ${streak}x streak 🔥` : ''}
+              +{(MAX_GUESSES - guesses.length + 1) * 50} pts {streak > 1 ? `- ${streak}x streak 🔥` : ''}
             </div>
           )}
           <button onClick={nextRound} style={{
@@ -891,7 +891,7 @@ function GuessWordGame({ playerName, onScore }) {
             boxShadow: gameState==='won' ? '0 0 16px rgba(0,255,100,0.5)' : '0 0 8px rgba(212,168,83,0.3)',
             animation: gameState==='won' ? 'btnGlow 1s ease-in-out infinite' : 'none',
           }}>
-            Next Word →
+            Next Word >
           </button>
           <style>{`
             @keyframes sparkle{0%,100%{transform:scale(1);opacity:0.8}50%{transform:scale(1.8);opacity:1}}
@@ -905,7 +905,7 @@ function GuessWordGame({ playerName, onScore }) {
           <div key={ri} style={{ display: 'flex', justifyContent: 'center', gap: 5, marginBottom: 6 }}>
             {ri === 2 && <button onPointerDown={e => { e.preventDefault(); pressKey('ENTER'); }} style={{ background: '#818384', border: 'none', borderRadius: 6, padding: '16px 8px', color: '#fff', fontSize: 11, fontWeight: 'bold', cursor: 'pointer', minWidth: 44, userSelect: 'none' }}>ENTER</button>}
             {row.split('').map(l => { const ks = keyColors[getKeyState(l)]; return (<button key={l} onPointerDown={e => { e.preventDefault(); pressKey(l); }} style={{ background: ks.bg, border: 'none', borderRadius: 6, padding: '16px 0', color: ks.color, fontSize: 15, fontWeight: 'bold', cursor: 'pointer', width: 30, userSelect: 'none', transition: 'background 0.2s' }}>{l}</button>); })}
-            {ri === 2 && <button onPointerDown={e => { e.preventDefault(); pressKey('DEL'); }} style={{ background: '#818384', border: 'none', borderRadius: 6, padding: '16px 8px', color: '#fff', fontSize: 13, fontWeight: 'bold', cursor: 'pointer', minWidth: 44, userSelect: 'none' }}>⌫</button>}
+            {ri === 2 && <button onPointerDown={e => { e.preventDefault(); pressKey('DEL'); }} style={{ background: '#818384', border: 'none', borderRadius: 6, padding: '16px 8px', color: '#fff', fontSize: 13, fontWeight: 'bold', cursor: 'pointer', minWidth: 44, userSelect: 'none' }}>DEL</button>}
           </div>
         ))}
       </div>
@@ -928,7 +928,7 @@ export default function GamesPage() {
   const [musicOn, setMusicOn] = useState(true);
   const audioRef = useRef(null);
 
-  // Background music — plays on Game Corner, stops when game is active
+  // Background music - plays on Game Corner, stops when game is active
   useEffect(() => {
     if (!audioRef.current) {
       audioRef.current = new Audio('/game-music.mp3');
@@ -960,7 +960,7 @@ export default function GamesPage() {
     return (
       <div style={S.fullscreen}>
         <div style={S.gameBar}>
-          <button style={S.backBtn} onClick={()=>setActiveGame(null)}>← Exit</button>
+          <button style={S.backBtn} onClick={()=>setActiveGame(null)}>< Exit</button>
           <span style={S.gameTitle}>{activeGame.title}</span>
           <button style={S.lbBtn} onClick={()=>{setActiveGame(null);setShowLB(true);}}>🏆</button>
         </div>
@@ -995,7 +995,7 @@ export default function GamesPage() {
           </svg>
           <span style={S.logo}>GAME CORNER</span>
         </div>
-        <div style={S.sub}>⚔ Theonyx Café Arcade ⚔</div>
+        <div style={S.sub}>Theonyx Cafe Arcade</div>
       </div>
       <div style={{height:3,background:'linear-gradient(90deg,transparent 0%,#ff4400 20%,#ffcc00 50%,#ff4400 80%,transparent 100%)',boxShadow:'0 0 10px rgba(255,140,0,0.7)',position:'relative',zIndex:2}}/>
       {/* Music toggle */}
