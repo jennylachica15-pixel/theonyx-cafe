@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { db } from '../firebase/config';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 
 const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 function getStatus(qty, threshold) {
   if (qty <= 0) return 'out';
@@ -32,7 +31,7 @@ const s = {
   statNum: (color) => ({ fontSize: 24, fontWeight: 700, color: color || 'var(--brown-dark)' }),
   statLabel: { fontSize: 11, color: 'var(--brown-light)', marginTop: 2 },
   barWrap: { display: 'flex', alignItems: 'flex-end', gap: 4, height: 120, marginBottom: 6 },
-  bar: (h, color) => ({ flex: 1, background: color || 'var(--brown-mid)', borderRadius: '4px 4px 0 0', height: `${Math.max(h, 2)}%`, minHeight: 2, transition: 'height 0.4s ease' }),
+  bar: (h) => ({ flex: 1, background: 'var(--brown-dark)', borderRadius: '4px 4px 0 0', height: `${Math.max(h, 2)}%`, minHeight: 2, transition: 'height 0.4s ease' }),
   barLabel: { fontSize: 9, color: 'var(--brown-light)', textAlign: 'center', marginTop: 2 },
   barValue: { fontSize: 9, color: 'var(--brown-mid)', textAlign: 'center', marginBottom: 2 },
   productRow: { display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', borderBottom: '1px solid #f5ede4' },
@@ -41,22 +40,21 @@ const s = {
   badge: (status) => ({ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: STATUS_CONFIG[status].bg, color: STATUS_CONFIG[status].color }),
 };
 
+const DAY_COLORS = ['#e07b39','#c8956c','#d4a853','#6b3a1f','#1a0a00','#888','#c8956c'];
+
 export default function Reports() {
   const [orders, setOrders] = useState([]);
   const [items, setItems] = useState([]);
-  const [feedbacks, setFeedbacks] = useState([]);
   const [activeTab, setActiveTab] = useState('daily');
 
   useEffect(() => {
     const unsub1 = onSnapshot(query(collection(db, 'orders'), orderBy('createdAt', 'desc')), snap => setOrders(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsub2 = onSnapshot(query(collection(db, 'inventory'), orderBy('createdAt', 'desc')), snap => setItems(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-    const unsub3 = onSnapshot(collection(db, 'feedbacks'), snap => setFeedbacks(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-    return () => { unsub1(); unsub2(); unsub3(); };
+    return () => { unsub1(); unsub2(); };
   }, []);
 
   const now = new Date();
 
-  // Daily — last 7 days
   const dailyData = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(now); d.setDate(d.getDate() - (6 - i));
     const dayKey = d.toDateString();
@@ -65,7 +63,6 @@ export default function Reports() {
   });
   const maxDaily = Math.max(...dailyData.map(d => d.total), 1);
 
-  // Weekly — last 4 weeks
   const weeklyData = Array.from({ length: 4 }, (_, i) => {
     const weekStart = new Date(now); weekStart.setDate(weekStart.getDate() - weekStart.getDay() - (3 - i) * 7);
     const weekDays = Array.from({ length: 7 }, (_, d) => { const day = new Date(weekStart); day.setDate(day.getDate() + d); return day.toDateString(); });
@@ -74,7 +71,6 @@ export default function Reports() {
   });
   const maxWeekly = Math.max(...weeklyData.map(w => w.total), 1);
 
-  // Monthly — last 30 days line
   const monthlyData = Array.from({ length: 30 }, (_, i) => {
     const d = new Date(now); d.setDate(d.getDate() - (29 - i));
     const dayKey = d.toDateString();
@@ -83,7 +79,6 @@ export default function Reports() {
   });
   const maxMonthly = Math.max(...monthlyData.map(d => d.total), 1);
 
-  // Top 10 products
   const productMap = {};
   orders.forEach(order => {
     (order.items || []).forEach(item => {
@@ -95,7 +90,6 @@ export default function Reports() {
   const totalSales = Object.values(productMap).reduce((a, b) => a + b, 0);
   const top10 = Object.entries(productMap).sort((a, b) => b[1] - a[1]).slice(0, 10);
 
-  // Summary stats
   const todayTotal = orders.filter(o => o.createdAt?.toDate && o.createdAt.toDate().toDateString() === now.toDateString()).reduce((s, o) => s + (o.total || 0), 0);
   const weekStart = new Date(now); weekStart.setDate(weekStart.getDate() - weekStart.getDay());
   const weekTotal = orders.filter(o => { if (!o.createdAt?.toDate) return false; const d = o.createdAt.toDate(); return d >= weekStart; }).reduce((s, o) => s + (o.total || 0), 0);
@@ -104,35 +98,30 @@ export default function Reports() {
 
   const alerts = items.filter(i => getStatus(i.quantity, i.threshold) !== 'ok');
 
-  const DAY_COLORS = ['#e07b39','#c8956c','#d4a853','#6b3a1f','#1a0a00','#888','#c8956c'];
-
   return (
     <div style={s.page}>
       <div style={s.title}>Reports</div>
       <div style={s.sub}>Sales & inventory overview</div>
 
-      {/* Summary stats */}
       <div style={s.statGrid}>
-        <div style={s.statBox}><div style={s.statNum('var(--brown-dark)')}>₱{todayTotal.toLocaleString()}</div><div style={s.statLabel}>Today</div></div>
-        <div style={s.statBox}><div style={s.statNum('var(--brown-mid)')}>₱{weekTotal.toLocaleString()}</div><div style={s.statLabel}>This Week</div></div>
-        <div style={s.statBox}><div style={s.statNum('var(--gold)')}>₱{monthTotal.toLocaleString()}</div><div style={s.statLabel}>This Month</div></div>
+        <div style={s.statBox}><div style={s.statNum('var(--brown-dark)')}>P{todayTotal.toLocaleString()}</div><div style={s.statLabel}>Today</div></div>
+        <div style={s.statBox}><div style={s.statNum('var(--brown-mid)')}>P{weekTotal.toLocaleString()}</div><div style={s.statLabel}>This Week</div></div>
+        <div style={s.statBox}><div style={s.statNum('var(--gold)')}>P{monthTotal.toLocaleString()}</div><div style={s.statLabel}>This Month</div></div>
         <div style={s.statBox}><div style={s.statNum('var(--green-ok)')}>{orders.length}</div><div style={s.statLabel}>Total Orders</div></div>
       </div>
 
-      {/* Tab selector */}
       <div style={s.tabRow}>
         {['daily','weekly','monthly'].map(t => <button key={t} style={s.tab(activeTab === t)} onClick={() => setActiveTab(t)}>{t.charAt(0).toUpperCase()+t.slice(1)}</button>)}
       </div>
 
-      {/* Daily Bar */}
       {activeTab === 'daily' && (
         <div style={s.card}>
-          <div style={s.cardTitle}>📊 Daily Sales — Last 7 Days</div>
+          <div style={s.cardTitle}>Daily Sales - Last 7 Days</div>
           <div style={s.barWrap}>
             {dailyData.map((d, i) => (
               <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <div style={s.barValue}>₱{d.total > 0 ? (d.total >= 1000 ? `${(d.total/1000).toFixed(1)}k` : d.total) : ''}</div>
-                <div style={s.bar((d.total / maxDaily) * 100, 'var(--brown-dark)')} />
+                <div style={s.barValue}>{d.total > 0 ? (d.total >= 1000 ? `${(d.total/1000).toFixed(1)}k` : d.total) : ''}</div>
+                <div style={s.bar((d.total / maxDaily) * 100)} />
                 <div style={s.barLabel}>{d.label}</div>
               </div>
             ))}
@@ -140,56 +129,40 @@ export default function Reports() {
         </div>
       )}
 
-      {/* Weekly Stacked Bar */}
       {activeTab === 'weekly' && (
         <div style={s.card}>
-          <div style={s.cardTitle}>📊 Weekly Sales — Last 4 Weeks</div>
+          <div style={s.cardTitle}>Weekly Sales - Last 4 Weeks</div>
           <div style={s.barWrap}>
             {weeklyData.map((w, i) => (
               <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <div style={s.barValue}>₱{w.total > 0 ? (w.total >= 1000 ? `${(w.total/1000).toFixed(1)}k` : w.total) : ''}</div>
+                <div style={s.barValue}>{w.total > 0 ? (w.total >= 1000 ? `${(w.total/1000).toFixed(1)}k` : w.total) : ''}</div>
                 <div style={{ flex: 1, width: '100%', display: 'flex', flexDirection: 'column-reverse', borderRadius: '4px 4px 0 0', overflow: 'hidden', height: `${(w.total/maxWeekly)*100}%`, minHeight: w.total > 0 ? 4 : 0 }}>
-                  {w.days.map((dayVal, di) => dayVal > 0 ? (
-                    <div key={di} style={{ background: DAY_COLORS[di], flex: dayVal, minHeight: 2 }} title={`${DAYS[di]}: ₱${dayVal}`} />
-                  ) : null)}
+                  {w.days.map((dayVal, di) => dayVal > 0 ? <div key={di} style={{ background: DAY_COLORS[di], flex: dayVal, minHeight: 2 }} /> : null)}
                 </div>
                 <div style={s.barLabel}>{w.label}</div>
               </div>
             ))}
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
-            {DAYS.map((d, i) => <span key={i} style={{ fontSize: 10, color: 'var(--brown-light)', display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: DAY_COLORS[i], display: 'inline-block' }} />{d}</span>)}
-          </div>
         </div>
       )}
 
-      {/* Monthly Line Graph */}
       {activeTab === 'monthly' && (
         <div style={s.card}>
-          <div style={s.cardTitle}>📈 Monthly Sales — Last 30 Days</div>
+          <div style={s.cardTitle}>Monthly Sales - Last 30 Days</div>
           <svg width="100%" height="130" viewBox={`0 0 ${monthlyData.length * 10} 100`} preserveAspectRatio="none">
-            <polyline
-              fill="none"
-              stroke="var(--brown-dark)"
-              strokeWidth="1.5"
-              points={monthlyData.map((d, i) => `${i * 10 + 5},${100 - (d.total / maxMonthly) * 90}`).join(' ')}
-            />
-            {monthlyData.map((d, i) => d.total > 0 ? (
-              <circle key={i} cx={i * 10 + 5} cy={100 - (d.total / maxMonthly) * 90} r="2" fill="var(--gold)" />
-            ) : null)}
+            <polyline fill="none" stroke="var(--brown-dark)" strokeWidth="1.5"
+              points={monthlyData.map((d, i) => `${i * 10 + 5},${100 - (d.total / maxMonthly) * 90}`).join(' ')} />
+            {monthlyData.map((d, i) => d.total > 0 ? <circle key={i} cx={i * 10 + 5} cy={100 - (d.total / maxMonthly) * 90} r="2" fill="var(--gold)" /> : null)}
           </svg>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--brown-light)', marginTop: 4 }}>
-            <span>{monthlyData[0]?.label}</span>
-            <span>{monthlyData[14]?.label}</span>
-            <span>{monthlyData[29]?.label}</span>
+            <span>{monthlyData[0]?.label}</span><span>{monthlyData[14]?.label}</span><span>{monthlyData[29]?.label}</span>
           </div>
         </div>
       )}
 
-      {/* Top 10 Products */}
       {top10.length > 0 && (
         <div style={s.card}>
-          <div style={s.cardTitle}>🏆 Top 10 Products</div>
+          <div style={s.cardTitle}>Top 10 Products</div>
           {top10.map(([name, sales], i) => (
             <div key={name} style={s.productRow}>
               <div style={s.rank}>{i + 1}</div>
@@ -200,7 +173,7 @@ export default function Reports() {
                 </div>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--brown-dark)' }}>₱{sales.toLocaleString()}</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--brown-dark)' }}>P{sales.toLocaleString()}</div>
                 <div style={{ fontSize: 10, color: 'var(--brown-light)' }}>{totalSales > 0 ? ((sales / totalSales) * 100).toFixed(1) : 0}%</div>
               </div>
             </div>
@@ -208,10 +181,9 @@ export default function Reports() {
         </div>
       )}
 
-      {/* Inventory alerts */}
       {alerts.length > 0 && (
         <div style={s.card}>
-          <div style={s.cardTitle}>🚨 Inventory Alerts</div>
+          <div style={s.cardTitle}>Inventory Alerts</div>
           {alerts.map(item => {
             const status = getStatus(item.quantity, item.threshold);
             return (
@@ -226,33 +198,6 @@ export default function Reports() {
           })}
         </div>
       )}
-      {/* Feedback Summary */}
-      {feedbacks.length > 0 && (() => {
-        const avg = (key) => {
-          const vals = feedbacks.map(f => Number(f[key])).filter(v => v > 0);
-          return vals.length ? (vals.reduce((a,b) => a+b, 0) / vals.length).toFixed(1) : 'N/A';
-        };
-        const avgStaff = avg('staffRating');
-        const avgPlace = avg('placeRating');
-        const avgDrink = avg('drinkOverall');
-        return (
-          <div style={s.card}>
-            <div style={s.cardTitle}>📝 Customer Feedback Summary</div>
-            <div style={s.statGrid}>
-              <div style={s.statBox}><div style={s.statNum('var(--gold)')}>{feedbacks.length}</div><div style={s.statLabel}>Total Responses</div></div>
-              <div style={s.statBox}><div style={s.statNum('var(--brown-dark)')}>{avgStaff} ★</div><div style={s.statLabel}>Staff Rating</div></div>
-              <div style={s.statBox}><div style={s.statNum('var(--brown-dark)')}>{avgPlace} ★</div><div style={s.statLabel}>Place Rating</div></div>
-              <div style={s.statBox}><div style={s.statNum('var(--brown-dark)')}>{avgDrink} ★</div><div style={s.statLabel}>Drink Rating</div></div>
-            </div>
-            <div style={s.cardTitle}>Recent Comments</div>
-            {feedbacks.slice(0, 3).map((f, i) => f.overallComment ? (
-              <div key={i} style={{ padding: '8px 0', borderBottom: '1px solid #f5ede4', fontSize: 12, color: 'var(--brown-mid)', fontStyle: 'italic' }}>
-                "{f.overallComment}" — <span style={{ fontStyle: 'normal', fontWeight: 600 }}>{f.customerName}</span>
-              </div>
-            ) : null)}
-          </div>
-        );
-      })()}
 
       <div style={{ height: 80 }} />
     </div>
