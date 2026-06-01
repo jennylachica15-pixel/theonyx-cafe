@@ -338,11 +338,11 @@ export default function AdminApp({ user, onSignOut }) {
               {activeTab === 'attendance'  && <Attendance role={role} userName={userName} />}
               {activeTab === 'orders'      && <Orders userName={userName} />}
               {activeTab === 'inventory'   && <Inventory />}
-              {activeTab === 'approvals'   && <Approvals />}
+              {activeTab === 'approvals'   && <Approvals role={role} />}
               {activeTab === 'reports'     && <Reports />}
               {activeTab === 'menu'        && role === 'manager' && <MenuManager />}
               {activeTab === 'cleanliness' && <CleanlinessCheck userName={userName} />}
-              {activeTab === 'feedback'    && <FeedbackPanel />}
+              {activeTab === 'feedback'    && <FeedbackPanel role={role} />}
             </div>
           </div>
         )}
