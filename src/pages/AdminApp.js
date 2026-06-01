@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { auth, db } from '../firebase/config';
 import { signOut } from 'firebase/auth';
-import { doc, getDoc, collection, addDoc, serverTimestamp, onSnapshot, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, collection, addDoc, serverTimestamp, onSnapshot, query, where, getDocs, updateDoc, orderBy, limit } from 'firebase/firestore';
 import Attendance from './Attendance';
 import Orders from './Orders';
 import Inventory from './Inventory';
@@ -176,6 +176,147 @@ function CleanlinessCheck({ userName }) {
   );
 }
 
+function CleanlinessReviews({ role, userName }) {
+  const [list, setList] = React.useState([]);
+  const [draft, setDraft] = React.useState({});
+  const [savingId, setSavingId] = React.useState(null);
+
+  React.useEffect(() => {
+    const unsub = onSnapshot(
+      query(collection(db, 'cleanlinessChecks'), orderBy('submittedAt', 'desc'), limit(40)),
+      snap => setList(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    );
+    return () => unsub();
+  }, []);
+
+  React.useEffect(() => {
+    if (role === 'manager') return;
+    list.forEach(c => {
+      if (c.staff === userName && c.reviewedAt && c.staffSeen !== true) {
+        updateDoc(doc(db, 'cleanlinessChecks', c.id), { staffSeen: true }).catch(() => {});
+      }
+    });
+  }, [list, role, userName]);
+
+  const visible = role === 'manager' ? list : list.filter(c => c.staff === userName);
+  const labelFor = (id) => (CHECKLIST_ITEMS.find(i => i.id === id) || {}).label || id;
+  const draftFor = (c) => (draft[c.id] !== undefined ? draft[c.id] : { verdict: c.verdict || '', comment: c.managerComment || '' });
+  const setDraftField = (c, patch) => setDraft(prev => ({ ...prev, [c.id]: { ...draftFor(c), ...patch } }));
+
+  const saveReview = async (c) => {
+    const d = draftFor(c);
+    setSavingId(c.id);
+    try {
+      await updateDoc(doc(db, 'cleanlinessChecks', c.id), {
+        verdict: d.verdict || null,
+        managerComment: (d.comment || '').trim(),
+        reviewedBy: userName,
+        reviewedAt: new Date().toISOString(),
+        staffSeen: false,
+      });
+    } catch (e) {}
+    setSavingId(null);
+  };
+
+  const verdictPill = (v) => v === 'clean'
+    ? { label: 'Clean', bg: '#f0fce8', bd: '#cfe0b0', fg: '#2a6000' }
+    : { label: 'Needs work', bg: '#ffece9', bd: '#f0c8c0', fg: '#b5482e' };
+
+  if (visible.length === 0) {
+    return <div style={{ padding: 28, textAlign: 'center', fontSize: 13, color: '#a07850' }}>No cleanliness checks yet.</div>;
+  }
+
+  return (
+    <div style={{ padding: '14px 16px 32px' }}>
+      {visible.map(c => {
+        const total = (c.checkedItems?.length || 0) + (c.uncheckedItems?.length || 0);
+        const photoIds = Object.keys(c.photoUrls || {}).filter(k => c.photoUrls[k] && c.photoUrls[k] !== '(upload failed)');
+        const reviewed = !!c.reviewedAt;
+        const d = draftFor(c);
+        return (
+          <div key={c.id} style={{ background: '#fff', border: '1px solid #f0e8d8', borderRadius: 12, padding: 14, marginBottom: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#2a1000' }}>{c.staff || 'Staff'}</div>
+                <div style={{ fontSize: 11, color: '#a07850', marginTop: 2 }}>{c.dateTime || c.date}</div>
+              </div>
+              <span style={{ fontSize: 11, color: '#2a6000', background: '#f0fce8', border: '1px solid #cfe0b0', borderRadius: 20, padding: '3px 9px', whiteSpace: 'nowrap' }}>{(c.checkedItems?.length || 0)} of {total || (c.checkedItems?.length || 0)}</span>
+            </div>
+
+            {c.checkedItems?.length > 0 && (
+              <div style={{ fontSize: 11, color: '#a07850', marginTop: 8, lineHeight: 1.5 }}>{c.checkedItems.join(', ')}</div>
+            )}
+            {c.notes && <div style={{ fontSize: 11.5, color: '#5a3a1a', marginTop: 6, fontStyle: 'italic' }}>Staff note: {c.notes}</div>}
+
+            {photoIds.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+                {photoIds.map(id => (
+                  <a key={id} href={c.photoUrls[id]} target="_blank" rel="noreferrer"
+                    style={{ fontSize: 11, color: '#c8943a', background: '#fff8f0', border: '1px solid #f0e8d8', borderRadius: 7, padding: '4px 9px', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#c8943a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                    {labelFor(id)}
+                  </a>
+                ))}
+              </div>
+            )}
+
+            {role === 'manager' ? (
+              <div style={{ marginTop: 12, borderTop: '1px solid #f0e8d8', paddingTop: 12 }}>
+                <div style={{ fontSize: 11, color: '#a07850', marginBottom: 6 }}>Is the area really clean?</div>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                  <button onClick={() => setDraftField(c, { verdict: 'clean' })}
+                    style={{ flex: 1, padding: '8px', borderRadius: 9, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                      background: d.verdict === 'clean' ? '#f0fce8' : '#fff', border: `1px solid ${d.verdict === 'clean' ? '#8bc34a' : '#f0e8d8'}`, color: d.verdict === 'clean' ? '#2a6000' : '#a07850' }}>Clean</button>
+                  <button onClick={() => setDraftField(c, { verdict: 'needs_work' })}
+                    style={{ flex: 1, padding: '8px', borderRadius: 9, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                      background: d.verdict === 'needs_work' ? '#ffece9' : '#fff', border: `1px solid ${d.verdict === 'needs_work' ? '#e0a89a' : '#f0e8d8'}`, color: d.verdict === 'needs_work' ? '#b5482e' : '#a07850' }}>Needs work</button>
+                </div>
+                <textarea value={d.comment} onChange={e => setDraftField(c, { comment: e.target.value })} placeholder="Comment to staff…"
+                  style={{ width: '100%', boxSizing: 'border-box', minHeight: 50, border: '1px solid #e8dfd0', borderRadius: 9, padding: '8px 10px', fontSize: 12.5, color: '#2a1000', resize: 'vertical', outline: 'none', fontFamily: 'inherit', background: '#fff8f0' }} />
+                <button onClick={() => saveReview(c)} disabled={savingId === c.id}
+                  style={{ width: '100%', marginTop: 9, background: '#c8943a', color: '#fff', border: 'none', borderRadius: 9, padding: '10px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+                  {savingId === c.id ? 'Saving…' : (reviewed ? `Update review & notify ${c.staff || 'staff'}` : `Save review & notify ${c.staff || 'staff'}`)}
+                </button>
+                {reviewed && <div style={{ fontSize: 10.5, color: '#a07850', marginTop: 6, textAlign: 'center' }}>Last reviewed by {c.reviewedBy || 'manager'}</div>}
+              </div>
+            ) : (
+              <div style={{ marginTop: 12, borderTop: '1px solid #f0e8d8', paddingTop: 12 }}>
+                {reviewed ? (
+                  <>
+                    {c.verdict && (
+                      <span style={{ fontSize: 11, color: verdictPill(c.verdict).fg, background: verdictPill(c.verdict).bg, border: `1px solid ${verdictPill(c.verdict).bd}`, borderRadius: 20, padding: '3px 10px', fontWeight: 600 }}>{verdictPill(c.verdict).label}</span>
+                    )}
+                    {c.managerComment && <div style={{ fontSize: 12.5, color: '#2a1000', background: '#fff8f0', border: '1px solid #f0e8d8', borderRadius: 9, padding: '9px 11px', marginTop: 8, lineHeight: 1.5 }}>{c.managerComment}</div>}
+                    <div style={{ fontSize: 10.5, color: '#a07850', marginTop: 6 }}>From {c.reviewedBy || 'manager'}</div>
+                  </>
+                ) : (
+                  <div style={{ fontSize: 12, color: '#a07850' }}>Awaiting manager review…</div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function CleanlinessPanel({ role, userName }) {
+  const [sub, setSub] = React.useState('new');
+  const tabBtn = (on) => ({ flex: 1, border: 'none', background: on ? '#c8943a' : 'transparent', color: on ? '#fff' : '#a07850', fontSize: 12.5, fontWeight: on ? 700 : 600, padding: '9px 4px', borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit' });
+  return (
+    <div>
+      <div style={{ padding: '14px 16px 0' }}>
+        <div style={{ display: 'flex', background: '#f5ede2', borderRadius: 11, padding: 3, gap: 3, border: '1px solid #f0e8d8' }}>
+          <button style={tabBtn(sub === 'new')} onClick={() => setSub('new')}>New check</button>
+          <button style={tabBtn(sub === 'reviews')} onClick={() => setSub('reviews')}>Reviews</button>
+        </div>
+      </div>
+      {sub === 'new' ? <CleanlinessCheck userName={userName} /> : <CleanlinessReviews role={role} userName={userName} />}
+    </div>
+  );
+}
+
 // ─── BIBLE VERSES NIV ────────────────────────────────────────────────────────
 const VERSES = [
   { text: "I can do all this through him who gives me strength.", ref: "Philippians 4:13" },
@@ -224,6 +365,7 @@ export default function AdminApp({ user, onSignOut }) {
   const [time, setTime] = useState(new Date());
   const [pendingPhotos, setPendingPhotos] = useState(0);
   const [cleanlinessAlert, setCleanlinessAlert] = useState(false);
+  const [cleanFeedback, setCleanFeedback] = useState(0);
 
   const verse = getDailyVerse();
 
@@ -262,6 +404,15 @@ export default function AdminApp({ user, onSignOut }) {
     const cleanTimer = setInterval(checkCleanliness, 60000);
     return () => { unsubPhotos(); clearInterval(cleanTimer); };
   }, []);
+
+  useEffect(() => {
+    if (!userName) return;
+    const unsub = onSnapshot(
+      query(collection(db, 'cleanlinessChecks'), where('staff', '==', userName)),
+      snap => setCleanFeedback(snap.docs.map(d => d.data()).filter(d => d.reviewedAt && d.staffSeen !== true).length)
+    );
+    return () => unsub();
+  }, [userName]);
 
   const handleSignOut = async () => { await signOut(auth); onSignOut(); };
 
@@ -359,6 +510,7 @@ export default function AdminApp({ user, onSignOut }) {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                 {morePanels.map(p => {
                   const badge = p.id === 'approvals' && pendingPhotos > 0 ? pendingPhotos
+                    : p.id === 'cleanliness' && cleanFeedback > 0 ? cleanFeedback
                     : p.id === 'cleanliness' && cleanlinessAlert ? '!' : null;
                   return (
                     <div key={p.id} onClick={() => setActiveTab(p.id)}
@@ -407,7 +559,7 @@ export default function AdminApp({ user, onSignOut }) {
               {activeTab === 'approvals'   && <Approvals role={role} />}
               {activeTab === 'reports'     && <Reports />}
               {activeTab === 'menu'        && role === 'manager' && <MenuManager />}
-              {activeTab === 'cleanliness' && <CleanlinessCheck userName={userName} />}
+              {activeTab === 'cleanliness' && <CleanlinessPanel role={role} userName={userName} />}
               {activeTab === 'feedback'    && <FeedbackPanel role={role} />}
             </div>
           </div>
