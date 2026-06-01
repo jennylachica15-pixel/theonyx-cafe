@@ -169,38 +169,30 @@ function SnakeGame({ playerName, onScore }) {
   const stateRef = useRef(null);
   const [score, setScore] = useState(0);
   const [alive, setAlive] = useState(true);
-  const [canvasSize, setCanvasSize] = useState({ w: 340, h: 520 });
 
-  useEffect(() => {
-    const update = () => {
-      if (!containerRef.current) return;
-      const w = Math.min(containerRef.current.clientWidth - 4, 420);
-      const h = Math.min(window.innerHeight - 160, 580);
-      setCanvasSize({ w, h });
-    };
-    update();
-    window.addEventListener('resize', update);
-    return () => window.removeEventListener('resize', update);
-  }, []);
+  const W = 340, H = 580;
+  const CELL = 12;
+  const COLS = Math.floor(W / CELL);
+  const ROWS = Math.floor(H / CELL);
 
-  const { w: W, h: H } = canvasSize;
-  const CELL = 20, COLS = Math.floor(W / CELL), ROWS = Math.floor(H / CELL);
-  const jsRef = useRef({ cx: 72, cy: 0, r: 55, knobR: 22, kx: 0, ky: 0, active: false, maxDist: 32 });
-  const orbsRef = useRef(null);
-  const orbColors = ORB_COLORS;
-  if (!orbsRef.current || orbsRef.current.length === 0) {
-    orbsRef.current = Array.from({length:30},(_,i) => ({
-      x: 20 + Math.random()*(W-40), y: 20 + Math.random()*(H-40),
-      color: orbColors[i % orbColors.length],
-      size: 2 + Math.random()*3.5, phase: Math.random()*Math.PI*2,
-      speed: 0.02 + Math.random()*0.05,
-      vx: (Math.random()-0.5)*0.3, vy: (Math.random()-0.5)*0.3,
-    }));
+  const jsRef = useRef({ cx:70, cy:H-75, r:50, kR:19, kx:0, ky:0, on:false, md:28 });
+
+  // Scatter beans
+  const beansRef = useRef([]);
+  const spawnBean = () => ({
+    x: 20 + Math.random()*(W-40),
+    y: 20 + Math.random()*(H-120),
+    phase: Math.random()*Math.PI*2,
+    size: 3 + Math.random()*2,
+    id: Math.random()
+  });
+  if (beansRef.current.length === 0) {
+    for (let i=0; i<8; i++) beansRef.current.push(spawnBean());
   }
 
-  const placeFood = (snake, cols, rows) => {
+  const placeFood = (snake) => {
     let pos;
-    do { pos = { x: Math.floor(Math.random()*cols), y: Math.floor(Math.random()*rows) }; }
+    do { pos = { x:1+Math.floor(Math.random()*(COLS-2)), y:1+Math.floor(Math.random()*(ROWS-2)) }; }
     while (snake.some(s => s.x===pos.x && s.y===pos.y));
     return pos;
   };
@@ -208,260 +200,244 @@ function SnakeGame({ playerName, onScore }) {
   const startGame = useCallback(() => {
     const cx = Math.floor(COLS/2), cy = Math.floor(ROWS/2);
     stateRef.current = {
-      snake: [{x:cx,y:cy},{x:cx-1,y:cy},{x:cx-2,y:cy},{x:cx-3,y:cy},{x:cx-4,y:cy}],
+      snake: [{x:cx,y:cy},{x:cx-1,y:cy},{x:cx-2,y:cy},{x:cx-3,y:cy}],
       dir: {x:1,y:0}, nextDir: {x:1,y:0},
-      food: {x:cx+5,y:cy},
+      food: {x:cx+5, y:cy},
       score: 0, frame: 0, running: true
     };
-    jsRef.current.cy = H - 72;
+    beansRef.current = [];
+    for (let i=0; i<8; i++) beansRef.current.push(spawnBean());
     setScore(0); setAlive(true);
-  }, [COLS, ROWS, H]);
+  }, [COLS, ROWS]);
 
-  useEffect(() => { if (COLS > 5 && ROWS > 5) startGame(); }, [COLS, ROWS, startGame]);
+  useEffect(() => { startGame(); }, [startGame]);
 
   const turn = useCallback((dx, dy) => {
     const g = stateRef.current; if (!g) return;
     if (dx !== -g.dir.x || dy !== -g.dir.y) g.nextDir = {x:dx, y:dy};
   }, []);
 
+  // Joystick
   const handleJsMove = useCallback((clientX, clientY) => {
     const canvas = canvasRef.current; if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
-    const scaleX = W/rect.width, scaleY = H/rect.height;
-    const mx = (clientX - rect.left)*scaleX, my = (clientY - rect.top)*scaleY;
+    const sx = W/rect.width, sy = H/rect.height;
+    const mx = (clientX-rect.left)*sx, my = (clientY-rect.top)*sy;
     const js = jsRef.current;
-    let dx = mx - js.cx, dy = my - js.cy;
-    const dist = Math.sqrt(dx*dx + dy*dy);
-    if (dist > js.maxDist) { dx = dx/dist*js.maxDist; dy = dy/dist*js.maxDist; }
-    js.kx = dx; js.ky = dy;
-    const angle = Math.atan2(dy, dx) * (180/Math.PI);
-    if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
-      if (angle > -45 && angle <= 45) turn(1,0);
-      else if (angle > 45 && angle <= 135) turn(0,1);
-      else if (angle > 135 || angle <= -135) turn(-1,0);
-      else turn(0,-1);
+    let dx = mx-js.cx, dy = my-js.cy;
+    const dist = Math.sqrt(dx*dx+dy*dy);
+    if (dist > js.md) { dx=dx/dist*js.md; dy=dy/dist*js.md; }
+    js.kx=dx; js.ky=dy;
+    const angle = Math.atan2(dy,dx)*180/Math.PI;
+    if (Math.abs(dx)>6||Math.abs(dy)>6) {
+      if (angle>-45&&angle<=45&&stateRef.current?.dir.x!==-1) turn(1,0);
+      else if (angle>45&&angle<=135&&stateRef.current?.dir.y!==-1) turn(0,1);
+      else if ((angle>135||angle<=-135)&&stateRef.current?.dir.x!==1) turn(-1,0);
+      else if (angle>-135&&angle<=-45&&stateRef.current?.dir.y!==1) turn(0,-1);
     }
-  }, [W, H, turn]);
+  }, [turn]);
 
   useEffect(() => {
     const canvas = canvasRef.current; if (!canvas) return;
     const js = jsRef.current;
-    const isOnJs = (mx, my) => Math.sqrt((mx-js.cx)**2 + (my-js.cy)**2) < js.r * 1.4;
-    const getPos = (clientX, clientY) => {
-      const rect = canvas.getBoundingClientRect();
-      return [(clientX-rect.left)*(W/rect.width), (clientY-rect.top)*(H/rect.height)];
-    };
-    const onTouchStart = e => { const [mx,my] = getPos(e.touches[0].clientX, e.touches[0].clientY); if (isOnJs(mx,my)) { js.active=true; e.preventDefault(); } };
-    const onTouchMove = e => { if (js.active) { handleJsMove(e.touches[0].clientX, e.touches[0].clientY); e.preventDefault(); } };
-    const onTouchEnd = () => { js.active=false; js.kx=0; js.ky=0; };
-    const onMouseDown = e => { const [mx,my] = getPos(e.clientX, e.clientY); if (isOnJs(mx,my)) js.active=true; };
-    const onMouseMove = e => { if (js.active) handleJsMove(e.clientX, e.clientY); };
-    const onMouseUp = () => { js.active=false; js.kx=0; js.ky=0; };
-    canvas.addEventListener('touchstart', onTouchStart, {passive:false});
-    canvas.addEventListener('touchmove', onTouchMove, {passive:false});
-    canvas.addEventListener('touchend', onTouchEnd);
-    canvas.addEventListener('mousedown', onMouseDown);
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup', onMouseUp);
+    const onJS = (mx,my) => Math.hypot(mx-js.cx,my-js.cy) < js.r*1.4;
+    const gp = (cx,cy) => { const r=canvas.getBoundingClientRect(); return [(cx-r.left)*(W/r.width),(cy-r.top)*(H/r.height)]; };
+    const onTouchStart = e => { const [mx,my]=gp(e.touches[0].clientX,e.touches[0].clientY); if(onJS(mx,my)){js.on=true;e.preventDefault();} };
+    const onTouchMove = e => { if(js.on){handleJsMove(e.touches[0].clientX,e.touches[0].clientY);e.preventDefault();} };
+    const onTouchEnd = () => { js.on=false; js.kx=0; js.ky=0; };
+    const onMouseDown = e => { const [mx,my]=gp(e.clientX,e.clientY); if(onJS(mx,my)) js.on=true; };
+    const onMouseMove = e => { if(js.on) handleJsMove(e.clientX,e.clientY); };
+    const onMouseUp = () => { js.on=false; js.kx=0; js.ky=0; };
+    canvas.addEventListener('touchstart',onTouchStart,{passive:false});
+    canvas.addEventListener('touchmove',onTouchMove,{passive:false});
+    canvas.addEventListener('touchend',onTouchEnd);
+    canvas.addEventListener('mousedown',onMouseDown);
+    window.addEventListener('mousemove',onMouseMove);
+    window.addEventListener('mouseup',onMouseUp);
     return () => {
-      canvas.removeEventListener('touchstart', onTouchStart);
-      canvas.removeEventListener('touchmove', onTouchMove);
-      canvas.removeEventListener('touchend', onTouchEnd);
-      canvas.removeEventListener('mousedown', onMouseDown);
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup', onMouseUp);
+      canvas.removeEventListener('touchstart',onTouchStart);
+      canvas.removeEventListener('touchmove',onTouchMove);
+      canvas.removeEventListener('touchend',onTouchEnd);
+      canvas.removeEventListener('mousedown',onMouseDown);
+      window.removeEventListener('mousemove',onMouseMove);
+      window.removeEventListener('mouseup',onMouseUp);
     };
-  }, [W, H, handleJsMove]);
+  }, [handleJsMove]);
 
   useEffect(() => {
     const k = e => {
       const m = {ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0]};
       if (m[e.key]) { e.preventDefault(); turn(...m[e.key]); }
     };
-    window.addEventListener('keydown', k);
-    return () => window.removeEventListener('keydown', k);
+    window.addEventListener('keydown',k);
+    return () => window.removeEventListener('keydown',k);
   }, [turn]);
 
   useEffect(() => {
     if (!alive) return;
     const interval = setInterval(() => {
-      const g = stateRef.current; if (!g || !g.running) return;
-      g.frame++;
+      const g = stateRef.current; if (!g||!g.running) return;
       g.dir = {...g.nextDir};
-      const head = {x: g.snake[0].x+g.dir.x, y: g.snake[0].y+g.dir.y};
+      const head = {x:g.snake[0].x+g.dir.x, y:g.snake[0].y+g.dir.y};
       if (head.x<0||head.x>=COLS||head.y<0||head.y>=ROWS||g.snake.some(s=>s.x===head.x&&s.y===head.y)) {
         g.running=false; onScore(g.score); setAlive(false); return;
       }
       g.snake.unshift(head);
-      if (head.x===g.food.x && head.y===g.food.y) {
-        g.score+=10; setScore(g.score); g.food=placeFood(g.snake,COLS,ROWS);
+      if (head.x===g.food.x&&head.y===g.food.y) {
+        g.score+=10; setScore(g.score); g.food=placeFood(g.snake);
       } else g.snake.pop();
-    }, Math.max(90, 220 - Math.floor((stateRef.current?.score||0)/50)*15));
+    }, Math.max(110, 250 - Math.floor((stateRef.current?.score||0)/40)*15));
     return () => clearInterval(interval);
   }, [alive, COLS, ROWS, onScore]);
 
+  // Draw loop
   useEffect(() => {
     const canvas = canvasRef.current; if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    let rafId, fn = 0;
-    const bgCanvas = document.createElement('canvas');
-    bgCanvas.width = W; bgCanvas.height = H;
-    const bgCtx = bgCanvas.getContext('2d');
-    bgCtx.fillStyle='#0d1117'; bgCtx.fillRect(0,0,W,H);
-    const _hs=26, _hh=_hs*Math.sqrt(3);
-    bgCtx.strokeStyle='#1e2530'; bgCtx.lineWidth=0.8;
-    for(let row=-1;row<H/_hh+2;row++){
-      for(let col=-1;col<W/(_hs*1.5)+2;col++){
-        const hcx=col*_hs*1.5, hcy=row*_hh+(col%2)*_hh/2;
-        bgCtx.fillStyle=((row+col)%3===0)?'#13181f':'#0f1419';
-        bgCtx.beginPath();
-        for(let a=0;a<6;a++){const ang=Math.PI/180*(60*a);bgCtx.lineTo(hcx+_hs*0.95*Math.cos(ang), hcy+_hs*0.95*Math.sin(ang));}
-        bgCtx.closePath(); bgCtx.fill(); bgCtx.stroke();
+    let rafId, fn=0;
+
+    // Pre-render hex bg
+    const bgC = document.createElement('canvas');
+    bgC.width=W; bgC.height=H;
+    const bc = bgC.getContext('2d');
+    bc.fillStyle='#111418'; bc.fillRect(0,0,W,H);
+    const hs=24, hh=hs*Math.sqrt(3);
+    bc.strokeStyle='#1a2028'; bc.lineWidth=1;
+    for(let row=-1;row<H/hh+2;row++){
+      for(let col=-1;col<W/(hs*1.5)+2;col++){
+        const hcx=col*hs*1.5, hcy=row*hh+(col%2)*hh/2;
+        bc.fillStyle='#131820';
+        bc.beginPath();
+        for(let a=0;a<6;a++){const ang=Math.PI/180*(60*a);bc.lineTo(hcx+hs*0.96*Math.cos(ang),hcy+hs*0.96*Math.sin(ang));}
+        bc.closePath(); bc.fill(); bc.stroke();
       }
     }
+
+    const drawBean = (x,y,size,alpha,glow) => {
+      ctx.save(); ctx.globalAlpha=alpha||1;
+      ctx.shadowColor='#c8943a'; ctx.shadowBlur=glow?18:5;
+      const g=ctx.createRadialGradient(x-size*.25,y-size*.25,0,x,y,size);
+      g.addColorStop(0,'#e8b84b'); g.addColorStop(.45,'#a06828'); g.addColorStop(1,'#3a1a00');
+      ctx.fillStyle=g; ctx.beginPath(); ctx.ellipse(x,y,size,size*.78,.4,0,Math.PI*2); ctx.fill();
+      ctx.shadowBlur=0; ctx.strokeStyle='rgba(0,0,0,.5)'; ctx.lineWidth=size*.2; ctx.lineCap='round';
+      ctx.beginPath(); ctx.moveTo(x-size*.32,y-size*.25); ctx.bezierCurveTo(x+size*.08,y,x-size*.08,y,x+size*.32,y+size*.25); ctx.stroke();
+      ctx.restore();
+    };
+
+    const drawJS = () => {
+      const js=jsRef.current;
+      ctx.save(); ctx.globalAlpha=js.on?.8:.45;
+      ctx.fillStyle='rgba(30,15,0,.88)'; ctx.shadowColor='rgba(0,0,0,.5)'; ctx.shadowBlur=10;
+      ctx.beginPath(); ctx.arc(js.cx,js.cy,js.r,0,Math.PI*2); ctx.fill(); ctx.shadowBlur=0;
+      ctx.strokeStyle=`rgba(212,168,83,${js.on?.6:.28})`; ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.arc(js.cx,js.cy,js.r,0,Math.PI*2); ctx.stroke();
+      [[0,-1],[0,1],[-1,0],[1,0]].forEach(([dx,dy])=>{
+        const ax=js.cx+dx*(js.r-11),ay=js.cy+dy*(js.r-11);
+        ctx.fillStyle='rgba(212,168,83,.15)';
+        ctx.save(); ctx.translate(ax,ay); ctx.rotate(Math.atan2(dy,dx));
+        ctx.beginPath(); ctx.moveTo(5,0); ctx.lineTo(-4,-4); ctx.lineTo(-4,4); ctx.closePath(); ctx.fill(); ctx.restore();
+      });
+      const kpx=js.cx+js.kx, kpy=js.cy+js.ky;
+      const kg=ctx.createRadialGradient(kpx-js.kR*.25,kpy-js.kR*.3,0,kpx,kpy,js.kR);
+      kg.addColorStop(0,'#e8c060'); kg.addColorStop(.45,'#c8943a'); kg.addColorStop(1,'#4a2800');
+      ctx.fillStyle=kg; ctx.shadowColor='rgba(0,0,0,.6)'; ctx.shadowBlur=7;
+      ctx.beginPath(); ctx.arc(kpx,kpy,js.kR,0,Math.PI*2); ctx.fill(); ctx.shadowBlur=0;
+      ctx.strokeStyle=`rgba(255,200,80,${js.on?.6:.35})`; ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.arc(kpx,kpy,js.kR,0,Math.PI*2); ctx.stroke();
+      ctx.globalAlpha=1; ctx.restore();
+    };
+
     const draw = () => {
       fn++;
       const g = stateRef.current;
-      const js = jsRef.current;
-      const orbs = orbsRef.current;
-      ctx.drawImage(bgCanvas, 0, 0);
-      orbs.forEach(o => {
-        o.x += o.vx; o.y += o.vy;
-        if(o.x < 10 || o.x > W-10) o.vx *= -1;
-        if(o.y < 10 || o.y > H-10) o.vy *= -1;
-        const pulse=0.7+0.3*Math.sin(fn*o.speed+o.phase);
-        const r=o.size*pulse;
-        ctx.fillStyle=o.color; ctx.globalAlpha=0.18*pulse;
-        ctx.beginPath(); ctx.arc(o.x,o.y,r*3.5,0,Math.PI*2); ctx.fill();
-        ctx.globalAlpha=0.5*pulse;
-        ctx.beginPath(); ctx.arc(o.x,o.y,r*1.8,0,Math.PI*2); ctx.fill();
-        ctx.globalAlpha=1;
-        ctx.fillStyle=o.color; ctx.beginPath(); ctx.arc(o.x,o.y,r,0,Math.PI*2); ctx.fill();
-        ctx.fillStyle='rgba(255,255,255,0.95)'; ctx.beginPath(); ctx.arc(o.x,o.y,r*0.35,0,Math.PI*2); ctx.fill();
-      });
-      if (g) {
-        const fx=g.food.x*CELL+CELL/2, fy=g.food.y*CELL+CELL/2;
-        const fp=0.85+0.15*Math.sin(fn*0.1);
-        ctx.shadowColor='#d4a853'; ctx.shadowBlur=18*fp;
-        ctx.fillStyle='rgba(212,168,83,0.2)';
-        ctx.beginPath(); ctx.arc(fx,fy,CELL*0.7*fp,0,Math.PI*2); ctx.fill();
-        const fbg=ctx.createRadialGradient(fx-2,fy-2,0,fx,fy,CELL*0.42);
-        fbg.addColorStop(0,'#ffd700'); fbg.addColorStop(0.5,'#d4a853'); fbg.addColorStop(1,'#8b5a00');
-        ctx.fillStyle=fbg; ctx.beginPath(); ctx.arc(fx,fy,CELL*0.38*fp,0,Math.PI*2); ctx.fill();
-        ctx.shadowBlur=0;
-        if(g.snake.length > 1) {
-          ctx.save(); ctx.lineCap='round'; ctx.lineJoin='round';
-          for(let i=g.snake.length-1;i>0;i--){
-            const s=g.snake[i], s2=g.snake[i-1];
-            const tt=i/g.snake.length;
-            const thick=(CELL*(0.82-tt*0.35))*2;
-            const hue=110-tt*20, light=55-tt*15;
-            ctx.strokeStyle=`hsl(${hue},85%,${light}%)`; ctx.lineWidth=thick;
-            ctx.beginPath(); ctx.moveTo(s.x*CELL+CELL/2, s.y*CELL+CELL/2); ctx.lineTo(s2.x*CELL+CELL/2, s2.y*CELL+CELL/2); ctx.stroke();
+      const beans = beansRef.current;
+      ctx.drawImage(bgC,0,0);
+
+      // Scatter beans - eat on proximity
+      for (let i=beans.length-1; i>=0; i--) {
+        const b=beans[i];
+        if (g && g.snake.length>0) {
+          const hx=g.snake[0].x*CELL+CELL/2, hy=g.snake[0].y*CELL+CELL/2;
+          if (Math.hypot(b.x-hx,b.y-hy)<CELL*.9) {
+            g.score+=5; setScore(g.score);
+            beans.splice(i,1);
+            setTimeout(()=>beans.push(spawnBean()),700);
+            continue;
           }
-          ctx.restore();
         }
-        g.snake.forEach((s,i) => {
-          const px=s.x*CELL+CELL/2, py=s.y*CELL+CELL/2;
-          const tt=i/g.snake.length, thick=CELL*(0.82-tt*0.35);
-          const hue=110-tt*20, light=55-tt*15;
-          const sg=ctx.createRadialGradient(px-thick*0.2,py-thick*0.2,0,px,py,thick);
-          sg.addColorStop(0,`hsl(${hue+10},95%,${light+15}%)`);
-          sg.addColorStop(0.5,`hsl(${hue},85%,${light}%)`);
-          sg.addColorStop(1,`hsl(${hue-10},70%,${light-20}%)`);
-          ctx.fillStyle=sg;
-          if(i===0){ ctx.shadowColor=`hsl(${hue},90%,${light}%)`; ctx.shadowBlur=12; }
-          ctx.beginPath(); ctx.arc(px,py,thick,0,Math.PI*2); ctx.fill();
-          ctx.shadowBlur=0;
-        });
-        if (g.snake.length >= 2) {
-          const h=g.snake[0];
-          const px=h.x*CELL+CELL/2, py=h.y*CELL+CELL/2;
-          ctx.save(); ctx.translate(px,py); ctx.rotate(Math.atan2(g.dir.y,g.dir.x));
-          [-1,1].forEach(side=>{
-            ctx.shadowColor='#ffd700'; ctx.shadowBlur=8; ctx.fillStyle='#ffd700';
-            ctx.beginPath(); ctx.arc(CELL*0.18,side*CELL*0.22,3.5,0,Math.PI*2); ctx.fill();
-            ctx.shadowBlur=0; ctx.fillStyle='#111';
-            ctx.beginPath(); ctx.ellipse(CELL*0.2,side*CELL*0.22,1.2,3,0,0,Math.PI*2); ctx.fill();
-            ctx.fillStyle='rgba(255,255,255,0.8)'; ctx.beginPath(); ctx.arc(CELL*0.14,side*CELL*0.22-1.2,1,0,Math.PI*2); ctx.fill();
-          });
-          if(fn%24<12){
-            ctx.strokeStyle='#ff3366'; ctx.lineWidth=1.5; ctx.lineCap='round';
-            ctx.shadowColor='#ff3366'; ctx.shadowBlur=4;
-            ctx.beginPath(); ctx.moveTo(CELL*0.45,0); ctx.lineTo(CELL*0.62,0); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(CELL*0.62,0); ctx.lineTo(CELL*0.74,-CELL*0.14); ctx.moveTo(CELL*0.62,0); ctx.lineTo(CELL*0.74,CELL*0.14); ctx.stroke();
-            ctx.shadowBlur=0;
-          }
-          ctx.restore();
-        }
+        const p=.78+.18*Math.sin(fn*.05+b.phase);
+        drawBean(b.x,b.y,b.size*p,.85);
       }
-      const jcx=js.cx, jcy=H-72, jr=js.r, jkr=js.knobR;
-      ctx.save();
-      ctx.globalAlpha=js.active?0.8:0.5;
-      const og=ctx.createRadialGradient(jcx,jcy-jr*0.2,jr*0.1,jcx,jcy,jr);
-      og.addColorStop(0,'rgba(50,28,0,0.85)'); og.addColorStop(1,'rgba(15,8,0,0.85)');
-      ctx.fillStyle=og; ctx.shadowColor='rgba(0,0,0,0.6)'; ctx.shadowBlur=16;
-      ctx.beginPath(); ctx.arc(jcx,jcy,jr,0,Math.PI*2); ctx.fill(); ctx.shadowBlur=0;
-      ctx.strokeStyle=`rgba(212,168,83,${js.active?0.6:0.3})`; ctx.lineWidth=1.5;
-      if(js.active){ctx.shadowColor='rgba(212,168,83,0.5)';ctx.shadowBlur=12;}
-      ctx.beginPath(); ctx.arc(jcx,jcy,jr,0,Math.PI*2); ctx.stroke(); ctx.shadowBlur=0;
-      ctx.strokeStyle='rgba(212,168,83,0.08)'; ctx.lineWidth=0.8;
-      ctx.beginPath(); ctx.arc(jcx,jcy,jr*0.55,0,Math.PI*2); ctx.stroke();
-      ctx.fillStyle=`rgba(212,168,83,${js.active?0.2:0.12})`;
-      [[0,-1],[0,1],[-1,0],[1,0]].forEach(([dx,dy])=>{
-        const ax=jcx+dx*(jr-14), ay=jcy+dy*(jr-14);
-        ctx.save(); ctx.translate(ax,ay); ctx.rotate(Math.atan2(dy,dx));
-        ctx.beginPath(); ctx.moveTo(6,0); ctx.lineTo(-5,-5); ctx.lineTo(-5,5); ctx.closePath(); ctx.fill(); ctx.restore();
-      });
-      const kpx=jcx+js.kx, kpy=jcy+js.ky;
-      if(js.active){ ctx.shadowColor='rgba(212,168,83,0.5)'; ctx.shadowBlur=18; ctx.fillStyle='rgba(212,168,83,0.12)'; ctx.beginPath(); ctx.arc(kpx,kpy,jkr*1.6,0,Math.PI*2); ctx.fill(); ctx.shadowBlur=0; }
-      const kg=ctx.createRadialGradient(kpx-jkr*0.25,kpy-jkr*0.3,0,kpx,kpy,jkr);
-      kg.addColorStop(0,'#e8c060'); kg.addColorStop(0.45,'#c8943a'); kg.addColorStop(0.75,'#8b5a00'); kg.addColorStop(1,'#4a2800');
-      ctx.fillStyle=kg; ctx.shadowColor='rgba(0,0,0,0.7)'; ctx.shadowBlur=10;
-      ctx.beginPath(); ctx.arc(kpx,kpy,jkr,0,Math.PI*2); ctx.fill(); ctx.shadowBlur=0;
-      ctx.strokeStyle=`rgba(255,200,80,${js.active?0.6:0.35})`; ctx.lineWidth=1.5;
-      ctx.beginPath(); ctx.arc(kpx,kpy,jkr,0,Math.PI*2); ctx.stroke();
-      ctx.strokeStyle='rgba(0,0,0,0.2)'; ctx.lineWidth=1;
-      ctx.beginPath(); ctx.arc(kpx,kpy,jkr*0.65,0,Math.PI*2); ctx.stroke();
-      ctx.beginPath(); ctx.arc(kpx,kpy,jkr*0.35,0,Math.PI*2); ctx.stroke();
-      ctx.fillStyle='rgba(255,255,255,0.15)';
-      ctx.beginPath(); ctx.ellipse(kpx-jkr*0.2,kpy-jkr*0.28,jkr*0.35,jkr*0.18,-0.4,0,Math.PI*2); ctx.fill();
-      ctx.globalAlpha=1; ctx.restore();
-      ctx.fillStyle='rgba(0,0,0,0.55)'; ctx.beginPath(); ctx.roundRect(8,8,110,28,8); ctx.fill();
-      ctx.fillStyle='#ffd700'; ctx.font='bold 14px Georgia'; ctx.textAlign='left';
-      ctx.shadowColor='#ff8800'; ctx.shadowBlur=8;
-      ctx.fillText(`☕ ${stateRef.current?.score||0}`, 16, 26); ctx.shadowBlur=0;
-      ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.font='11px Georgia'; ctx.fillText(playerName, 70, 26);
+
+      if (g) {
+        // Main food bean
+        const fp=.88+.12*Math.sin(fn*.1);
+        drawBean(g.food.x*CELL+CELL/2,g.food.y*CELL+CELL/2,8*fp,1,true);
+
+        // Snake - thin smooth line
+        if (g.snake.length>1) {
+          ctx.save(); ctx.lineCap='round'; ctx.lineJoin='round';
+          for (let i=g.snake.length-1;i>0;i--) {
+            const s=g.snake[i],s2=g.snake[i-1],tt=i/g.snake.length;
+            const tk=Math.max(2,(CELL*.32-tt*CELL*.08)*2);
+            ctx.strokeStyle='rgba(0,0,0,.4)'; ctx.lineWidth=tk+2.5;
+            ctx.beginPath(); ctx.moveTo(s.x*CELL+CELL/2,s.y*CELL+CELL/2); ctx.lineTo(s2.x*CELL+CELL/2,s2.y*CELL+CELL/2); ctx.stroke();
+            ctx.strokeStyle=`hsl(120,${85-tt*10}%,${44+tt*5}%)`; ctx.lineWidth=tk;
+            ctx.beginPath(); ctx.moveTo(s.x*CELL+CELL/2,s.y*CELL+CELL/2); ctx.lineTo(s2.x*CELL+CELL/2,s2.y*CELL+CELL/2); ctx.stroke();
+            ctx.strokeStyle=`hsla(120,90%,70%,.35)`; ctx.lineWidth=tk*.25;
+            ctx.beginPath(); ctx.moveTo(s.x*CELL+CELL/2,s.y*CELL+CELL/2); ctx.lineTo(s2.x*CELL+CELL/2,s2.y*CELL+CELL/2); ctx.stroke();
+          }
+          ctx.restore();
+        }
+
+        // Head
+        const h=g.snake[0], hpx=h.x*CELL+CELL/2, hpy=h.y*CELL+CELL/2, hr=CELL*.34;
+        ctx.fillStyle='rgba(0,0,0,.3)'; ctx.beginPath(); ctx.arc(hpx+1,hpy+1,hr,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle='hsl(120,85%,42%)'; ctx.beginPath(); ctx.arc(hpx,hpy,hr,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle='hsla(120,90%,70%,.4)'; ctx.beginPath(); ctx.arc(hpx-hr*.2,hpy-hr*.22,hr*.45,0,Math.PI*2); ctx.fill();
+        ctx.save(); ctx.translate(hpx,hpy); ctx.rotate(Math.atan2(g.dir.y,g.dir.x));
+        [-1,1].forEach(s=>{
+          ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(hr*.35,s*hr*.42,hr*.28,0,Math.PI*2); ctx.fill();
+          ctx.fillStyle='#222'; ctx.beginPath(); ctx.arc(hr*.42,s*hr*.42,hr*.15,0,Math.PI*2); ctx.fill();
+          ctx.fillStyle='rgba(255,255,255,.8)'; ctx.beginPath(); ctx.arc(hr*.38,s*hr*.38,hr*.07,0,Math.PI*2); ctx.fill();
+        });
+        ctx.restore();
+      }
+
+      drawJS();
+
+      // HUD
+      ctx.fillStyle='rgba(0,0,0,.5)'; ctx.beginPath(); ctx.roundRect(8,8,120,28,8); ctx.fill();
+      ctx.fillStyle='#ffd700'; ctx.font='bold 13px Arial'; ctx.textAlign='left';
+      ctx.fillText('Score: '+(stateRef.current?.score||0),14,26);
+
       if (!alive && g && !g.running) {
-        ctx.fillStyle='rgba(0,0,0,0.72)'; ctx.fillRect(0,H/2-44,W,80);
-        ctx.shadowColor='#ff0000'; ctx.shadowBlur=24;
-        ctx.fillStyle='#ff4444'; ctx.font='bold 22px Georgia'; ctx.textAlign='center';
+        ctx.fillStyle='rgba(0,0,0,.72)'; ctx.fillRect(0,H/2-44,W,88);
+        ctx.fillStyle='#ff4444'; ctx.font='bold 22px Arial'; ctx.textAlign='center';
+        ctx.shadowColor='#ff0000'; ctx.shadowBlur=20;
         ctx.fillText('GAME OVER',W/2,H/2-10); ctx.shadowBlur=0;
-        ctx.fillStyle='#ffd700'; ctx.font='14px Georgia'; ctx.fillText(`Score: ${g.score}`,W/2,H/2+18);
+        ctx.fillStyle='#ffd700'; ctx.font='14px Arial';
+        ctx.fillText('Score: '+(g.score||0),W/2,H/2+18);
       }
       rafId = requestAnimationFrame(draw);
     };
     rafId = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(rafId);
-  }, [alive, W, H, CELL, COLS, ROWS, playerName]);
+  }, [alive, W, H, CELL, playerName]);
 
   return (
-    <div style={{display:'flex',flexDirection:'column',flex:1}}>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 14px',background:'#08060e',borderBottom:'1px solid #1e2530',flexShrink:0}}>
-        <span style={{fontSize:13,color:'#ffd700',fontWeight:'bold',textShadow:'0 0 8px #ff8800'}}>☕ {score}</span>
+    <div style={{display:'flex',flexDirection:'column',flex:1,alignItems:'center',background:'#111418'}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 14px',background:'#0d1117',borderBottom:'1px solid #1e2530',width:'100%',boxSizing:'border-box',flexShrink:0}}>
+        <span style={{fontSize:13,color:'#ffd700',fontWeight:'bold'}}>Score: {score}</span>
         <span style={{fontSize:11,color:'#888'}}>{playerName}</span>
-        <button style={{background:'linear-gradient(180deg,#1a0e00,#0d0700)',border:'1px solid #d4a85366',borderRadius:8,color:'#ffd700',fontSize:12,padding:'5px 12px',cursor:'pointer'}} onClick={startGame}>Restart</button>
+        <button style={{background:'rgba(212,168,83,0.15)',border:'1px solid #d4a85366',borderRadius:8,color:'#ffd700',fontSize:12,padding:'5px 12px',cursor:'pointer'}} onClick={startGame}>Restart</button>
       </div>
-      <div ref={containerRef} style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',background:'#0d1117'}}>
-        <canvas ref={canvasRef} width={W} height={H} style={{display:'block',maxWidth:'100%'}}/>
-      </div>
+      <canvas ref={canvasRef} width={W} height={H} style={{display:'block',maxWidth:'100%'}}/>
     </div>
   );
 }
 
-// =
-// TETRIS
-// =
+
 function TetrisGame({ playerName, onScore }) {
   const canvasRef=useRef(null),nextCanvRef=useRef(null),containerRef=useRef(null),stateRef=useRef(null),rafRef=useRef(null),cellRef=useRef(24);
   const COLS=10,ROWS=20;
