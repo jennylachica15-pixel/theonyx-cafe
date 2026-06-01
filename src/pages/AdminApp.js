@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { auth, db } from '../firebase/config';
 import { signOut } from 'firebase/auth';
-import { doc, getDoc, collection, addDoc, serverTimestamp, onSnapshot, query, where, getDocs, updateDoc, orderBy, limit } from 'firebase/firestore';
+import { doc, getDoc, collection, addDoc, serverTimestamp, onSnapshot, query, where, getDocs, updateDoc, orderBy, limit, deleteDoc } from 'firebase/firestore';
 import Attendance from './Attendance';
 import Orders from './Orders';
 import Inventory from './Inventory';
@@ -21,8 +21,6 @@ const CHECKLIST_ITEMS = [
   { id: 'entrance', label: 'Entrance / Exit' },
 ];
 
-const CLEANLINESS_FOLDER = '1U3nFpZ14aeprxCmFtNshpYFUUemQioM5';
-
 function CleanlinessCheck({ userName }) {
   const [checks, setChecks] = React.useState({});
   const [photos, setPhotos] = React.useState({});
@@ -41,29 +39,27 @@ function CleanlinessCheck({ userName }) {
     setPhotos(prev => ({ ...prev, [itemId]: { file, url: URL.createObjectURL(file) } }));
   };
 
-  const uploadToGoogleDrive = async (file, itemLabel) => {
-    const token = await new Promise((resolve, reject) => {
-      const client = window.google?.accounts?.oauth2?.initTokenClient({
-        client_id: '596322682185-n5hm66hvol3nnqqllnuop995kcnefbgu.apps.googleusercontent.com',
-        scope: 'https://www.googleapis.com/auth/drive.file',
-        callback: (res) => res.error ? reject(res.error) : resolve(res.access_token),
-      });
-      client?.requestAccessToken();
-    });
-    const dateStr = now.toISOString().split('T')[0];
-    const metadata = {
-      name: `clean_${dateStr}_${userName}_${itemLabel.replace(/\s/g,'_')}_${Date.now()}.jpg`,
-      parents: [CLEANLINESS_FOLDER],
+  const compressImage = (file, maxDim = 640, quality = 0.5) => new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          let w = img.width, h = img.height;
+          if (w > h && w > maxDim) { h = Math.round(h * maxDim / w); w = maxDim; }
+          else if (h >= w && h > maxDim) { w = Math.round(w * maxDim / h); h = maxDim; }
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        } catch { resolve(null); }
+      };
+      img.onerror = () => resolve(null);
+      img.src = e.target.result;
     };
-    const form = new FormData();
-    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-    form.append('file', file);
-    const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-      method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form,
-    });
-    const data = await res.json();
-    return `https://drive.google.com/file/d/${data.id}/view`;
-  };
+    reader.onerror = () => resolve(null);
+    reader.readAsDataURL(file);
+  });
 
   const handleSubmit = async () => {
     const checked = CHECKLIST_ITEMS.filter(i => checks[i.id]);
@@ -73,10 +69,8 @@ function CleanlinessCheck({ userName }) {
       const photoUrls = {};
       for (const item of CHECKLIST_ITEMS) {
         if (photos[item.id]) {
-          try {
-            const url = await uploadToGoogleDrive(photos[item.id].file, item.label);
-            photoUrls[item.id] = url;
-          } catch { photoUrls[item.id] = '(upload failed)'; }
+          const dataUrl = await compressImage(photos[item.id].file);
+          if (dataUrl) photoUrls[item.id] = dataUrl;
         }
       }
       const dateTimeStr = now.toLocaleDateString('en-PH', { weekday:'long', year:'numeric', month:'long', day:'numeric' })
@@ -180,6 +174,8 @@ function CleanlinessReviews({ role, userName }) {
   const [list, setList] = React.useState([]);
   const [draft, setDraft] = React.useState({});
   const [savingId, setSavingId] = React.useState(null);
+  const [lightbox, setLightbox] = React.useState(null);
+  const [confirmDelId, setConfirmDelId] = React.useState(null);
 
   React.useEffect(() => {
     const unsub = onSnapshot(
@@ -218,6 +214,11 @@ function CleanlinessReviews({ role, userName }) {
     setSavingId(null);
   };
 
+  const deleteCheck = async (id) => {
+    try { await deleteDoc(doc(db, 'cleanlinessChecks', id)); } catch (e) {}
+    setConfirmDelId(null);
+  };
+
   const verdictPill = (v) => v === 'clean'
     ? { label: 'Clean', bg: '#f0fce8', bd: '#cfe0b0', fg: '#2a6000' }
     : { label: 'Needs work', bg: '#ffece9', bd: '#f0c8c0', fg: '#b5482e' };
@@ -249,14 +250,24 @@ function CleanlinessReviews({ role, userName }) {
             {c.notes && <div style={{ fontSize: 11.5, color: '#5a3a1a', marginTop: 6, fontStyle: 'italic' }}>Staff note: {c.notes}</div>}
 
             {photoIds.length > 0 && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
-                {photoIds.map(id => (
-                  <a key={id} href={c.photoUrls[id]} target="_blank" rel="noreferrer"
-                    style={{ fontSize: 11, color: '#c8943a', background: '#fff8f0', border: '1px solid #f0e8d8', borderRadius: 7, padding: '4px 9px', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#c8943a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                    {labelFor(id)}
-                  </a>
-                ))}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+                {photoIds.map(id => {
+                  const v = c.photoUrls[id];
+                  const isData = typeof v === 'string' && v.startsWith('data:');
+                  return isData ? (
+                    <div key={id} style={{ width: 76 }}>
+                      <img src={v} alt={labelFor(id)} onClick={() => setLightbox(v)}
+                        style={{ width: 76, height: 76, objectFit: 'cover', borderRadius: 8, border: '1px solid #f0e8d8', cursor: 'pointer', display: 'block' }} />
+                      <div style={{ fontSize: 9.5, color: '#a07850', marginTop: 3, textAlign: 'center', lineHeight: 1.2 }}>{labelFor(id)}</div>
+                    </div>
+                  ) : (
+                    <a key={id} href={v} target="_blank" rel="noreferrer"
+                      style={{ fontSize: 11, color: '#c8943a', background: '#fff8f0', border: '1px solid #f0e8d8', borderRadius: 7, padding: '4px 9px', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#c8943a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                      {labelFor(id)}
+                    </a>
+                  );
+                })}
               </div>
             )}
 
@@ -278,6 +289,18 @@ function CleanlinessReviews({ role, userName }) {
                   {savingId === c.id ? 'Saving…' : (reviewed ? `Update review & notify ${c.staff || 'staff'}` : `Save review & notify ${c.staff || 'staff'}`)}
                 </button>
                 {reviewed && <div style={{ fontSize: 10.5, color: '#a07850', marginTop: 6, textAlign: 'center' }}>Last reviewed by {c.reviewedBy || 'manager'}</div>}
+                <div style={{ marginTop: 10, textAlign: 'center' }}>
+                  {confirmDelId === c.id ? (
+                    <span style={{ fontSize: 11.5, color: '#a07850' }}>
+                      Delete this check permanently?{' '}
+                      <button onClick={() => deleteCheck(c.id)} style={{ background: 'none', border: 'none', color: '#a3402d', fontWeight: 700, cursor: 'pointer', fontSize: 11.5, fontFamily: 'inherit', padding: 0 }}>Yes</button>
+                      <span style={{ color: '#d9c3a6' }}> · </span>
+                      <button onClick={() => setConfirmDelId(null)} style={{ background: 'none', border: 'none', color: '#a07850', cursor: 'pointer', fontSize: 11.5, fontFamily: 'inherit', padding: 0 }}>Cancel</button>
+                    </span>
+                  ) : (
+                    <button onClick={() => setConfirmDelId(c.id)} style={{ background: 'none', border: 'none', color: '#b06a55', cursor: 'pointer', fontSize: 11.5, fontFamily: 'inherit', padding: 0, textDecoration: 'underline' }}>Delete check</button>
+                  )}
+                </div>
               </div>
             ) : (
               <div style={{ marginTop: 12, borderTop: '1px solid #f0e8d8', paddingTop: 12 }}>
@@ -297,6 +320,11 @@ function CleanlinessReviews({ role, userName }) {
           </div>
         );
       })}
+      {lightbox && (
+        <div onClick={() => setLightbox(null)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.88)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <img src={lightbox} alt="" style={{ maxWidth: '100%', maxHeight: '100%', borderRadius: 8 }} />
+        </div>
+      )}
     </div>
   );
 }
