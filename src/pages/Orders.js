@@ -190,7 +190,6 @@ export default function Orders({ userName }) {
   const [expandedId, setExpandedId] = useState(null);
   const [editingKey, setEditingKey] = useState(null);
   const [editQty, setEditQty] = useState('');
-  const [editPrice, setEditPrice] = useState('');
   const [editReason, setEditReason] = useState('');
   const [editErr, setEditErr] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
@@ -330,9 +329,9 @@ export default function Orders({ userName }) {
   const maxQty = tallyArr.length ? tallyArr[0].qty : 1;
   const totalOrders = summaryList.length;
 
-  const startEdit = (orderId, idx, qty, price) => {
+  const startEdit = (orderId, idx, qty) => {
     setRemovingId(null);
-    setEditingKey(`${orderId}_${idx}`); setEditQty(String(qty)); setEditPrice(String(price)); setEditReason(''); setEditErr(false);
+    setEditingKey(`${orderId}_${idx}`); setEditQty(String(qty)); setEditReason(''); setEditErr(false);
   };
 
   const saveEdit = async (orderId, idx) => {
@@ -342,16 +341,26 @@ export default function Orders({ userName }) {
       const ord = allOrders.find(o => o.id === orderId);
       if (ord) {
         const it = (ord.items || [])[idx];
-        const newQty = Math.max(1, parseInt(editQty) || 1);
-        const newPrice = Math.max(0, parseFloat(editPrice) || 0);
-        const items = (ord.items || []).map((x, i) => i === idx
+        const parsedQty = parseInt(editQty, 10);
+        const newQty = Number.isNaN(parsedQty) ? it.qty : Math.max(0, parsedQty);
+        const newPrice = Number(it.price) || 0;
+        let items = (ord.items || []).map((x, i) => i === idx
           ? { ...x, qty: newQty, price: newPrice, edited: true, editReason: editReason.trim(), editedBy: cashier, editedAt: new Date().toISOString(), prevQty: x.qty, prevPrice: x.price }
           : x);
-        const newTotal = items.reduce((sm, x) => sm + x.price * x.qty, 0);
-        await updateDoc(doc(db, 'orders', orderId), { items, total: newTotal });
-        await appendToSheet([[
-          dateStr, timeStr, ord.buyerName || 'Walk-in', `${it.name} (EDITED)`, it.size || '', newQty, newPrice, newPrice * newQty, ord.paymentMethod || '', cashier
-        ]]);
+        const itemRemoved = newQty === 0;
+        items = items.filter(x => (Number(x.qty) || 0) > 0);
+        const newTotal = items.reduce((sm, x) => sm + (Number(x.price) || 0) * (Number(x.qty) || 0), 0);
+        if (items.length === 0) {
+          await updateDoc(doc(db, 'orders', orderId), { hidden: true, removeReason: editReason.trim(), removedBy: cashier, removedAt: new Date().toISOString() });
+          await appendToSheet([[
+            dateStr, timeStr, ord.buyerName || 'Walk-in', 'ORDER REMOVED', '', '', '', ord.total || 0, ord.paymentMethod || '', cashier
+          ]]);
+        } else {
+          await updateDoc(doc(db, 'orders', orderId), { items, total: newTotal });
+          await appendToSheet([[
+            dateStr, timeStr, ord.buyerName || 'Walk-in', `${it.name}${itemRemoved ? ' (ITEM REMOVED)' : ' (EDITED)'}`, it.size || '', newQty, newPrice, newPrice * newQty, ord.paymentMethod || '', cashier
+          ]]);
+        }
       }
       setEditingKey(null); setEditErr(false);
     } catch (e) { console.error(e); }
@@ -495,21 +504,15 @@ export default function Orders({ userName }) {
                                     <div style={{ fontSize: 12, color: C.ink }}>{it.name} <span style={{ color: C.muted }}>{it.size ? `(${it.size}) ` : ''}×{it.qty}</span></div>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                       <span style={{ fontSize: 12, color: C.ink }}>₱{(it.price * it.qty).toLocaleString()}</span>
-                                      <button style={s.smallEdit} aria-label="Edit item" onClick={() => editing ? setEditingKey(null) : startEdit(o.id, idx, it.qty, it.price)}><EditIcon /></button>
+                                      <button style={s.smallEdit} aria-label="Edit item" onClick={() => editing ? setEditingKey(null) : startEdit(o.id, idx, it.qty)}><EditIcon /></button>
                                     </div>
                                   </div>
                                   {it.edited && <div style={s.editTag}><EditIcon /> Edited{it.editedBy ? ` by ${it.editedBy}` : ''} — {it.editReason}</div>}
                                   {editing && (
                                     <div style={{ background: C.input, border: `0.5px solid ${C.rowBorder}`, borderRadius: 9, padding: 10, margin: '6px 0' }}>
-                                      <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-                                        <div style={{ flex: 1 }}>
-                                          <div style={{ fontSize: 10.5, color: C.muted, marginBottom: 4 }}>Quantity</div>
-                                          <input type="number" value={editQty} onChange={e => setEditQty(e.target.value)} style={{ ...s.input, marginBottom: 0, padding: '7px 9px', background: '#fff' }} />
-                                        </div>
-                                        <div style={{ flex: 1 }}>
-                                          <div style={{ fontSize: 10.5, color: C.muted, marginBottom: 4 }}>Price (each)</div>
-                                          <input type="number" value={editPrice} onChange={e => setEditPrice(e.target.value)} style={{ ...s.input, marginBottom: 0, padding: '7px 9px', background: '#fff' }} />
-                                        </div>
+                                      <div style={{ marginBottom: 8 }}>
+                                        <div style={{ fontSize: 10.5, color: C.muted, marginBottom: 4 }}>Quantity <span style={{ opacity: 0.75 }}>(set to 0 to remove)</span></div>
+                                        <input type="number" min="0" value={editQty} onChange={e => setEditQty(e.target.value)} style={{ ...s.input, marginBottom: 0, padding: '7px 9px', background: '#fff' }} />
                                       </div>
                                       <div style={{ fontSize: 10.5, color: C.muted, marginBottom: 4 }}>Reason for edit (required)</div>
                                       <textarea value={editReason} onChange={e => { setEditReason(e.target.value); setEditErr(false); }} placeholder="Why was this changed?" style={{ width: '100%', boxSizing: 'border-box', minHeight: 42, background: '#fff', border: `0.5px solid ${C.inputBorder}`, borderRadius: 8, padding: '7px 9px', fontSize: 12, color: C.ink, fontFamily: 'inherit', resize: 'vertical' }} />
