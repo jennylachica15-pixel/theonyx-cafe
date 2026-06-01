@@ -503,10 +503,10 @@ function TetrisGame({ playerName, onScore }) {
       {gameOver&&(<div style={{position:'absolute',inset:0,background:'rgba(5,8,16,0.92)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',zIndex:20}}><div style={{fontSize:28,fontWeight:900,color:'#ff1744',textShadow:'0 0 20px #ff1744',marginBottom:4}}>GAME OVER</div><div style={{fontSize:18,color:'#ffd600',marginBottom:20,textShadow:'0 0 10px #ffd600'}}>{score.toLocaleString()} pts</div><button onClick={startGame} style={{background:'linear-gradient(180deg,#00e5ff,#0077aa)',border:'none',borderRadius:12,padding:'12px 32px',color:'#fff',fontSize:16,fontWeight:900,cursor:'pointer'}}>PLAY AGAIN</button></div>)}
       {!started&&!gameOver&&(<div style={{position:'absolute',inset:0,background:'rgba(5,8,16,0.92)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',zIndex:20}}><div style={{fontSize:32,fontWeight:900,color:'#00e5ff',textShadow:'0 0 20px #00e5ff',marginBottom:8,letterSpacing:3}}>TETRIS</div><div style={{fontSize:13,color:'#4a6a9a',marginBottom:24}}>by {playerName}</div><button onClick={startGame} style={{background:'linear-gradient(180deg,#00e5ff,#0077aa)',border:'none',borderRadius:12,padding:'14px 40px',color:'#fff',fontSize:18,fontWeight:900,cursor:'pointer',letterSpacing:1}}>START</button></div>)}
       <div style={{display:'flex',gap:8,padding:'8px',background:'#08101e',borderTop:'1px solid #1e2a4a',flexShrink:0}}>
-        <button style={ctrlBtn} onPointerDown={e=>{e.preventDefault();move(-1);}}><</button>
+        <button style={ctrlBtn} onPointerDown={e=>{e.preventDefault();move(-1);}}>&lt;</button>
         <button style={ctrlBtn} onPointerDown={e=>{e.preventDefault();rot();}}>Rot</button>
         <button style={ctrlBtn} onPointerDown={e=>{e.preventDefault();drop();}}>Drop</button>
-        <button style={ctrlBtn} onPointerDown={e=>{e.preventDefault();move(1);}}>></button>
+        <button style={ctrlBtn} onPointerDown={e=>{e.preventDefault();move(1);}}>&gt;</button>
       </div>
     </div>
   );
@@ -532,7 +532,7 @@ function RacingGame({ playerName, onScore }) {
   const moveLeft=()=>{const now=Date.now();if(now-lastMoveRef.current<220)return;lastMoveRef.current=now;const st=stateRef.current;if(!st)return;const nl=Math.max(0,st.car.lane-1);st.car.lane=nl;st.targetX=laneX(nl);};
   const moveRight=()=>{const now=Date.now();if(now-lastMoveRef.current<220)return;lastMoveRef.current=now;const st=stateRef.current;if(!st)return;const nl=Math.min(LANES-1,st.car.lane+1);st.car.lane=nl;st.targetX=laneX(nl);};
   const btnStyle={background:'linear-gradient(180deg,#555,#333)',border:'2px solid #888',color:'#fff',padding:'18px 36px',borderRadius:14,fontSize:26,cursor:'pointer',userSelect:'none',WebkitUserSelect:'none',boxShadow:'0 4px 0 #111'};
-  return(<div ref={containerRef} style={{display:'flex',flexDirection:'column',alignItems:'center',height:'100%',background:'#1a1a1a',overflow:'hidden'}}><div style={{color:'#d4a853',fontSize:14,fontWeight:'bold',padding:'4px 0',flexShrink:0}}>{playerName} - Score: {score} ☕x{collected}</div><canvas ref={canvasRef} width={W} height={H} style={{display:'block',flex:1,maxWidth:'100%'}}/>{!started&&!gameOver&&<button style={{width:160,background:'#d4a853',border:'none',borderRadius:10,padding:'12px',color:'#1a0a00',fontSize:15,fontWeight:'bold',cursor:'pointer',flexShrink:0}} onClick={startGame}>Start</button>}{gameOver&&(<div style={{textAlign:'center',flexShrink:0}}><div style={{color:'#ff6b6b',fontSize:20,fontWeight:'bold'}}>CRASH! 💥</div><div style={{color:'#d4a853',marginBottom:8}}>Score: {score}</div><button style={{width:160,background:'#d4a853',border:'none',borderRadius:10,padding:'12px',color:'#1a0a00',fontSize:15,fontWeight:'bold',cursor:'pointer'}} onClick={startGame}>Again</button></div>)}{started&&!gameOver&&(<div style={{display:'flex',gap:20,padding:'8px 0',flexShrink:0}}><button style={btnStyle} onPointerDown={e=>{e.preventDefault();moveLeft();}} onTouchStart={e=>{e.preventDefault();moveLeft();}}><</button><button style={btnStyle} onPointerDown={e=>{e.preventDefault();moveRight();}} onTouchStart={e=>{e.preventDefault();moveRight();}}>></button></div>)}</div>);
+  return(<div ref={containerRef} style={{display:'flex',flexDirection:'column',alignItems:'center',height:'100%',background:'#1a1a1a',overflow:'hidden'}}><div style={{color:'#d4a853',fontSize:14,fontWeight:'bold',padding:'4px 0',flexShrink:0}}>{playerName} - Score: {score} ☕x{collected}</div><canvas ref={canvasRef} width={W} height={H} style={{display:'block',flex:1,maxWidth:'100%'}}/>{!started&&!gameOver&&<button style={{width:160,background:'#d4a853',border:'none',borderRadius:10,padding:'12px',color:'#1a0a00',fontSize:15,fontWeight:'bold',cursor:'pointer',flexShrink:0}} onClick={startGame}>Start</button>}{gameOver&&(<div style={{textAlign:'center',flexShrink:0}}><div style={{color:'#ff6b6b',fontSize:20,fontWeight:'bold'}}>CRASH! 💥</div><div style={{color:'#d4a853',marginBottom:8}}>Score: {score}</div><button style={{width:160,background:'#d4a853',border:'none',borderRadius:10,padding:'12px',color:'#1a0a00',fontSize:15,fontWeight:'bold',cursor:'pointer'}} onClick={startGame}>Again</button></div>)}{started&&!gameOver&&(<div style={{display:'flex',gap:20,padding:'8px 0',flexShrink:0}}><button style={btnStyle} onPointerDown={e=>{e.preventDefault();moveLeft();}} onTouchStart={e=>{e.preventDefault();moveLeft();}}>&lt;</button><button style={btnStyle} onPointerDown={e=>{e.preventDefault();moveRight();}} onTouchStart={e=>{e.preventDefault();moveRight();}}>&gt;</button></div>)}</div>);
 }
 
 
@@ -960,7 +960,7 @@ export default function GamesPage() {
     return (
       <div style={S.fullscreen}>
         <div style={S.gameBar}>
-          <button style={S.backBtn} onClick={()=>setActiveGame(null)}>< Exit</button>
+          <button style={S.backBtn} onClick={()=>setActiveGame(null)}>Exit</button>
           <span style={S.gameTitle}>{activeGame.title}</span>
           <button style={S.lbBtn} onClick={()=>{setActiveGame(null);setShowLB(true);}}>🏆</button>
         </div>
