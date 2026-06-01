@@ -10,7 +10,6 @@ import MenuManager from './MenuManager';
 import Approvals from './Approvals';
 import FeedbackPanel from './FeedbackPanel';
 
-// ─── CLEANLINESS CHECK ───────────────────────────────────────────────────────
 const CHECKLIST_ITEMS = [
   { id: 'tables',   label: 'Tables & Chairs' },
   { id: 'counter',  label: 'Counter Area' },
@@ -26,7 +25,7 @@ const CLEANLINESS_FOLDER = '1U3nFpZ14aeprxCmFtNshpYFUUemQioM5';
 
 function CleanlinessCheck({ userName }) {
   const [checks, setChecks] = React.useState({});
-  const [photos, setPhotos] = React.useState({}); // { itemId: { file, url } }
+  const [photos, setPhotos] = React.useState({});
   const [notes, setNotes] = React.useState('');
   const [uploading, setUploading] = React.useState(false);
   const [submitted, setSubmitted] = React.useState(false);
@@ -40,10 +39,6 @@ function CleanlinessCheck({ userName }) {
     const file = e.target.files[0];
     if (!file) return;
     setPhotos(prev => ({ ...prev, [itemId]: { file, url: URL.createObjectURL(file) } }));
-  };
-
-  const removePhoto = (itemId) => {
-    setPhotos(prev => { const n = {...prev}; delete n[itemId]; return n; });
   };
 
   const uploadToGoogleDrive = async (file, itemLabel) => {
@@ -86,21 +81,14 @@ function CleanlinessCheck({ userName }) {
       }
       const dateTimeStr = now.toLocaleDateString('en-PH', { weekday:'long', year:'numeric', month:'long', day:'numeric' })
         + ' ' + now.toLocaleTimeString('en-PH', { hour:'2-digit', minute:'2-digit' });
-
       await addDoc(collection(db, 'cleanlinessChecks'), {
-        staff: userName,
-        dateTime: dateTimeStr,
-        date: now.toDateString(),
+        staff: userName, dateTime: dateTimeStr, date: now.toDateString(),
         checkedItems: checked.map(i => i.label),
         uncheckedItems: CHECKLIST_ITEMS.filter(i => !checks[i.id]).map(i => i.label),
-        photoUrls,
-        notes,
-        submittedAt: serverTimestamp(),
+        photoUrls, notes, submittedAt: serverTimestamp(),
       });
       setSubmitted(true);
-    } catch (e) {
-      setError('Failed to submit. Please try again.');
-    }
+    } catch (e) { setError('Failed to submit. Please try again.'); }
     setUploading(false);
   };
 
@@ -125,18 +113,11 @@ function CleanlinessCheck({ userName }) {
 
   return (
     <div style={{ padding: '16px 16px 32px' }}>
-      {/* Header */}
       <div style={{ marginBottom: 4 }}>
         <div style={{ fontSize: 18, fontWeight: 700, color: '#2a1000' }}>Cleanliness Check</div>
-        <div style={{ fontSize: 13, color: '#c8943a', marginTop: 2 }}>
-          Welcome, <b>{userName}</b>! Let's check the cafe.
-        </div>
+        <div style={{ fontSize: 13, color: '#c8943a', marginTop: 2 }}>Welcome, <b>{userName}</b>! Let's check the cafe.</div>
       </div>
-      <div style={{ fontSize: 11, color: '#a07850', marginBottom: 12 }}>
-        {formatDate} · {formatTime} · {userName}
-      </div>
-
-      {/* Progress */}
+      <div style={{ fontSize: 11, color: '#a07850', marginBottom: 12 }}>{formatDate} · {formatTime} · {userName}</div>
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#888', marginBottom: 5 }}>
         <span>{doneCount} of {CHECKLIST_ITEMS.length} checked</span>
         <span style={{ color: '#c8943a', fontWeight: 600 }}>{Math.round(doneCount / CHECKLIST_ITEMS.length * 100)}%</span>
@@ -144,41 +125,25 @@ function CleanlinessCheck({ userName }) {
       <div style={{ height: 6, background: '#f0e8d8', borderRadius: 3, overflow: 'hidden', marginBottom: 16 }}>
         <div style={{ height: '100%', width: `${doneCount / CHECKLIST_ITEMS.length * 100}%`, background: '#c8943a', borderRadius: 3, transition: 'width 0.3s' }} />
       </div>
-
-      {/* Checklist with per-item photos */}
       <div style={{ marginBottom: 18 }}>
         {CHECKLIST_ITEMS.map(item => {
           const isChecked = checks[item.id];
           const hasPhoto = photos[item.id];
           return (
-            <div key={item.id}
-              style={{ background: isChecked ? '#f0fce8' : '#fff', border: `1px solid ${isChecked ? '#8bc34a' : '#f0e8d8'}`, borderRadius: 12, padding: '12px 14px', marginBottom: 8, transition: 'all 0.15s' }}>
+            <div key={item.id} style={{ background: isChecked ? '#f0fce8' : '#fff', border: `1px solid ${isChecked ? '#8bc34a' : '#f0e8d8'}`, borderRadius: 12, padding: '12px 14px', marginBottom: 8, transition: 'all 0.15s' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                {/* Checkbox */}
-                <div onClick={() => toggle(item.id)}
-                  style={{ width: 24, height: 24, borderRadius: 6, border: `2px solid ${isChecked ? '#8bc34a' : '#c8943a'}`, background: isChecked ? '#8bc34a' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'pointer', transition: 'all 0.15s' }}>
+                <div onClick={() => toggle(item.id)} style={{ width: 24, height: 24, borderRadius: 6, border: `2px solid ${isChecked ? '#8bc34a' : '#c8943a'}`, background: isChecked ? '#8bc34a' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'pointer', transition: 'all 0.15s' }}>
                   {isChecked && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
                 </div>
-
-                {/* Label */}
-                <span onClick={() => toggle(item.id)} style={{ fontSize: 14, color: isChecked ? '#2a6000' : '#2a1000', fontWeight: isChecked ? 600 : 400, flex: 1, cursor: 'pointer' }}>
-                  {item.label}
-                </span>
-
-                {/* Camera — only active when checked */}
+                <span onClick={() => toggle(item.id)} style={{ fontSize: 14, color: isChecked ? '#2a6000' : '#2a1000', fontWeight: isChecked ? 600 : 400, flex: 1, cursor: 'pointer' }}>{item.label}</span>
                 {isChecked ? (
                   hasPhoto ? (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <img src={hasPhoto.url} alt={item.label}
-                        style={{ width: 38, height: 38, borderRadius: 8, objectFit: 'cover', border: '1px solid #8bc34a' }} />
-                      <button onClick={() => fileRefs.current[item.id]?.click()}
-                        style={{ background: '#e8f5e9', border: '1px solid #8bc34a', borderRadius: 8, padding: '5px 9px', cursor: 'pointer', fontSize: 11, color: '#2d6a4f', fontWeight: 600 }}>
-                        Retake
-                      </button>
+                      <img src={hasPhoto.url} alt={item.label} style={{ width: 38, height: 38, borderRadius: 8, objectFit: 'cover', border: '1px solid #8bc34a' }} />
+                      <button onClick={() => fileRefs.current[item.id]?.click()} style={{ background: '#e8f5e9', border: '1px solid #8bc34a', borderRadius: 8, padding: '5px 9px', cursor: 'pointer', fontSize: 11, color: '#2d6a4f', fontWeight: 600 }}>Retake</button>
                     </div>
                   ) : (
-                    <button onClick={() => fileRefs.current[item.id]?.click()}
-                      style={{ background: '#fff8f0', border: '1.5px dashed #c8943a', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', fontSize: 11, color: '#c8943a', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <button onClick={() => fileRefs.current[item.id]?.click()} style={{ background: '#fff8f0', border: '1.5px dashed #c8943a', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', fontSize: 11, color: '#c8943a', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5 }}>
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#c8943a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
                       Add Photo
                     </button>
@@ -188,36 +153,67 @@ function CleanlinessCheck({ userName }) {
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#a07850" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
                   </div>
                 )}
-
-                {/* Hidden file input per item */}
-                <input ref={el => fileRefs.current[item.id] = el} type="file" accept="image/*" capture="environment"
-                  onChange={e => handlePhotoCapture(item.id, e)} style={{ display: 'none' }} />
+                <input ref={el => fileRefs.current[item.id] = el} type="file" accept="image/*" capture="environment" onChange={e => handlePhotoCapture(item.id, e)} style={{ display: 'none' }} />
               </div>
             </div>
           );
         })}
       </div>
-
-      {/* Notes */}
       <div style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 12, fontWeight: 600, color: '#2a1000', marginBottom: 6 }}>Notes (optional)</div>
         <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Any concerns or remarks..."
           style={{ width: '100%', minHeight: 72, border: '1px solid #e8dfd0', borderRadius: 10, padding: '10px 12px', fontSize: 13, color: '#2a1000', resize: 'vertical', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', background: '#fff' }} />
       </div>
-
-      {/* Submit info */}
       <div style={{ background: '#fff8f0', border: '1px solid #f0e8d8', borderRadius: 10, padding: '10px 14px', marginBottom: 12, fontSize: 12, color: '#a07850' }}>
         Will be saved as: <b style={{ color: '#2a1000' }}>{formatDate} · {formatTime} · {userName}</b>
       </div>
-
       {error && <div style={{ color: '#cc3333', fontSize: 13, marginBottom: 10 }}>{error}</div>}
-
       <button onClick={handleSubmit} disabled={uploading}
         style={{ width: '100%', background: uploading ? '#ccc' : '#c8943a', border: 'none', borderRadius: 12, padding: '13px', color: '#fff', fontWeight: 700, fontSize: 15, cursor: uploading ? 'not-allowed' : 'pointer' }}>
         {uploading ? 'Submitting...' : 'Submit Check'}
       </button>
     </div>
   );
+}
+
+// ─── BIBLE VERSES NIV ────────────────────────────────────────────────────────
+const VERSES = [
+  { text: "I can do all this through him who gives me strength.", ref: "Philippians 4:13" },
+  { text: "The Lord is my shepherd, I lack nothing.", ref: "Psalm 23:1" },
+  { text: "Be strong and courageous. Do not be afraid; do not be discouraged, for the Lord your God will be with you wherever you go.", ref: "Joshua 1:9" },
+  { text: "And we know that in all things God works for the good of those who love him.", ref: "Romans 8:28" },
+  { text: "For I know the plans I have for you, declares the Lord, plans to prosper you and not to harm you, plans to give you hope and a future.", ref: "Jeremiah 29:11" },
+  { text: "Trust in the Lord with all your heart and lean not on your own understanding.", ref: "Proverbs 3:5" },
+  { text: "The Lord is my light and my salvation — whom shall I fear?", ref: "Psalm 27:1" },
+  { text: "Do not be anxious about anything, but in every situation, by prayer and petition, present your requests to God.", ref: "Philippians 4:6" },
+  { text: "Come to me, all you who are weary and burdened, and I will give you rest.", ref: "Matthew 11:28" },
+  { text: "She is clothed with strength and dignity; she can laugh at the days to come.", ref: "Proverbs 31:25" },
+  { text: "Even youths grow tired and weary, but those who hope in the Lord will renew their strength.", ref: "Isaiah 40:31" },
+  { text: "The Lord himself goes before you and will be with you; he will never leave you nor forsake you.", ref: "Deuteronomy 31:8" },
+  { text: "Cast all your anxiety on him because he cares for you.", ref: "1 Peter 5:7" },
+  { text: "Whatever you do, work at it with all your heart, as working for the Lord.", ref: "Colossians 3:23" },
+  { text: "Let your light shine before others, that they may see your good deeds and glorify your Father in heaven.", ref: "Matthew 5:16" },
+  { text: "God is our refuge and strength, an ever-present help in trouble.", ref: "Psalm 46:1" },
+  { text: "I praise you because I am fearfully and wonderfully made.", ref: "Psalm 139:14" },
+  { text: "With God all things are possible.", ref: "Matthew 19:26" },
+  { text: "The Lord bless you and keep you; the Lord make his face shine on you.", ref: "Numbers 6:24-25" },
+  { text: "Peace I leave with you; my peace I give you.", ref: "John 14:27" },
+  { text: "For the Spirit God gave us does not make us timid, but gives us power, love and self-discipline.", ref: "2 Timothy 1:7" },
+  { text: "I have learned, in whatever state I am, to be content.", ref: "Philippians 4:11" },
+  { text: "Your word is a lamp for my feet, a light on my path.", ref: "Psalm 119:105" },
+  { text: "Delight yourself in the Lord, and he will give you the desires of your heart.", ref: "Psalm 37:4" },
+  { text: "No eye has seen, no ear has heard what God has prepared for those who love him.", ref: "1 Corinthians 2:9" },
+  { text: "The name of the Lord is a fortified tower; the righteous run to it and are safe.", ref: "Proverbs 18:10" },
+  { text: "He gives strength to the weary and increases the power of the weak.", ref: "Isaiah 40:29" },
+  { text: "Be joyful in hope, patient in affliction, faithful in prayer.", ref: "Romans 12:12" },
+  { text: "Seek first his kingdom and his righteousness, and all these things will be given to you.", ref: "Matthew 6:33" },
+  { text: "I sought the Lord, and he answered me; he delivered me from all my fears.", ref: "Psalm 34:4" },
+  { text: "The joy of the Lord is your strength.", ref: "Nehemiah 8:10" },
+];
+
+function getDailyVerse() {
+  const day = Math.floor(Date.now() / 86400000);
+  return VERSES[day % VERSES.length];
 }
 
 // ─── MAIN ADMIN APP ──────────────────────────────────────────────────────────
@@ -228,6 +224,8 @@ export default function AdminApp({ user, onSignOut }) {
   const [time, setTime] = useState(new Date());
   const [pendingPhotos, setPendingPhotos] = useState(0);
   const [cleanlinessAlert, setCleanlinessAlert] = useState(false);
+
+  const verse = getDailyVerse();
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -244,9 +242,7 @@ export default function AdminApp({ user, onSignOut }) {
     return () => clearInterval(timer);
   }, []);
 
-  // Notifications: pending photos + cleanliness check
   useEffect(() => {
-    // Watch pending photo approvals
     const unsubPhotos = onSnapshot(
       query(collection(db, 'guestPhotos'), where('public', '==', true)),
       snap => {
@@ -254,21 +250,16 @@ export default function AdminApp({ user, onSignOut }) {
         setPendingPhotos(docs.filter(d => d.approved === undefined || d.approved === null).length);
       }
     );
-
-    // Check if cleanliness submitted today (only alert after 3PM)
     const checkCleanliness = async () => {
       const now = new Date();
       if (now.getHours() >= 15) {
         const today = now.toDateString();
         const snap = await getDocs(query(collection(db, 'cleanlinessChecks'), where('date', '==', today)));
         setCleanlinessAlert(snap.empty);
-      } else {
-        setCleanlinessAlert(false);
-      }
+      } else { setCleanlinessAlert(false); }
     };
     checkCleanliness();
-    const cleanTimer = setInterval(checkCleanliness, 60000); // check every minute
-
+    const cleanTimer = setInterval(checkCleanliness, 60000);
     return () => { unsubPhotos(); clearInterval(cleanTimer); };
   }, []);
 
@@ -277,10 +268,8 @@ export default function AdminApp({ user, onSignOut }) {
   const formatTime = (d) => {
     const h = d.getHours() % 12 || 12;
     const m = String(d.getMinutes()).padStart(2, '0');
-    const ampm = d.getHours() >= 12 ? 'PM' : 'AM';
-    return `${h}:${m} ${ampm}`;
+    return `${h}:${m} ${d.getHours() >= 12 ? 'PM' : 'AM'}`;
   };
-
   const formatDate = (d) => d.toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
   const S = {
@@ -289,53 +278,60 @@ export default function AdminApp({ user, onSignOut }) {
     content: { flex: 1, overflowY: 'auto', background: 'rgba(253,246,238,0.97)', borderRadius: activeTab ? '0' : '16px 16px 0 0', marginTop: activeTab ? 0 : 4 },
   };
 
-  // Dashboard cards config
   const mainPanels = [
-    { id: 'attendance', label: 'Clock In',   desc: 'Staff attendance', icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#c8943a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> },
-    { id: 'orders',     label: 'Orders',     desc: 'Take & manage',    icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#c8943a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> },
-    { id: 'inventory',  label: 'Stocks',     desc: 'Inventory',        icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#c8943a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg> },
-    { id: 'reports',    label: 'Reports',    desc: 'Sales & analytics', icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#c8943a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> },
+    { id: 'attendance', label: 'Clock In',  desc: 'Staff attendance', icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#c8943a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> },
+    { id: 'orders',     label: 'Orders',    desc: 'Take & manage',    icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#c8943a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> },
+    { id: 'inventory',  label: 'Stocks',    desc: 'Inventory',        icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#c8943a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg> },
+    { id: 'reports',    label: 'Reports',   desc: 'Sales & analytics', icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#c8943a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> },
   ];
 
   const morePanels = [
     { id: 'cleanliness', label: 'Cleanliness', desc: 'Daily check', icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#c8943a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> },
-    { id: 'feedback', label: 'Feedback', desc: 'Customer reviews', icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#c8943a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> },
+    { id: 'feedback',    label: 'Feedback',    desc: 'Customer reviews', icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#c8943a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> },
     ...(role === 'manager' ? [{ id: 'menu', label: 'Menu', desc: 'Edit items', icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#c8943a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg> }] : []),
-    { id: 'approvals', label: 'Approvals', desc: 'Guest photos', icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#c8943a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> },
+    { id: 'approvals',   label: 'Approvals',   desc: 'Guest photos', icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#c8943a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> },
   ];
 
   return (
     <div style={S.container}>
-      {/* Top bar */}
       <div style={S.topbar}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <img src="/logo.jpg" alt="logo" style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover', border: '1.5px solid #c8943a' }} />
           <div>
             <div style={{ fontSize: 15, fontWeight: 700, color: '#f5e6d0' }}>Theonyx Cafe</div>
             <span style={{ fontSize: 10, padding: '1px 8px', borderRadius: 10, background: '#c8943a22', color: '#c8943a', border: '1px solid #c8943a44' }}>
-              {role === 'manager' ? 'Manager' : userName}
+              {role === 'manager' ? 'Manager' : 'Staff'}
             </span>
           </div>
         </div>
-        <button onClick={handleSignOut}
-          style={{ background: '#2a1800', border: '1px solid #3d2200', borderRadius: 8, color: '#a07850', padding: '7px 14px', fontSize: 13, cursor: 'pointer' }}>
+        <button onClick={handleSignOut} style={{ background: '#2a1800', border: '1px solid #3d2200', borderRadius: 8, color: '#a07850', padding: '7px 14px', fontSize: 13, cursor: 'pointer' }}>
           Exit
         </button>
       </div>
 
       <div style={S.content}>
         {!activeTab ? (
-          // ── DASHBOARD ──
           <div style={{ paddingBottom: 32 }}>
-            {/* Date & time row */}
+            {/* Greeting + time */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 18px', background: '#fff8f0', borderBottom: '1px solid #f0e8d8' }}>
               <div style={{ fontSize: 13, color: '#a07850' }}>
-                Good day, <span style={{ color: '#2a1000', fontWeight: 600 }}>{userName || (role === 'manager' ? 'Manager' : 'Staff')}</span>
+                Good day, <span style={{ color: '#2a1000', fontWeight: 700 }}>{userName || 'Friend'}</span>
               </div>
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: 15, fontWeight: 700, color: '#c8943a' }}>{formatTime(time)}</div>
                 <div style={{ fontSize: 10, color: '#a07850' }}>{formatDate(time)}</div>
               </div>
+            </div>
+
+            {/* Daily verse — plain text, no card background */}
+            <div style={{ padding: '14px 18px 4px' }}>
+              <div style={{ fontSize: 10, color: '#c8943a', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 6, fontWeight: 600 }}>
+                Here's to encourage you today
+              </div>
+              <p style={{ margin: 0, fontSize: 13, color: '#5a3a1a', fontStyle: 'italic', lineHeight: 1.65 }}>
+                "{verse.text}"
+              </p>
+              <div style={{ fontSize: 11, color: '#a07850', marginTop: 5 }}>{verse.ref} &middot; NIV</div>
             </div>
 
             {/* Main panels */}
@@ -377,8 +373,8 @@ export default function AdminApp({ user, onSignOut }) {
                         <div style={{ fontSize: 10, color: '#a07850' }}>{p.desc}</div>
                       </div>
                       {badge && (
-                        <div style={{ background: '#2196f3', color: '#fff', borderRadius: '50%', width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, flexShrink: 0,
-                          ...(p.id === 'cleanliness' ? { background: '#ff9800' } : {}) }}>
+                        <div style={{ color: '#fff', borderRadius: '50%', width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, flexShrink: 0,
+                          background: p.id === 'cleanliness' ? '#ff9800' : '#2196f3' }}>
                           {badge}
                         </div>
                       )}
@@ -388,21 +384,16 @@ export default function AdminApp({ user, onSignOut }) {
               </div>
             </div>
 
-            {/* Logout */}
             <div style={{ padding: '8px 16px' }}>
-              <button onClick={handleSignOut}
-                style={{ width: '100%', background: 'transparent', border: '1px solid #f0e8d8', borderRadius: 10, color: '#a07850', padding: 12, fontSize: 13, cursor: 'pointer' }}>
+              <button onClick={handleSignOut} style={{ width: '100%', background: 'transparent', border: '1px solid #f0e8d8', borderRadius: 10, color: '#a07850', padding: 12, fontSize: 13, cursor: 'pointer' }}>
                 Log out
               </button>
             </div>
           </div>
         ) : (
-          // ── ACTIVE PANEL ──
           <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-            {/* Back bar */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: '#fff8f0', borderBottom: '1px solid #f0e8d8', flexShrink: 0 }}>
-              <button onClick={() => setActiveTab(null)}
-                style={{ background: 'transparent', border: '1px solid #f0e8d8', borderRadius: 8, color: '#c8943a', padding: '6px 12px', fontSize: 13, cursor: 'pointer', fontWeight: 600 }}>
+              <button onClick={() => setActiveTab(null)} style={{ background: 'transparent', border: '1px solid #f0e8d8', borderRadius: 8, color: '#c8943a', padding: '6px 12px', fontSize: 13, cursor: 'pointer', fontWeight: 600 }}>
                 Back
               </button>
               <span style={{ fontSize: 15, fontWeight: 700, color: '#2a1000' }}>
