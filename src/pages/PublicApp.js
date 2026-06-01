@@ -5,12 +5,14 @@ import GuestLanding from './GuestLanding';
 import Gallery from './Gallery';
 import Snapshots from './Snapshots';
 import GamesPage from './Games';
+import Leaderboard from './Leaderboard';
 
 const NAV_ICONS = {
   home: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
   gallery: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>,
   snapshots: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>,
   games: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="20" height="12" rx="3"/><circle cx="8" cy="12" r="1.5" fill="currentColor"/><circle cx="16" cy="12" r="1.5" fill="currentColor"/><path d="M12 9v6M9 12h6" strokeLinecap="round"/></svg>,
+  leaderboard: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="14" width="4" height="7" rx="1"/><rect x="10" y="9" width="4" height="12" rx="1"/><rect x="18" y="4" width="4" height="17" rx="1"/></svg>,
 };
 
 const styles = {
@@ -35,10 +37,11 @@ const styles = {
 };
 
 const TABS = [
-  { id: 'home', label: 'Home' },
-  { id: 'gallery', label: 'Snapshots' },
-  { id: 'snapshots', label: 'Feedback' },
-  { id: 'games', label: 'Games' },
+  { id: 'home',        label: 'Home'      },
+  { id: 'gallery',     label: 'Snapshots' },
+  { id: 'snapshots',   label: 'Feedback'  },
+  { id: 'games',       label: 'Games'     },
+  { id: 'leaderboard', label: 'Board'     },
 ];
 
 export default function PublicApp({ onAdminLogin, user }) {
@@ -76,10 +79,11 @@ export default function PublicApp({ onAdminLogin, user }) {
       </div>
 
       <div style={styles.content}>
-        {activeTab === 'home' && <GuestLanding />}
-        {activeTab === 'gallery' && <Gallery />}
-        {activeTab === 'snapshots' && <Snapshots />}
-        {activeTab === 'games' && <GamesPage />}
+        {activeTab === 'home'        && <GuestLanding />}
+        {activeTab === 'gallery'     && <Gallery />}
+        {activeTab === 'snapshots'   && <Snapshots />}
+        {activeTab === 'games'       && <GamesPage />}
+        {activeTab === 'leaderboard' && <Leaderboard />}
       </div>
 
       <div style={styles.bottomNav}>
