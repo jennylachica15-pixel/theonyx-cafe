@@ -51,6 +51,7 @@ const GAME_LIST = [
   { id: 'zombie',      title: 'Zombie Barista',   sub: 'Multiplayer survival' },
   { id: 'guessword',   title: 'Guess the Word',   sub: 'Clues & letters' },
   { id: 'cafemystery', title: 'Cafe Mystery',     sub: 'Social deduction' },
+  { id: 'fairyq',      title: 'Friends & Questions', sub: 'Funny, deep & spicy' },
 ];
 
 async function registerUser(username, password) {
@@ -897,6 +898,280 @@ function GuessWordGame({ playerName, onScore }) {
   );
 }
 
+// === FRIENDS & QUESTIONS (Fairy Theme) ===
+const FAIRY_QUESTIONS = [
+  { text: "If your life had a theme song, what would it be and why?", tag: "deep" },
+  { text: "What is one thing you would never eat even if someone paid you?", tag: "funny" },
+  { text: "If you could only eat one food for the rest of your life, what would it be?", tag: "funny" },
+  { text: "What is your biggest fear that most people would laugh at?", tag: "deep" },
+  { text: "If you woke up tomorrow with one superpower, what would you choose?", tag: "funny" },
+  { text: "What is the most embarrassing thing you have done in public?", tag: "funny" },
+  { text: "If you could relive one day of your life, which would it be?", tag: "deep" },
+  { text: "What would you do first if you won a million pesos?", tag: "funny" },
+  { text: "Who in this group would survive a zombie apocalypse the longest?", tag: "funny" },
+  { text: "What is one thing you thought you were good at but actually are not?", tag: "funny" },
+  { text: "If you had to describe yourself as a food, what would you be?", tag: "funny" },
+  { text: "What is the worst advice you have ever given someone?", tag: "funny" },
+  { text: "What is something you do when no one is watching?", tag: "spicy" },
+  { text: "If you could trade lives with anyone in this room for a day, who would it be?", tag: "spicy" },
+  { text: "What is the most childish thing you still do?", tag: "funny" },
+  { text: "Have you ever pretended to not see someone in public to avoid talking to them?", tag: "spicy" },
+  { text: "What is one thing on your bucket list that surprises people?", tag: "deep" },
+  { text: "If animals could talk, which one do you think would be the rudest?", tag: "funny" },
+  { text: "What is a guilty pleasure you are embarrassed to admit?", tag: "spicy" },
+  { text: "If you had to wear one outfit for the rest of your life, what would it be?", tag: "funny" },
+  { text: "What is the most random skill you have that no one knows about?", tag: "deep" },
+  { text: "Who in this group is most likely to become famous?", tag: "funny" },
+  { text: "What is the most spontaneous thing you have ever done?", tag: "deep" },
+  { text: "If you were a villain in a movie, what would your evil plan be?", tag: "funny" },
+  { text: "What is something you believed as a child that turned out to be completely wrong?", tag: "funny" },
+  { text: "If you could only keep three apps on your phone, which would they be?", tag: "funny" },
+  { text: "What is the weirdest dream you can remember?", tag: "funny" },
+  { text: "If you were stuck on a deserted island with one person in this group, who would you pick?", tag: "spicy" },
+  { text: "What is one thing you would change about yourself if you could?", tag: "deep" },
+  { text: "If your personality was a weather forecast, what would today's forecast be?", tag: "funny" },
+];
+
+const FAIRY_CATEGORIES = [
+  { id: "all",   label: "All questions", icon: "ti-diamond" },
+  { id: "funny", label: "Funny only",    icon: "ti-mood-happy" },
+  { id: "deep",  label: "Deep only",     icon: "ti-moon" },
+  { id: "spicy", label: "Spicy only",    icon: "ti-flame" },
+];
+
+const FAIRY_TAG_COLORS = {
+  deep:  { bg: "#3d1060", color: "#d48fff", label: "Thoughtful" },
+  funny: { bg: "#1a3060", color: "#8fc8ff", label: "Funny"      },
+  spicy: { bg: "#601020", color: "#ffb0b0", label: "Spicy"      },
+};
+
+function shuffleArr(arr) { return [...arr].sort(() => Math.random() - 0.5); }
+
+function FairyQGame({ playerName, onBack }) {
+  const [screen, setScreen]   = React.useState("intro");
+  const [category, setCategory] = React.useState("all");
+  const [questions, setQuestions] = React.useState([]);
+  const [qIdx, setQIdx]       = React.useState(0);
+  const [skipped, setSkipped] = React.useState(0);
+  const audioRef              = React.useRef(null);
+  const [muted, setMuted]     = React.useState(false);
+
+  React.useEffect(() => {
+    audioRef.current = new Audio("/game-music.mp3");
+    audioRef.current.loop = true;
+    audioRef.current.volume = 0.35;
+    return () => { if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; } };
+  }, []);
+
+  const toggleMute = () => {
+    setMuted(m => {
+      if (audioRef.current) audioRef.current.muted = !m;
+      return !m;
+    });
+  };
+
+  const startGame = (cat) => {
+    if (audioRef.current) audioRef.current.play().catch(() => {});
+    const pool = FAIRY_QUESTIONS.filter(q => cat === "all" || q.tag === cat);
+    setQuestions(shuffleArr(pool).slice(0, 15));
+    setCategory(cat);
+    setQIdx(0);
+    setSkipped(0);
+    setScreen("game");
+  };
+
+  const nextQ = (skip) => {
+    if (skip) setSkipped(s => s + 1);
+    if (qIdx + 1 >= questions.length) {
+      if (audioRef.current) audioRef.current.pause();
+      setScreen("done");
+    } else {
+      setQIdx(i => i + 1);
+    }
+  };
+
+  const C = {
+    bg:         "#1a0530",
+    card:       "#2d0a50",
+    cardBorder: "#7a3db5",
+    softBorder: "#4a2070",
+    purple:     "#9455d0",
+    purpleDim:  "#7a3db5",
+    textPrimary:"#f0c6ff",
+    textMuted:  "#c48de8",
+    textDim:    "#7a5090",
+  };
+
+  const base = {
+    minHeight: "100%",
+    background: C.bg,
+    color: C.textPrimary,
+    fontFamily: "'Georgia', serif",
+    position: "relative",
+    display: "flex",
+    flexDirection: "column",
+  };
+
+  const cardStyle = {
+    background: C.card,
+    border: `1.5px solid ${C.cardBorder}`,
+    borderRadius: 18,
+    padding: "22px 18px",
+    marginBottom: 16,
+  };
+
+  const btnPrimary = {
+    width: "100%",
+    padding: "14px",
+    borderRadius: 14,
+    background: C.purpleDim,
+    border: "none",
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: 700,
+    cursor: "pointer",
+    marginTop: 4,
+    fontFamily: "inherit",
+  };
+
+  const btnSecondary = {
+    width: "100%",
+    padding: "10px",
+    borderRadius: 14,
+    background: "transparent",
+    border: `1.5px solid ${C.softBorder}`,
+    color: C.textDim,
+    fontSize: 13,
+    fontWeight: 600,
+    cursor: "pointer",
+    marginTop: 8,
+    fontFamily: "inherit",
+  };
+
+  const topBar = {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: "12px 16px",
+    background: "#12022a",
+    borderBottom: `1px solid ${C.softBorder}`,
+    flexShrink: 0,
+  };
+
+  // === INTRO ===
+  if (screen === "intro") {
+    return (
+      <div style={base}>
+        <div style={topBar}>
+          <button onClick={onBack} style={{ background: C.card, border: `1px solid ${C.softBorder}`, borderRadius: 20, padding: "6px 14px", color: C.textMuted, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+            Exit
+          </button>
+          <span style={{ fontSize: 14, fontWeight: 700, color: C.textPrimary, letterSpacing: 1 }}>Friends & Questions</span>
+          <button onClick={toggleMute} style={{ background: C.card, border: `1px solid ${C.softBorder}`, borderRadius: 20, padding: "6px 12px", color: C.textMuted, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+            {muted ? "unmute" : "mute"}
+          </button>
+        </div>
+        <div style={{ flex: 1, padding: "28px 20px 24px", overflowY: "auto" }}>
+          <div style={{ textAlign: "center", fontSize: 52, marginBottom: 4 }}>&#10024;</div>
+          <div style={{ fontSize: 24, fontWeight: 700, color: C.textPrimary, textAlign: "center", marginBottom: 4 }}>Friends & Questions</div>
+          <div style={{ fontSize: 13, color: C.textMuted, textAlign: "center", marginBottom: 22 }}>A magical game of laughs, spice & deep thoughts</div>
+          <div style={{ background: C.card, border: `1.5px solid ${C.softBorder}`, borderRadius: 16, padding: "16px 14px", marginBottom: 18 }}>
+            <div style={{ fontSize: 11, color: "#b06adf", fontWeight: 700, letterSpacing: 1.2, textTransform: "uppercase", marginBottom: 12 }}>Choose a vibe</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              {FAIRY_CATEGORIES.map(cat => (
+                <button key={cat.id} onClick={() => startGame(cat.id)}
+                  style={{ padding: "16px 10px", borderRadius: 14, border: `1.5px solid ${C.softBorder}`, background: C.bg, color: C.textPrimary, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", textAlign: "center" }}>
+                  <i className={`ti ${cat.icon}`} style={{ fontSize: 26, display: "block", marginBottom: 6, color: C.textMuted }} aria-hidden="true" />
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div style={{ fontSize: 12, color: C.textDim, textAlign: "center" }}>30 questions - answer together - no right or wrong</div>
+        </div>
+      </div>
+    );
+  }
+
+  // === GAME ===
+  if (screen === "game") {
+    const q = questions[qIdx];
+    const tc = FAIRY_TAG_COLORS[q.tag] || FAIRY_TAG_COLORS.funny;
+    const prog = Math.round((qIdx / questions.length) * 100);
+    return (
+      <div style={base}>
+        <div style={topBar}>
+          <button onClick={onBack} style={{ background: C.card, border: `1px solid ${C.softBorder}`, borderRadius: 20, padding: "6px 14px", color: C.textMuted, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+            Exit
+          </button>
+          <span style={{ fontSize: 13, fontWeight: 700, color: C.textPrimary }}>{qIdx + 1} / {questions.length}</span>
+          <button onClick={toggleMute} style={{ background: C.card, border: `1px solid ${C.softBorder}`, borderRadius: 20, padding: "6px 12px", color: C.textMuted, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+            {muted ? "unmute" : "mute"}
+          </button>
+        </div>
+        {/* Progress bar */}
+        <div style={{ height: 4, background: C.card }}>
+          <div style={{ height: "100%", width: `${prog}%`, background: C.purple, transition: "width 0.4s" }} />
+        </div>
+        <div style={{ flex: 1, padding: "20px 18px 24px", overflowY: "auto", display: "flex", flexDirection: "column" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
+            <span style={{ fontSize: 11, color: C.textDim, fontWeight: 700 }}>Question {qIdx + 1}</span>
+            <span style={{ fontSize: 11, color: C.textDim }}>{skipped} skipped</span>
+          </div>
+          {/* Question card */}
+          <div style={{ ...cardStyle, flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+            <div style={{ fontSize: 20, fontWeight: 700, color: C.textPrimary, lineHeight: 1.55, marginBottom: 14 }}>
+              {q.text}
+            </div>
+            <div style={{ display: "inline-block", background: tc.bg, color: tc.color, borderRadius: 20, padding: "4px 12px", fontSize: 11, fontWeight: 700 }}>
+              {tc.label}
+            </div>
+          </div>
+          {/* Skipped counter pills */}
+          <div style={{ display: "flex", justifyContent: "center", gap: 6, marginBottom: 14, flexWrap: "wrap" }}>
+            {questions.map((_, i) => (
+              <div key={i} style={{ width: 8, height: 8, borderRadius: "50%", background: i < qIdx ? C.purple : C.softBorder, transition: "background 0.3s" }} />
+            ))}
+          </div>
+          <button style={btnPrimary} onClick={() => nextQ(false)}>
+            Next question &#10024;
+          </button>
+          <button style={btnSecondary} onClick={() => nextQ(true)}>
+            Skip this one
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // === DONE ===
+  return (
+    <div style={base}>
+      <div style={topBar}>
+        <button onClick={onBack} style={{ background: C.card, border: `1px solid ${C.softBorder}`, borderRadius: 20, padding: "6px 14px", color: C.textMuted, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+          Exit
+        </button>
+        <span style={{ fontSize: 14, fontWeight: 700, color: C.textPrimary }}>Done!</span>
+        <div style={{ width: 60 }} />
+      </div>
+      <div style={{ flex: 1, padding: "32px 20px 28px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ fontSize: 56, marginBottom: 8 }}>&#127775;</div>
+        <div style={{ fontSize: 22, fontWeight: 700, color: C.textPrimary, textAlign: "center", marginBottom: 8 }}>All done, fairies!</div>
+        <div style={{ fontSize: 14, color: C.textMuted, textAlign: "center", lineHeight: 1.6, marginBottom: 28 }}>
+          You answered {questions.length - skipped} questions<br />and skipped {skipped}.<br />
+          <span style={{ color: C.textDim, fontSize: 12 }}>Hope you learned something fun!</span>
+        </div>
+        <button style={{ ...btnPrimary, maxWidth: 280 }} onClick={() => startGame(category)}>
+          Play again &#10024;
+        </button>
+        <button style={{ ...btnSecondary, maxWidth: 280 }} onClick={() => setScreen("intro")}>
+          Change vibe
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function GamesPage() {
   const [activeGame, setActiveGame] = useState(null);
   const [showLB, setShowLB] = useState(false);
@@ -947,6 +1222,7 @@ export default function GamesPage() {
           {activeGame.id==='zombie'      && <ZombieGame     playerName={playerName} username={username} onScore={s=>handleScore('zombie',s)} onBack={()=>setActiveGame(null)} />}
           {activeGame.id==='guessword'   && <GuessWordGame  playerName={playerName} onScore={s=>handleScore('guessword',s)} />}
           {activeGame.id==='cafemystery' && <CafeGame       playerName={playerName} onBack={()=>setActiveGame(null)} />}
+          {activeGame.id==='fairyq'      && <FairyQGame    playerName={playerName} onBack={()=>setActiveGame(null)} />}
         </div>
       </div>
     );
