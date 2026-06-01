@@ -312,26 +312,26 @@ export default function AdminApp({ user, onSignOut }) {
       <div style={S.content}>
         {!activeTab ? (
           <div style={{ paddingBottom: 32 }}>
-            {/* Greeting + time */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 18px', background: '#fff8f0', borderBottom: '1px solid #f0e8d8' }}>
-              <div style={{ fontSize: 13, color: '#a07850' }}>
-                Good day, <span style={{ color: '#2a1000', fontWeight: 700 }}>{userName || 'Friend'}</span>
+            {/* Greeting + time + daily verse — one card */}
+            <div style={{ padding: '14px 18px 16px', background: '#fff8f0', borderBottom: '1px solid #f0e8d8' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ fontSize: 13, color: '#a07850' }}>
+                  Good day, <span style={{ color: '#2a1000', fontWeight: 700 }}>{userName || 'Friend'}</span>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: '#c8943a' }}>{formatTime(time)}</div>
+                  <div style={{ fontSize: 10, color: '#a07850' }}>{formatDate(time)}</div>
+                </div>
               </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: 15, fontWeight: 700, color: '#c8943a' }}>{formatTime(time)}</div>
-                <div style={{ fontSize: 10, color: '#a07850' }}>{formatDate(time)}</div>
+              <div style={{ marginTop: 14 }}>
+                <div style={{ fontSize: 10, color: '#c8943a', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 6, fontWeight: 600 }}>
+                  Here's to encourage you today
+                </div>
+                <p style={{ margin: 0, fontSize: 13, color: '#5a3a1a', fontStyle: 'italic', lineHeight: 1.65 }}>
+                  "{verse.text}"
+                </p>
+                <div style={{ fontSize: 11, color: '#a07850', marginTop: 5 }}>{verse.ref} &middot; NIV</div>
               </div>
-            </div>
-
-            {/* Daily verse — plain text, no card background */}
-            <div style={{ padding: '14px 18px 4px' }}>
-              <div style={{ fontSize: 10, color: '#c8943a', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 6, fontWeight: 600 }}>
-                Here's to encourage you today
-              </div>
-              <p style={{ margin: 0, fontSize: 13, color: '#5a3a1a', fontStyle: 'italic', lineHeight: 1.65 }}>
-                "{verse.text}"
-              </p>
-              <div style={{ fontSize: 11, color: '#a07850', marginTop: 5 }}>{verse.ref} &middot; NIV</div>
             </div>
 
             {/* Main panels */}
