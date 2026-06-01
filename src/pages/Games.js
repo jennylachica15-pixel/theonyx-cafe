@@ -54,6 +54,16 @@ const GAME_LIST = [
   { id: 'fairyq',      title: 'Friends & Questions',  sub: 'Funny, deep & spicy',  mode: 'Group play'    },
 ];
 
+// Games that appear on the leaderboard (Cafe Mystery & Friends & Questions track no score)
+const LEADERBOARD_GAMES = GAME_LIST.filter(g => g.id !== 'cafemystery' && g.id !== 'fairyq');
+
+// Format a leaderboard score: Zombie Barista shows "days survived", others show points
+const fmtScore = (gameId, score) => {
+  const n = (Number(score) || 0).toLocaleString();
+  if (gameId === 'zombie') return `${n} ${Number(score) === 1 ? 'day' : 'days'}`;
+  return n;
+};
+
 async function registerUser(username, password) {
   const ref = doc(db, 'gameUsers', username.toLowerCase());
   const snap = await getDoc(ref);
@@ -137,7 +147,7 @@ function NameModal({ gameTitle, username, onStart, onClose }) {
 }
 
 function LeaderboardModal({ onClose, username }) {
-  const [tab, setTab] = useState(GAME_LIST[0].id);
+  const [tab, setTab] = useState(LEADERBOARD_GAMES[0].id);
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
@@ -150,11 +160,11 @@ function LeaderboardModal({ onClose, username }) {
         <div style={{fontSize:28,marginBottom:4}}>🏆</div>
         <div style={{fontSize:20,fontWeight:'bold',color:'#d4a853',marginBottom:12}}>Global Leaderboard</div>
         <div style={{display:'flex',flexWrap:'wrap',gap:6,justifyContent:'center',marginBottom:16}}>
-          {GAME_LIST.map(g=>(<button key={g.id} onClick={()=>setTab(g.id)} style={{background: tab===g.id ? '#d4a853':'#3d1f00', color: tab===g.id ? '#1a0a00':'#d4a853', border:'1px solid #6b3a1f', borderRadius:20, padding:'6px 12px', fontSize:12, cursor:'pointer'}}>{g.title}</button>))}
+          {LEADERBOARD_GAMES.map(g=>(<button key={g.id} onClick={()=>setTab(g.id)} style={{background: tab===g.id ? '#d4a853':'#3d1f00', color: tab===g.id ? '#1a0a00':'#d4a853', border:'1px solid #6b3a1f', borderRadius:20, padding:'6px 12px', fontSize:12, cursor:'pointer'}}>{g.title}</button>))}
         </div>
         {loading ? <div style={{color:'#a07850'}}>Loading...</div> : rows.length === 0 ?
           <div style={{color:'#a07850',padding:20}}>No scores yet - be the first!</div> :
-          rows.map((r,i)=>(<div key={i} style={{...S.lbRow(i), background: r.username===username ? 'rgba(212,168,83,0.15)' : S.lbRow(i).background}}><span style={{width:28,fontSize:18}}>{S.medal(i)}</span><span style={{flex:1,fontWeight:'bold',color: r.username===username ? '#d4a853':'#f5e6d0'}}>{r.username}</span><span style={{color:'#8bc34a',fontWeight:'bold'}}>{r.score.toLocaleString()}</span>{r.username===username && <span style={{marginLeft:6,fontSize:11,color:'#d4a853'}}>YOU</span>}</div>))
+          rows.map((r,i)=>(<div key={i} style={{...S.lbRow(i), background: r.username===username ? 'rgba(212,168,83,0.15)' : S.lbRow(i).background}}><span style={{width:28,fontSize:18}}>{S.medal(i)}</span><span style={{flex:1,fontWeight:'bold',color: r.username===username ? '#d4a853':'#f5e6d0'}}>{r.username}</span><span style={{color:'#8bc34a',fontWeight:'bold'}}>{fmtScore(tab, r.score)}</span>{r.username===username && <span style={{marginLeft:6,fontSize:11,color:'#d4a853'}}>YOU</span>}</div>))
         }
         <button style={{...S.btn('#6b3a1f'),marginTop:16}} onClick={onClose}>Close</button>
       </div>
@@ -1172,7 +1182,7 @@ function FairyQGame({ playerName, onBack }) {
   );
 }
 
-const FEATURED_GAME_WEEKS = GAME_LIST.map(g => g.id);
+const FEATURED_GAME_WEEKS = LEADERBOARD_GAMES.map(g => g.id);
 const FEATURED_WEEK_NUM = Math.floor(Date.now() / (7 * 24 * 60 * 60 * 1000));
 const FEATURED_GAME = FEATURED_GAME_WEEKS[FEATURED_WEEK_NUM % FEATURED_GAME_WEEKS.length];
 const GAME_NAMES = {
@@ -1377,7 +1387,7 @@ export default function GamesPage() {
             <div style={{textAlign:'center',flexShrink:0}}>
               <div style={{width:28,height:28,borderRadius:'50%',background:'#2a1400',border:'2px solid #ffd700',display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,fontWeight:700,color:'#ffd700',margin:'0 auto 2px',boxShadow:'0 0 6px #ffd70088'}}>{featuredLeader.username.slice(0,2).toUpperCase()}</div>
               <div style={{fontSize:9,color:'#ffd700',fontWeight:700,maxWidth:52,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{featuredLeader.username}</div>
-              <div style={{fontSize:8,color:'#7a5020'}}>{(featuredLeader.score||0).toLocaleString()} pts</div>
+              <div style={{fontSize:8,color:'#7a5020'}}>{fmtScore(FEATURED_GAME, featuredLeader.score)}{FEATURED_GAME==='zombie'?'':' pts'}</div>
             </div>
           ) : (
             <div style={{fontSize:9,color:'#4a3010',textAlign:'center',maxWidth:60}}>No scores yet!</div>
@@ -1386,7 +1396,7 @@ export default function GamesPage() {
 
         {/* Game tabs */}
         <div style={{display:'flex',overflowX:'auto',background:'#100600',borderRadius:8,padding:'0 4px',gap:1,scrollbarWidth:'none',marginBottom:8}}>
-          {GAME_LIST.map(g => (
+          {LEADERBOARD_GAMES.map(g => (
             <button key={g.id}
               onClick={()=>setLbGame(g.id)}
               style={{flexShrink:0,padding:'6px 11px',border:'none',fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'inherit',transition:'all 0.15s',borderBottom:`2px solid ${lbGame===g.id?'#ffe066':'transparent'}`,background:lbGame===g.id?'linear-gradient(180deg,#c8943a,#9a6010)':'transparent',color:lbGame===g.id?'#1a0800':'#6a4820'}}>
@@ -1412,7 +1422,7 @@ export default function GamesPage() {
                     {isFirst ? <span style={{fontSize:14,filter:'drop-shadow(0 0 5px #ffd700)',animation:'crownSpin 2.5s ease-in-out infinite',display:'inline-block',marginBottom:1}}>&#128081;</span> : <div style={{height:17}}/>}
                     <div style={{width:isFirst?34:26,height:isFirst?34:26,borderRadius:'50%',background:'#2a1400',border:`2px solid ${mc}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:isFirst?11:9,fontWeight:700,color:mc,flexShrink:0,boxShadow:`0 0 5px ${mg}`}}>{p?p.username.slice(0,2).toUpperCase():'?'}</div>
                     <div style={{fontSize:isFirst?10:9,fontWeight:700,color:'#f0ddb0',margin:'3px 0 1px',maxWidth:86,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p?p.username:'---'}</div>
-                    <div style={{fontSize:isFirst?11:10,fontWeight:700,color:mc,marginBottom:3,filter:`drop-shadow(0 0 2px ${mc})`}}>{p?(p.score||0).toLocaleString():'---'}</div>
+                    <div style={{fontSize:isFirst?11:10,fontWeight:700,color:mc,marginBottom:3,filter:`drop-shadow(0 0 2px ${mc})`}}>{p?fmtScore(lbGame, p.score):'---'}</div>
                     <div style={{width:'100%',height:ph,background:`${mc}12`,border:`1px solid ${mc}44`,borderBottom:'none',borderRadius:'5px 5px 0 0',display:'flex',alignItems:'center',justifyContent:'center'}}>
                       <span style={{fontFamily:"'Cinzel',serif",fontSize:14,fontWeight:700,color:mc,opacity:0.7}}>{rankIdx===0?'1':rankIdx===1?'2':'3'}</span>
                     </div>
@@ -1427,7 +1437,7 @@ export default function GamesPage() {
                 <div style={{width:14,fontSize:10,fontWeight:700,color:'#4a3010',textAlign:'center'}}>{idx+4}</div>
                 <div style={{width:22,height:22,borderRadius:'50%',background:'#2a1400',border:'1.5px solid #5a3a10',display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,fontWeight:700,color:'#c8943a',flexShrink:0}}>{p.username.slice(0,2).toUpperCase()}</div>
                 <div style={{flex:1,fontSize:11,fontWeight:700,color:'#c89050'}}>{p.username}</div>
-                <div style={{fontSize:11,fontWeight:700,background:'linear-gradient(90deg,#c8943a,#ffd700,#c8943a)',backgroundSize:'200% auto',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',backgroundClip:'text',animation:'shimmerLB 2.5s linear infinite'}}>{(p.score||0).toLocaleString()}</div>
+                <div style={{fontSize:11,fontWeight:700,background:'linear-gradient(90deg,#c8943a,#ffd700,#c8943a)',backgroundSize:'200% auto',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',backgroundClip:'text',animation:'shimmerLB 2.5s linear infinite'}}>{fmtScore(lbGame, p.score)}</div>
               </div>
             ))}
             {lbRows.length===0 && <div style={{textAlign:'center',color:'#4a3010',fontSize:11,padding:'12px 0'}}>No scores yet. Be the first!</div>}
@@ -1451,7 +1461,7 @@ export default function GamesPage() {
             <div style={S.cardTitle}>{game.title}</div>
             <div style={S.cardSub}>{game.sub}</div>
             <div style={{fontSize:9,color:'#8a6030',marginTop:3,background:'#2a1200',border:'1px solid #4a2600',borderRadius:8,padding:'2px 7px',display:'inline-block'}}>{game.mode}</div>
-            {localBests[game.id]>0 && <div style={S.cardBest}>Best: {localBests[game.id]}</div>}
+            {localBests[game.id]>0 && <div style={S.cardBest}>Best: {fmtScore(game.id, localBests[game.id])}</div>}
           </div>
         ))}
       </div>
