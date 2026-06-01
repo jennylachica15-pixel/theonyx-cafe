@@ -227,7 +227,6 @@ export default function Attendance({ role, userName }) {
         setRecords(prev => { const next = { ...prev, ...restored }; persistRecords(next); return next; });
       }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessToken, role, userName]);
 
   const formatTime = d => d.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
