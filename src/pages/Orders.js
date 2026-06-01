@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../firebase/config';
-import { collection, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, serverTimestamp, query, orderBy, updateDoc, doc } from 'firebase/firestore';
 
 const GOOGLE_CLIENT_ID = '596322682185-n5hm66hvol3nnqqllnuop995kcnefbgu.apps.googleusercontent.com';
 const SALES_SHEET_ID = '1UvI6I6aZkaPzcIf3qwcrENWaiPR3ibKMxjWwLRYSFfY';
@@ -12,7 +12,7 @@ const SIZES = ['mini', 'classic', 'upgrade', 'regular'];
 const SIZE_LABELS = { mini: 'Mini', classic: 'Classic', upgrade: 'Upgrade', regular: 'Regular' };
 
 const MENU_GROUPS = [
-  { id: 'espresso', icon: '☕', label: 'Espresso Based', items: [
+  { id: 'espresso', label: 'Espresso based', items: [
     { name: 'COFFEE LATTE', mini: 75, classic: 85, upgrade: 95 },
     { name: 'CARAMEL MACCHIATO', mini: 99, classic: 120, upgrade: 150 },
     { name: 'AMERICANO', mini: 50, classic: 75, upgrade: 99 },
@@ -24,7 +24,7 @@ const MENU_GROUPS = [
     { name: 'RHUMPUCCINO', mini: 99, classic: 135, upgrade: 150 },
     { name: 'BREWED', mini: 25, classic: 50, upgrade: 85 },
   ]},
-  { id: 'noncoffee', icon: '🍵', label: 'Non-Coffee', items: [
+  { id: 'noncoffee', label: 'Non-coffee', items: [
     { name: 'DIRTY MATCHA', classic: 120, upgrade: 150 },
     { name: 'STRAWBERRY LATTE', classic: 120, upgrade: 150 },
     { name: 'STRAWBERRY MATCHA', classic: 120, upgrade: 150 },
@@ -35,7 +35,7 @@ const MENU_GROUPS = [
     { name: 'FRAPPE UBE HALAYA', regular: 150 },
     { name: 'FRAPPE CARAMEL MACCHIATO', regular: 150 },
   ]},
-  { id: 'milktea', icon: '🧋', label: 'Milk Tea', items: [
+  { id: 'milktea', label: 'Milk tea', items: [
     { name: 'M.T. - HOKKAIDO', regular: 55 },
     { name: 'M.T. - OKINAWA', regular: 55 },
     { name: 'M.T. - MANGO CHEESECAKE', regular: 60 },
@@ -47,7 +47,7 @@ const MENU_GROUPS = [
     { name: 'M.T. - WHITE BUNNY', regular: 60 },
     { name: 'M.T. - WINTERMELON', regular: 60 },
   ]},
-  { id: 'soda', icon: '🥤', label: 'Soda & Tea', items: [
+  { id: 'soda', label: 'Soda & tea', items: [
     { name: 'SODA - PASSION', classic: 50 },
     { name: 'SODA - STRAWBERRY', classic: 50 },
     { name: 'SODA - BLUEBERRY', classic: 50 },
@@ -56,11 +56,11 @@ const MENU_GROUPS = [
     { name: 'TEA - CHAMOMILE', classic: 50 },
     { name: 'TEA - HIBISCUS', classic: 50 },
   ]},
-  { id: 'pasta', icon: '🍝', label: 'Pasta', items: [
+  { id: 'pasta', label: 'Pasta', items: [
     { name: 'PASTA - CARBONARA', regular: 129 },
     { name: 'PASTA - BOLOGNESE', regular: 129 },
   ]},
-  { id: 'rice', icon: '🍚', label: 'Rice Meals', items: [
+  { id: 'rice', label: 'Rice meals', items: [
     { name: 'TAPSILOG', regular: 129 },
     { name: 'CORNSILOG', regular: 129 },
     { name: 'PORK SISIG RICE', regular: 190 },
@@ -74,7 +74,7 @@ const MENU_GROUPS = [
     { name: 'RICE MEAL - C. KOREAN', regular: 180 },
     { name: 'RICE MEAL - C. INASAL', regular: 180 },
   ]},
-  { id: 'pastries', icon: '🥐', label: 'Pastries & Sweets', items: [
+  { id: 'pastries', label: 'Pastries & sweets', items: [
     { name: 'WAFFLE - MANGO', regular: 80 },
     { name: 'WAFFLE - CHOCOLATE', regular: 80 },
     { name: 'WAFFLE - OTHER', regular: 80 },
@@ -83,7 +83,7 @@ const MENU_GROUPS = [
     { name: 'SWEET BITES', regular: 15 },
     { name: 'GRILLED CHEESE SANDWICH', regular: 80 },
   ]},
-  { id: 'snacks', icon: '🍟', label: 'Snacks', items: [
+  { id: 'snacks', label: 'Snacks', items: [
     { name: 'CHEESE BURGER', regular: 50 },
     { name: 'ONYX BURGER', regular: 150 },
     { name: 'NACHOS', regular: 130 },
@@ -91,43 +91,76 @@ const MENU_GROUPS = [
     { name: 'FRIES - SOUR CREAM', regular: 30 },
     { name: 'FRIES - CHEESE', regular: 30 },
   ]},
-  { id: 'addons', icon: '➕', label: 'Add-ons', items: [
+  { id: 'addons', label: 'Add-ons', items: [
     { name: 'PEARL', regular: 10 },
     { name: 'ESPRESSO SHOT', regular: 10 },
     { name: 'RICE', regular: 15 },
   ]},
 ];
 
-const s = {
-  page: { padding: '16px 16px 0', animation: 'fadeIn 0.3s ease' },
-  title: { fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: 'var(--brown-dark)', marginBottom: 4 },
-  sub: { fontSize: 13, color: 'var(--brown-light)', marginBottom: 14 },
-  groupCard: { background: 'white', borderRadius: 12, marginBottom: 8, boxShadow: '0 1px 4px rgba(26,10,0,0.06)', overflow: 'hidden' },
-  groupHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', cursor: 'pointer' },
-  groupLabel: { fontSize: 14, fontWeight: 600, color: 'var(--brown-dark)' },
-  itemRow: { display: 'flex', alignItems: 'center', padding: '10px 14px', borderTop: '1px solid #f5ede4' },
-  itemName: { fontSize: 12, fontWeight: 600, color: 'var(--brown-dark)', flex: 1 },
-  sizeRow: { display: 'flex', gap: 5, flexWrap: 'wrap' },
-  sizeBtn: { padding: '4px 8px', borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: 'pointer', border: 'none', background: 'var(--cream)', color: 'var(--brown-mid)' },
-  input: { width: '100%', padding: '11px 14px', borderRadius: 10, border: '1.5px solid #e8d8c8', fontSize: 14, background: 'var(--cream)', color: 'var(--brown-dark)', outline: 'none', boxSizing: 'border-box', marginBottom: 10 },
-  label: { display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--brown-mid)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: 0.4 },
-  orderPanel: { background: 'white', borderRadius: 14, padding: '14px', marginTop: 12, boxShadow: '0 2px 12px rgba(26,10,0,0.10)' },
-  orderRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 0', borderBottom: '1px solid #f5ede4', fontSize: 12 },
-  total: { display: 'flex', justifyContent: 'space-between', padding: '10px 0 4px', fontWeight: 700, fontSize: 17, color: 'var(--brown-dark)' },
-  previewBtn: { width: '100%', padding: '13px', borderRadius: 12, background: 'var(--brown-dark)', color: 'var(--gold-light)', fontSize: 14, fontWeight: 600, border: 'none', cursor: 'pointer', marginTop: 10 },
-  modal: { position: 'fixed', inset: 0, background: 'rgba(26,10,0,0.6)', zIndex: 300, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' },
-  modalCard: { background: 'var(--cream)', borderRadius: '20px 20px 0 0', padding: '28px 24px 40px', width: '100%', maxWidth: 480, animation: 'slideUp 0.3s ease', maxHeight: '90vh', overflowY: 'auto' },
-  modalTitle: { fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700, color: 'var(--brown-dark)', marginBottom: 16, textAlign: 'center' },
-  receiptHeader: { textAlign: 'center', marginBottom: 16, borderBottom: '1px dashed #e8d8c8', paddingBottom: 12 },
-  receiptRow: { display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '5px 0', color: 'var(--brown-dark)' },
-  receiptTotal: { display: 'flex', justifyContent: 'space-between', fontSize: 16, fontWeight: 700, padding: '10px 0 0', borderTop: '2px solid var(--brown-dark)', marginTop: 6, color: 'var(--brown-dark)' },
-  confirmBtn: { width: '100%', padding: '13px', borderRadius: 12, background: 'var(--brown-dark)', color: 'var(--gold-light)', fontSize: 14, fontWeight: 600, border: 'none', cursor: 'pointer', marginTop: 14 },
-  cancelBtn: { width: '100%', padding: '12px', borderRadius: 12, background: 'var(--cream)', color: 'var(--brown-mid)', fontSize: 13, border: '1.5px solid #e8d8c8', cursor: 'pointer', marginTop: 8 },
-  connectBtn: { width: '100%', padding: '11px', borderRadius: 10, background: '#1a73e8', color: 'white', fontSize: 13, fontWeight: 600, border: 'none', cursor: 'pointer', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  connectedBadge: { background: 'var(--green-bg)', color: 'var(--green-ok)', borderRadius: 10, padding: '8px 12px', fontSize: 12, fontWeight: 500, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 },
+const C = {
+  ink: '#3a2613', gold: '#b07d35', goldDeep: '#8a6320', muted: '#9c7f5e',
+  cream: '#fbf6ef', card: '#f4e9d8', cardBorder: '#e6d6c0',
+  row: '#f7f0e6', rowBorder: '#ead9c2', dark: '#3a2613', darker: '#281607',
+  goldBright: '#c8943a', pill: '#f0e2cd', pillBorder: '#e3d0b4',
+  red: '#a32d2d', green: '#5a8a3a', greenBg: '#f1f7e9', greenBorder: '#d7e8c0',
+  white: '#fff', input: '#fbf6ef', inputBorder: '#e3d0b4',
 };
 
+const s = {
+  page: { padding: '16px 16px 0', animation: 'fadeIn 0.3s ease' },
+  title: { fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: C.ink, marginBottom: 4 },
+  sub: { fontSize: 13, color: C.muted, marginBottom: 14 },
+  tabBar: { display: 'flex', background: C.pill, borderRadius: 11, padding: 3, gap: 3, marginBottom: 16 },
+  tab: (on) => ({ flex: 1, border: 'none', background: on ? C.gold : 'transparent', color: on ? '#fff' : C.muted, fontSize: 12.5, fontWeight: on ? 700 : 600, padding: '9px 4px', borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit' }),
+  groupCard: { background: C.card, borderRadius: 12, marginBottom: 8, border: `0.5px solid ${C.cardBorder}`, overflow: 'hidden' },
+  groupHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 14px', cursor: 'pointer' },
+  groupLabel: { fontSize: 14, fontWeight: 600, color: C.ink },
+  itemRow: { display: 'flex', alignItems: 'center', padding: '10px 14px', borderTop: `0.5px solid ${C.rowBorder}` },
+  itemName: { fontSize: 12, fontWeight: 600, color: C.ink, flex: 1 },
+  sizeRow: { display: 'flex', gap: 5, flexWrap: 'wrap' },
+  sizeBtn: { padding: '5px 9px', borderRadius: 7, fontSize: 10.5, fontWeight: 600, cursor: 'pointer', border: `0.5px solid ${C.pillBorder}`, background: C.cream, color: C.goldDeep },
+  input: { width: '100%', padding: '11px 13px', borderRadius: 10, border: `0.5px solid ${C.inputBorder}`, fontSize: 14, background: C.input, color: C.ink, outline: 'none', boxSizing: 'border-box', marginBottom: 10, fontFamily: 'inherit' },
+  label: { display: 'block', fontSize: 11.5, fontWeight: 600, color: C.muted, marginBottom: 5 },
+  orderPanel: { background: C.card, borderRadius: 14, padding: '14px', marginTop: 12, border: `0.5px solid ${C.cardBorder}` },
+  orderRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: `0.5px solid ${C.rowBorder}`, fontSize: 12 },
+  total: { display: 'flex', justifyContent: 'space-between', padding: '11px 0 4px', fontWeight: 700, fontSize: 17, color: C.ink },
+  primaryBtn: { width: '100%', padding: '13px', borderRadius: 11, background: C.gold, color: '#fff', fontSize: 14, fontWeight: 700, border: 'none', cursor: 'pointer', marginTop: 10 },
+  darkBtn: { width: '100%', padding: '13px', borderRadius: 11, background: C.darker, color: C.goldBright, fontSize: 14, fontWeight: 700, border: 'none', cursor: 'pointer', marginTop: 8 },
+  modal: { position: 'fixed', inset: 0, background: 'rgba(26,10,0,0.6)', zIndex: 300, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' },
+  modalCard: { background: C.cream, borderRadius: '20px 20px 0 0', padding: '26px 22px 38px', width: '100%', maxWidth: 480, animation: 'slideUp 0.3s ease', maxHeight: '90vh', overflowY: 'auto' },
+  modalTitle: { fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700, color: C.ink, marginBottom: 16, textAlign: 'center' },
+  receiptHeader: { textAlign: 'center', marginBottom: 16, borderBottom: `1px dashed ${C.pillBorder}`, paddingBottom: 12 },
+  receiptRow: { display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '5px 0', color: C.ink },
+  receiptTotal: { display: 'flex', justifyContent: 'space-between', fontSize: 16, fontWeight: 700, padding: '10px 0 0', borderTop: `2px solid ${C.ink}`, marginTop: 6, color: C.ink },
+  cancelBtn: { width: '100%', padding: '12px', borderRadius: 11, background: 'transparent', color: C.muted, fontSize: 13, border: `0.5px solid ${C.inputBorder}`, cursor: 'pointer', marginTop: 8 },
+  connectBtn: { width: '100%', padding: '12px', borderRadius: 11, background: C.darker, color: C.goldBright, fontSize: 13, fontWeight: 600, border: 'none', cursor: 'pointer', marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 },
+  connectedBadge: { background: C.greenBg, color: C.green, borderRadius: 10, padding: '9px 12px', fontSize: 12, fontWeight: 500, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 7, border: `0.5px solid ${C.greenBorder}` },
+  pill: { fontSize: 11, color: C.goldDeep, background: C.pill, border: `0.5px solid ${C.pillBorder}`, borderRadius: 20, padding: '3px 10px' },
+  dateHdr: { fontSize: 11, color: C.muted, margin: '4px 0 8px', display: 'flex', alignItems: 'center', gap: 6 },
+  recCard: { background: C.card, border: `0.5px solid ${C.cardBorder}`, borderRadius: 12, padding: '11px 13px', marginBottom: 8 },
+  editTag: { marginTop: 6, fontSize: 10.5, color: C.goldDeep, background: C.pill, borderRadius: 6, padding: '3px 8px', display: 'inline-flex', alignItems: 'center', gap: 5 },
+  iconBtn: { background: C.pill, border: `0.5px solid ${C.pillBorder}`, borderRadius: 8, color: C.gold, padding: '6px 9px', cursor: 'pointer', lineHeight: 0 },
+  metricCard: { flex: 1, background: C.card, border: `0.5px solid ${C.cardBorder}`, borderRadius: 12, padding: '13px', textAlign: 'center' },
+  metricDark: { flex: 1, background: C.darker, borderRadius: 12, padding: '13px', textAlign: 'center' },
+};
+
+const Chev = ({ open }) => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={C.gold} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}><polyline points="6 9 12 15 18 9" /></svg>
+);
+const EditIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={C.gold} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>
+);
+const CalIcon = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={C.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
+);
+
+const tsToDate = (ts) => (ts && ts.toDate ? ts.toDate() : (ts instanceof Date ? ts : null));
+const fmtTime12 = (d) => (d ? d.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' }) : '—');
+const fmtDateLabel = (d) => (d ? d.toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric' }) : 'Today');
+
 export default function Orders({ userName }) {
+  const [tab, setTab] = useState(1);
   const [openGroup, setOpenGroup] = useState(null);
   const [order, setOrder] = useState([]);
   const [buyerName, setBuyerName] = useState('');
@@ -138,6 +171,14 @@ export default function Orders({ userName }) {
   const [saved, setSaved] = useState(false);
   const [accessToken, setAccessToken] = useState(null);
   const tokenClientRef = React.useRef(null);
+
+  const [allOrders, setAllOrders] = useState([]);
+  const [editingKey, setEditingKey] = useState(null);
+  const [editQty, setEditQty] = useState('');
+  const [editPrice, setEditPrice] = useState('');
+  const [editReason, setEditReason] = useState('');
+  const [editErr, setEditErr] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
 
   useEffect(() => {
     const script = document.createElement('script');
@@ -152,6 +193,13 @@ export default function Orders({ userName }) {
     };
     document.body.appendChild(script);
     return () => document.body.removeChild(script);
+  }, []);
+
+  useEffect(() => {
+    const unsub = onSnapshot(query(collection(db, 'orders'), orderBy('createdAt', 'desc')), snap => {
+      setAllOrders(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return () => unsub();
   }, []);
 
   const addToOrder = (item, size) => {
@@ -173,12 +221,11 @@ export default function Orders({ userName }) {
   const cashier = userName || auth.currentUser?.email?.split('@')[0] || 'Staff';
   const dateStr = now.toLocaleDateString('en-PH', { month: '2-digit', day: '2-digit', year: '2-digit' });
   const timeStr = now.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' });
-  const pdfName = `${dateStr.replace(/\//g,'-')}-${timeStr.replace(/:/g,'-')}-${cashier}`;
+  const pdfName = `${dateStr.replace(/\//g, '-')}-${timeStr.replace(/:/g, '-')}-${cashier}`;
 
   const generateReceiptHTML = () => `
     <html><head><style>
       body { font-family: 'Times New Roman', serif; max-width: 320px; margin: 0 auto; padding: 20px; }
-      .logo { text-align: center; margin-bottom: 8px; }
       .cafe-name { font-size: 20px; font-weight: bold; letter-spacing: 2px; text-align: center; }
       .sub { font-size: 11px; text-align: center; color: #555; margin-bottom: 12px; }
       .divider { border-top: 1px dashed #333; margin: 8px 0; }
@@ -205,15 +252,12 @@ export default function Orders({ userName }) {
 
   const saveOrder = async () => {
     setSaving(true);
-    const now = new Date();
     try {
-      // Save to Firebase
       await addDoc(collection(db, 'orders'), {
         items: order, total, buyerName, paymentMethod, notes,
         cashier, createdAt: serverTimestamp(),
       });
 
-      // Save to Google Sheets (one row per item)
       if (accessToken) {
         const rows = order.map(o => [
           dateStr, o.name, o.size, o.qty, paymentMethod, cashier, o.price * o.qty, notes || ''
@@ -223,7 +267,6 @@ export default function Orders({ userName }) {
           { method: 'POST', headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ values: rows }) }
         );
 
-        // Generate and upload PDF receipt to Drive
         const htmlContent = generateReceiptHTML();
         const blob = new Blob([htmlContent], { type: 'text/html' });
         const form = new FormData();
@@ -242,91 +285,225 @@ export default function Orders({ userName }) {
     setSaving(false);
   };
 
+  // ── derived data for Today's orders + Summary ──
+  const startToday = new Date(); startToday.setHours(0, 0, 0, 0);
+  const startYesterday = new Date(startToday); startYesterday.setDate(startToday.getDate() - 1);
+
+  const inWindow = (o, start) => { const d = tsToDate(o.createdAt); return d ? d >= start : true; };
+  const todayList = allOrders.filter(o => inWindow(o, startYesterday));
+  const summaryList = allOrders.filter(o => inWindow(o, startToday));
+
+  const groupedRows = [];
+  todayList.forEach(o => {
+    const d = tsToDate(o.createdAt);
+    const label = fmtDateLabel(d);
+    let g = groupedRows.find(x => x.label === label);
+    if (!g) { g = { label, rows: [] }; groupedRows.push(g); }
+    (o.items || []).forEach((it, idx) => {
+      g.rows.push({ orderId: o.id, idx, name: it.name, size: it.size, qty: it.qty, price: it.price, line: it.price * it.qty, cashier: o.cashier, time: fmtTime12(d), edited: it.edited, editReason: it.editReason, editedBy: it.editedBy });
+    });
+  });
+
+  const tally = {}; let totalSales = 0;
+  summaryList.forEach(o => (o.items || []).forEach(it => { tally[it.name] = (tally[it.name] || 0) + it.qty; totalSales += it.price * it.qty; }));
+  const tallyArr = Object.entries(tally).map(([name, qty]) => ({ name, qty })).sort((a, b) => b.qty - a.qty);
+  const maxQty = tallyArr.length ? tallyArr[0].qty : 1;
+  const totalOrders = summaryList.length;
+
+  const startEdit = (orderId, idx, qty, price) => {
+    setEditingKey(`${orderId}_${idx}`); setEditQty(String(qty)); setEditPrice(String(price)); setEditReason(''); setEditErr(false);
+  };
+  const saveEdit = async (orderId, idx) => {
+    if (!editReason.trim()) { setEditErr(true); return; }
+    setEditSaving(true);
+    try {
+      const ord = allOrders.find(o => o.id === orderId);
+      if (ord) {
+        const items = (ord.items || []).map((it, i) => i === idx
+          ? { ...it, qty: Math.max(1, parseInt(editQty) || 1), price: Math.max(0, parseFloat(editPrice) || 0), edited: true, editReason: editReason.trim(), editedBy: cashier, editedAt: new Date().toISOString() }
+          : it);
+        const newTotal = items.reduce((sm, it) => sm + it.price * it.qty, 0);
+        await updateDoc(doc(db, 'orders', orderId), { items, total: newTotal });
+      }
+      setEditingKey(null); setEditErr(false);
+    } catch (e) { console.error(e); }
+    setEditSaving(false);
+  };
+
   return (
     <div style={s.page}>
       <div style={s.title}>Orders</div>
-      <div style={s.sub}>Tap a size to add · {order.length} item{order.length !== 1 ? 's' : ''} in order</div>
+      <div style={s.sub}>
+        {tab === 1 ? `Tap a size to add · ${order.length} item${order.length !== 1 ? 's' : ''} in order`
+          : tab === 2 ? 'All orders · tap edit to adjust (reason required)'
+            : 'Totals and items sold today'}
+      </div>
 
-      {!accessToken
-        ? <button style={s.connectBtn} onClick={() => tokenClientRef.current?.requestAccessToken()}>🔗 Connect Google (Sheets + Drive)</button>
-        : <div style={s.connectedBadge}>✅ Connected — orders will sync to Sheets</div>
-      }
+      <div style={s.tabBar}>
+        <button style={s.tab(tab === 1)} onClick={() => setTab(1)}>Order taker</button>
+        <button style={s.tab(tab === 2)} onClick={() => setTab(2)}>Today's orders</button>
+        <button style={s.tab(tab === 3)} onClick={() => setTab(3)}>Summary</button>
+      </div>
 
-      {saved && <div style={{ background: 'var(--green-bg)', color: 'var(--green-ok)', borderRadius: 10, padding: '10px 14px', fontSize: 13, marginBottom: 12 }}>✅ Order saved successfully!</div>}
+      {tab === 1 && (
+        <>
+          {!accessToken
+            ? <button style={s.connectBtn} onClick={() => tokenClientRef.current?.requestAccessToken()}>Connect Google (Sheets + Drive)</button>
+            : <div style={s.connectedBadge}>Connected — orders sync to Sheets</div>
+          }
+          {saved && <div style={{ background: C.greenBg, color: C.green, border: `0.5px solid ${C.greenBorder}`, borderRadius: 10, padding: '10px 14px', fontSize: 13, marginBottom: 12 }}>Order saved successfully.</div>}
 
-      {/* Buyer name + payment */}
-      <label style={s.label}>Buyer Name (optional)</label>
-      <input style={s.input} placeholder="Customer name..." value={buyerName} onChange={e => setBuyerName(e.target.value)} />
-      <label style={s.label}>Payment Method</label>
-      <select style={s.input} value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)}>
-        {PAYMENT_METHODS.map(m => <option key={m}>{m}</option>)}
-      </select>
+          <label style={s.label}>Buyer name (optional)</label>
+          <input style={s.input} placeholder="Customer name…" value={buyerName} onChange={e => setBuyerName(e.target.value)} />
+          <label style={s.label}>Payment method</label>
+          <select style={s.input} value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)}>
+            {PAYMENT_METHODS.map(m => <option key={m}>{m}</option>)}
+          </select>
 
-      {/* Menu groups */}
-      {MENU_GROUPS.map(group => (
-        <div key={group.id} style={s.groupCard}>
-          <div style={s.groupHeader} onClick={() => setOpenGroup(openGroup === group.id ? null : group.id)}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 20 }}>{group.icon}</span>
-              <span style={s.groupLabel}>{group.label}</span>
-            </div>
-            <span style={{ fontSize: 12, color: 'var(--brown-light)', transition: 'transform 0.2s', transform: openGroup === group.id ? 'rotate(180deg)' : 'none' }}>▼</span>
-          </div>
-          {openGroup === group.id && group.items.map((item, i) => (
-            <div key={i} style={s.itemRow}>
-              <span style={s.itemName}>{item.name}</span>
-              <div style={s.sizeRow}>
-                {SIZES.filter(s => item[s]).map(size => (
-                  <button key={size} style={s.sizeBtn} onClick={() => addToOrder(item, size)}>
-                    {SIZE_LABELS[size]} ₱{item[size]}
-                  </button>
-                ))}
+          {MENU_GROUPS.map(group => (
+            <div key={group.id} style={s.groupCard}>
+              <div style={s.groupHeader} onClick={() => setOpenGroup(openGroup === group.id ? null : group.id)}>
+                <span style={s.groupLabel}>{group.label}</span>
+                <Chev open={openGroup === group.id} />
               </div>
-            </div>
-          ))}
-        </div>
-      ))}
-
-      {/* Current order summary */}
-      {order.length > 0 && (
-        <div style={s.orderPanel}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--brown-dark)' }}>Order Summary</span>
-            <button style={{ background: 'none', border: 'none', color: 'var(--red-crit)', fontSize: 12, cursor: 'pointer' }} onClick={() => setOrder([])}>Clear all</button>
-          </div>
-          {order.map(o => (
-            <div key={o.key} style={s.orderRow}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--brown-dark)' }}>{o.name}</div>
-                <div style={{ fontSize: 11, color: 'var(--brown-light)' }}>{o.size} · ₱{o.price}</div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--brown-mid)', fontSize: 14, padding: '0 4px' }} onClick={() => updateQty(o.key, -1)}>−</button>
-                <span style={{ fontSize: 13, fontWeight: 600, minWidth: 16, textAlign: 'center' }}>{o.qty}</span>
-                <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--brown-mid)', fontSize: 14, padding: '0 4px' }} onClick={() => updateQty(o.key, 1)}>+</button>
-                <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--red-crit)', fontSize: 14, padding: '0 4px' }} onClick={() => removeItem(o.key)}>✕</button>
-                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--brown-dark)', minWidth: 50, textAlign: 'right' }}>₱{(o.price * o.qty).toLocaleString()}</span>
-              </div>
+              {openGroup === group.id && group.items.map((item, i) => (
+                <div key={i} style={s.itemRow}>
+                  <span style={s.itemName}>{item.name}</span>
+                  <div style={s.sizeRow}>
+                    {SIZES.filter(sz => item[sz]).map(size => (
+                      <button key={size} style={s.sizeBtn} onClick={() => addToOrder(item, size)}>
+                        {SIZE_LABELS[size]} ₱{item[size]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           ))}
-          <div style={s.total}><span>TOTAL</span><span>₱{total.toLocaleString()}</span></div>
-          <label style={{ ...s.label, marginTop: 10 }}>Notes (optional)</label>
-          <input style={s.input} placeholder="Special instructions..." value={notes} onChange={e => setNotes(e.target.value)} />
-          <button style={s.previewBtn} onClick={() => setShowPreview(true)}>🧾 Preview & Save Order</button>
-        </div>
+
+          {order.length > 0 && (
+            <div style={s.orderPanel}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <span style={{ fontSize: 14, fontWeight: 600, color: C.ink }}>Order summary</span>
+                <button style={{ background: 'none', border: 'none', color: C.red, fontSize: 12, cursor: 'pointer' }} onClick={() => setOrder([])}>Clear all</button>
+              </div>
+              {order.map(o => (
+                <div key={o.key} style={s.orderRow}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: C.ink }}>{o.name}</div>
+                    <div style={{ fontSize: 11, color: C.muted }}>{o.size} · ₱{o.price}</div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.gold, fontSize: 16, padding: '0 4px' }} onClick={() => updateQty(o.key, -1)}>−</button>
+                    <span style={{ fontSize: 13, fontWeight: 600, minWidth: 16, textAlign: 'center', color: C.ink }}>{o.qty}</span>
+                    <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.gold, fontSize: 16, padding: '0 4px' }} onClick={() => updateQty(o.key, 1)}>+</button>
+                    <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.red, fontSize: 14, padding: '0 4px' }} onClick={() => removeItem(o.key)}>×</button>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: C.ink, minWidth: 50, textAlign: 'right' }}>₱{(o.price * o.qty).toLocaleString()}</span>
+                  </div>
+                </div>
+              ))}
+              <div style={s.total}><span>TOTAL</span><span>₱{total.toLocaleString()}</span></div>
+              <label style={{ ...s.label, marginTop: 10 }}>Notes (optional)</label>
+              <input style={s.input} placeholder="Special instructions…" value={notes} onChange={e => setNotes(e.target.value)} />
+              <button style={s.primaryBtn} onClick={() => setShowPreview(true)}>Preview & save order</button>
+            </div>
+          )}
+        </>
       )}
 
-      {/* Preview Modal */}
+      {tab === 2 && (
+        <>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+            <span style={s.pill}>Resets every 2 days</span>
+          </div>
+          {groupedRows.length === 0
+            ? <div style={{ fontSize: 13, color: C.muted, textAlign: 'center', padding: '24px 0' }}>No orders yet.</div>
+            : groupedRows.map(g => (
+              <div key={g.label}>
+                <div style={s.dateHdr}><CalIcon /> {g.label}</div>
+                {g.rows.map(r => {
+                  const k = `${r.orderId}_${r.idx}`;
+                  const editing = editingKey === k;
+                  return (
+                    <div key={k} style={s.recCard}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 13, color: C.ink, fontWeight: 600 }}>{r.name} <span style={{ color: C.muted, fontWeight: 400 }}>×{r.qty}</span></div>
+                          <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{r.time} · ₱{r.line.toLocaleString()} · {r.cashier}</div>
+                          {r.edited && (
+                            <div style={s.editTag}><EditIcon /> Edited{r.editedBy ? ` by ${r.editedBy}` : ''} — {r.editReason}</div>
+                          )}
+                        </div>
+                        <button style={s.iconBtn} aria-label="Edit order" onClick={() => editing ? setEditingKey(null) : startEdit(r.orderId, r.idx, r.qty, r.price)}><EditIcon /></button>
+                      </div>
+                      {editing && (
+                        <div style={{ marginTop: 11, borderTop: `0.5px solid ${C.rowBorder}`, paddingTop: 11 }}>
+                          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>Quantity</div>
+                              <input type="number" value={editQty} onChange={e => setEditQty(e.target.value)} style={{ ...s.input, marginBottom: 0, padding: '8px 10px' }} />
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>Price (each)</div>
+                              <input type="number" value={editPrice} onChange={e => setEditPrice(e.target.value)} style={{ ...s.input, marginBottom: 0, padding: '8px 10px' }} />
+                            </div>
+                          </div>
+                          <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>Reason for edit (required)</div>
+                          <textarea value={editReason} onChange={e => { setEditReason(e.target.value); setEditErr(false); }} placeholder="Why was this changed?" style={{ width: '100%', boxSizing: 'border-box', minHeight: 46, background: C.input, border: `0.5px solid ${C.inputBorder}`, borderRadius: 8, padding: '8px 10px', fontSize: 12.5, color: C.ink, fontFamily: 'inherit', resize: 'vertical' }} />
+                          {editErr && <div style={{ color: C.red, fontSize: 11, marginTop: 5 }}>Please add a reason before saving.</div>}
+                          <div style={{ display: 'flex', gap: 8, marginTop: 9 }}>
+                            <button style={{ flex: 1, background: C.gold, color: '#fff', border: 'none', borderRadius: 9, padding: '9px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }} onClick={() => saveEdit(r.orderId, r.idx)} disabled={editSaving}>{editSaving ? 'Saving…' : 'Save'}</button>
+                            <button style={{ flex: 1, background: 'transparent', color: C.muted, border: `0.5px solid ${C.inputBorder}`, borderRadius: 9, padding: '9px', fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit' }} onClick={() => setEditingKey(null)}>Cancel</button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ))
+          }
+        </>
+      )}
+
+      {tab === 3 && (
+        <>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+            <span style={s.pill}>Resets every day</span>
+          </div>
+          <div style={s.dateHdr}><CalIcon /> {fmtDateLabel(new Date())}</div>
+          <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
+            <div style={s.metricCard}><div style={{ fontSize: 22, fontWeight: 700, color: C.ink }}>{totalOrders}</div><div style={{ fontSize: 11, color: C.muted, marginTop: 3 }}>Total orders</div></div>
+            <div style={s.metricDark}><div style={{ fontSize: 20, fontWeight: 700, color: C.goldBright }}>₱{totalSales.toLocaleString()}</div><div style={{ fontSize: 11, color: '#b08a5a', marginTop: 3 }}>Total sales</div></div>
+          </div>
+          <div style={{ fontSize: 11, color: C.muted, marginBottom: 10 }}>Items ordered</div>
+          {tallyArr.length === 0
+            ? <div style={{ fontSize: 13, color: C.muted, textAlign: 'center', padding: '16px 0' }}>No items sold yet today.</div>
+            : tallyArr.map(t => (
+              <div key={t.name} style={{ marginBottom: 11 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <span style={{ fontSize: 12, color: C.ink }}>{t.name}</span>
+                  <span style={{ fontSize: 12, color: C.goldDeep, fontWeight: 600 }}>×{t.qty}</span>
+                </div>
+                <div style={{ height: 5, background: C.pill, borderRadius: 3, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${Math.round(t.qty / maxQty * 100)}%`, background: C.gold }} />
+                </div>
+              </div>
+            ))
+          }
+        </>
+      )}
+
       {showPreview && (
         <div style={s.modal} onClick={() => setShowPreview(false)}>
           <div style={s.modalCard} onClick={e => e.stopPropagation()}>
-            <div style={s.modalTitle}>Order Receipt</div>
+            <div style={s.modalTitle}>Order receipt</div>
             <div style={s.receiptHeader}>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 700, color: 'var(--brown-dark)', letterSpacing: 1 }}>THEONYX CAFE</div>
-              <div style={{ fontSize: 12, color: 'var(--brown-light)', marginTop: 4 }}>{dateStr} · {timeStr}</div>
-              <div style={{ fontSize: 12, color: 'var(--brown-light)' }}>Cashier: {cashier}</div>
-              {buyerName && <div style={{ fontSize: 12, color: 'var(--brown-light)' }}>Buyer: {buyerName}</div>}
-              <div style={{ fontSize: 12, color: 'var(--brown-light)' }}>Payment: {paymentMethod}</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 700, color: C.ink, letterSpacing: 1 }}>THEONYX CAFE</div>
+              <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>{dateStr} · {timeStr}</div>
+              <div style={{ fontSize: 12, color: C.muted }}>Cashier: {cashier}</div>
+              {buyerName && <div style={{ fontSize: 12, color: C.muted }}>Buyer: {buyerName}</div>}
+              <div style={{ fontSize: 12, color: C.muted }}>Payment: {paymentMethod}</div>
             </div>
             {order.map(o => (
               <div key={o.key} style={s.receiptRow}>
@@ -335,18 +512,18 @@ export default function Orders({ userName }) {
               </div>
             ))}
             <div style={s.receiptTotal}><span>TOTAL</span><span>₱{total.toLocaleString()}</span></div>
-            {notes && <div style={{ fontSize: 12, color: 'var(--brown-light)', marginTop: 8 }}>Notes: {notes}</div>}
-            <button style={s.confirmBtn} onClick={saveOrder} disabled={saving}>
-              {saving ? 'Saving...' : '✅ Confirm & Save'}
+            {notes && <div style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>Notes: {notes}</div>}
+            <button style={s.primaryBtn} onClick={saveOrder} disabled={saving}>
+              {saving ? 'Saving…' : 'Confirm & save'}
             </button>
-            <button style={{ ...s.confirmBtn, background: '#1a73e8', marginTop: 8 }} onClick={() => {
+            <button style={s.darkBtn} onClick={() => {
               const w = window.open('', '_blank');
               w.document.write(generateReceiptHTML());
               w.document.close();
               w.focus();
               setTimeout(() => { w.print(); }, 500);
-            }}>🖨️ Print / Save as PDF</button>
-            <button style={s.cancelBtn} onClick={() => setShowPreview(false)}>Back to Edit</button>
+            }}>Print / save as PDF</button>
+            <button style={s.cancelBtn} onClick={() => setShowPreview(false)}>Back to edit</button>
           </div>
         </div>
       )}
