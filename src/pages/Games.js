@@ -45,13 +45,13 @@ const S = {
 const MENU_NAMES = ['Latte','Matcha','Americano','Espresso','Cappuccino','Frappe','Mocha','Macchiato','Cortado','Affogato'];
 
 const GAME_LIST = [
-  { id: 'snake',       title: 'Snake',           sub: 'Collect coffee beans' },
-  { id: 'tetris',      title: 'Tetris',           sub: 'Classic stacking' },
-  { id: 'racing',      title: 'Cafe Racer',       sub: 'Dodge the barriers' },
-  { id: 'zombie',      title: 'Zombie Barista',   sub: 'Multiplayer survival' },
-  { id: 'guessword',   title: 'Guess the Word',   sub: 'Clues & letters' },
-  { id: 'cafemystery', title: 'Cafe Mystery',     sub: 'Social deduction' },
-  { id: 'fairyq',      title: 'Friends & Questions', sub: 'Funny, deep & spicy' },
+  { id: 'snake',       title: 'Snake',               sub: 'Collect coffee beans',  mode: 'Single player' },
+  { id: 'tetris',      title: 'Tetris',               sub: 'Classic stacking',      mode: 'Single player' },
+  { id: 'racing',      title: 'Cafe Racer',           sub: 'Dodge the barriers',    mode: 'Single player' },
+  { id: 'zombie',      title: 'Zombie Barista',       sub: 'Survive the horde',     mode: 'Multiplayer'   },
+  { id: 'guessword',   title: 'Guess the Word',       sub: 'Clues & letters',       mode: 'Single player' },
+  { id: 'cafemystery', title: 'Cafe Mystery',         sub: 'Who is the impostor?',  mode: 'Multiplayer'   },
+  { id: 'fairyq',      title: 'Friends & Questions',  sub: 'Funny, deep & spicy',  mode: 'Group play'    },
 ];
 
 async function registerUser(username, password) {
@@ -1172,6 +1172,19 @@ function FairyQGame({ playerName, onBack }) {
   );
 }
 
+const FEATURED_GAME_WEEKS = GAME_LIST.map(g => g.id);
+const FEATURED_WEEK_NUM = Math.floor(Date.now() / (7 * 24 * 60 * 60 * 1000));
+const FEATURED_GAME = FEATURED_GAME_WEEKS[FEATURED_WEEK_NUM % FEATURED_GAME_WEEKS.length];
+const GAME_NAMES = {
+  snake: 'Snake', tetris: 'Tetris', racing: 'Cafe Racer',
+  zombie: 'Zombie Barista', guessword: 'Guess the Word', fairyq: 'Friends & Questions',
+};
+const _now = new Date();
+const _ws = new Date(_now); _ws.setDate(_now.getDate() - _now.getDay());
+const _we = new Date(_ws); _we.setDate(_ws.getDate() + 6);
+const _fmt = d => d.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
+const weeklyDateRange = `${_fmt(_ws)} – ${_fmt(_we)}`;
+
 export default function GamesPage() {
   const [activeGame, setActiveGame] = useState(null);
   const [showLB, setShowLB] = useState(false);
@@ -1199,6 +1212,38 @@ export default function GamesPage() {
   const [pendingGame, setPendingGame] = useState(null);
   const [playerName, setPlayerName] = useState(()=>{try{return localStorage.getItem('cafePlayerName')||'';}catch{return '';}});
   const [localBests, setLocalBests] = useState(()=>{try{return JSON.parse(localStorage.getItem('cafeBests')||'{}');}catch{return {};}});
+  const [lbGame, setLbGame]       = useState(FEATURED_GAME);
+  const [lbRows, setLbRows]       = useState([]);
+  const [lbLoading, setLbLoading] = useState(true);
+  const [featuredLeader, setFeaturedLeader] = useState(null);
+
+  // Fetch leaderboard
+  React.useEffect(() => {
+    const fetchLB = async () => {
+      setLbLoading(true);
+      try {
+        const { getDocs, collection: col } = await import('firebase/firestore');
+        const snap = await getDocs(col(db, 'leaderboard'));
+        const all = snap.docs.map(d => d.data());
+        const filtered = all
+          .filter(d => d.gameId === lbGame)
+          .sort((a, b) => (b.score || 0) - (a.score || 0))
+          .slice(0, 10);
+        setLbRows(filtered);
+        // Also fetch featured game leader
+        if (lbGame !== FEATURED_GAME) {
+          const fl = all
+            .filter(d => d.gameId === FEATURED_GAME)
+            .sort((a, b) => (b.score || 0) - (a.score || 0))[0] || null;
+          setFeaturedLeader(fl);
+        } else {
+          setFeaturedLeader(filtered[0] || null);
+        }
+      } catch (e) { setLbRows([]); }
+      setLbLoading(false);
+    };
+    fetchLB();
+  }, [lbGame]);
 
   const saveLocal = (gameId, score) => { setLocalBests(prev => { const upd = {...prev,[gameId]:Math.max(prev[gameId]||0,score)}; try{localStorage.setItem('cafeBests',JSON.stringify(upd));}catch{} return upd; }); };
   const handleGameSelect = (game) => { if (game.id==='cafemystery'||game.id==='zombie'){setActiveGame(game);return;} setPendingGame(game); setShowName(true); };
@@ -1256,21 +1301,144 @@ export default function GamesPage() {
           {musicOn ? '🔊' : '🔇'}
         </button>
       </div>
-      <div style={{position:'relative',zIndex:2,display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 16px',background:'linear-gradient(90deg,#1a0800,#2a1000,#1a0800)',borderBottom:'1px solid #3d1500'}}>
+      <div style={{position:'relative',zIndex:2,display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 14px',background:'linear-gradient(90deg,#1a0800,#2a1000,#1a0800)',borderBottom:'1px solid #3d1500'}}>
         {username ? (
-          <><span style={{color:'#8bc34a',fontSize:13}}>👤 {username}</span>
-          <div style={{display:'flex',gap:8}}>
-            <button onClick={()=>setShowLB(true)} style={{background:'#1a0800',border:'2px solid #d4a853',color:'#ffd700',padding:'6px 14px',borderRadius:16,fontSize:12,fontWeight:'bold',cursor:'pointer'}}>🏆 Leaderboard</button>
-            <button onClick={handleLogout} style={{background:'transparent',border:'1px solid #6b3a1f',color:'#a07850',padding:'6px 12px',borderRadius:16,fontSize:12,cursor:'pointer'}}>Logout</button>
-          </div></>
+          <>
+            <span style={{color:'#8bc34a',fontSize:12,display:'flex',alignItems:'center',gap:5}}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#8bc34a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              {username}
+            </span>
+            <div style={{display:'flex',gap:6}}>
+              <button onClick={()=>setShowLB(true)} style={{background:'#1a0800',border:'1.5px solid #d4a853',color:'#ffd700',padding:'5px 11px',borderRadius:14,fontSize:11,fontWeight:'bold',cursor:'pointer',display:'flex',alignItems:'center',gap:5}}>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#ffd700" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 4h4v12a6 6 0 0 1-4 0V4z"/><path d="M4 6h6v8a3 3 0 0 1-6 0V6z"/><path d="M14 6h6v8a3 3 0 0 1-6 0V6z"/></svg>
+                Leaderboard
+              </button>
+              <button onClick={handleLogout} style={{background:'transparent',border:'1px solid #6b3a1f',color:'#a07850',padding:'5px 10px',borderRadius:14,fontSize:11,cursor:'pointer'}}>Logout</button>
+            </div>
+          </>
         ) : (
-          <><span style={{color:'#c8a070',fontSize:12}}>Sign in to save scores globally</span>
-          <button onClick={()=>setShowAuth(true)} style={{background:'linear-gradient(180deg,#1a0800,#2c1000)',border:'2px solid #d4a853',color:'#ffd700',padding:'7px 16px',borderRadius:20,fontSize:12,fontWeight:'bold',cursor:'pointer',textShadow:'0 0 8px rgba(255,200,0,0.8)',boxShadow:'0 0 12px rgba(212,168,83,0.4)'}}>Sign In / Register</button></>
+          <>
+            <span style={{color:'#7a5020',fontSize:11}}>Save your scores to the global board</span>
+            <div style={{display:'flex',gap:6}}>
+              <button onClick={()=>{setShowAuth(true);}} style={{background:'linear-gradient(135deg,#ffd700,#e8a000)',border:'none',color:'#1a0800',padding:'6px 13px',borderRadius:14,fontSize:11,fontWeight:'bold',cursor:'pointer'}}>Sign Up</button>
+              <button onClick={()=>{setShowAuth(true);}} style={{background:'#1a0800',border:'1.5px solid #d4a853',color:'#ffd700',padding:'6px 13px',borderRadius:14,fontSize:11,fontWeight:'bold',cursor:'pointer'}}>Sign In</button>
+            </div>
+          </>
         )}
       </div>
       <div style={{position:'fixed',inset:0,pointerEvents:'none',zIndex:0,overflow:'hidden'}}>
         {Array.from({length:20}).map((_,i)=>(<div key={i} style={{position:'absolute',borderRadius:'50%',width:`${2+Math.random()*4}px`,height:`${2+Math.random()*4}px`,left:`${(i*17)%100}%`,background:['#ff8800','#ffcc00','#ff4400','#ffd700','#ff6600'][i%5],boxShadow:'0 0 6px #ff8800',animation:`floatUp ${3+i*0.4}s linear ${i*0.3}s infinite`,opacity:0}}/>))}
       </div>
+      {/* ===== INLINE LEADERBOARD ===== */}
+      {/* Ticker */}
+      <div style={{overflow:'hidden',height:22,display:'flex',alignItems:'center',background:'#ffd700',position:'relative',zIndex:2}}>
+        <div style={{display:'flex',whiteSpace:'nowrap',animation:'lbTicker 16s linear infinite',fontSize:10,fontWeight:700,color:'#1a0800',letterSpacing:0.8}}>
+          {[1,2].map(i=>(
+            <span key={i} style={{padding:'0 28px'}}>
+              TOP SCORER THIS WEEK WINS 1 FREE DRINK &nbsp;&#9733;&nbsp; REGISTER TO SAVE SCORES &nbsp;&#9733;&nbsp;
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <div style={{background:'linear-gradient(180deg,#120800,#0a0400)',padding:'10px 12px 14px',position:'relative',zIndex:2}}>
+
+        {/* LB header */}
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+          <div style={{display:'flex',alignItems:'center',gap:6}}>
+            <span style={{fontSize:16,filter:'drop-shadow(0 0 5px #ffd700aa)',animation:'crownSpin 2.5s ease-in-out infinite',display:'inline-block'}}>&#127942;</span>
+            <span style={{fontFamily:"'Cinzel',serif",fontSize:12,fontWeight:700,background:'linear-gradient(90deg,#ffd700,#fff8cc,#ffaa00,#ffd700)',backgroundSize:'200% auto',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',backgroundClip:'text',animation:'shimmerLB 2s linear infinite'}}>HALL OF FAME</span>
+          </div>
+          <div style={{display:'flex',alignItems:'center',gap:4}}>
+            <span style={{width:5,height:5,borderRadius:'50%',background:'#44ff88',display:'inline-block',animation:'lbPulse 1.2s infinite'}}/>
+            <span style={{fontSize:9,color:'#c8943a',fontWeight:700}}>Live</span>
+          </div>
+        </div>
+
+        {/* Weekly prize */}
+        <div style={{background:'#1a0d00',border:'1px solid #ffd70033',borderRadius:10,padding:'7px 10px',marginBottom:8,display:'flex',alignItems:'center',gap:9}}>
+          <svg width="24" height="24" viewBox="0 0 44 44" fill="none" style={{flexShrink:0,animation:'floatLB 2.5s ease-in-out infinite'}}>
+            <rect x="8" y="18" width="24" height="18" rx="4" fill="#3d2200" stroke="#ffd700" strokeWidth="1.5"/>
+            <path d="M32 22 Q40 22 40 28 Q40 34 32 34" stroke="#ffd700" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+            <rect x="12" y="13" width="16" height="5" rx="2" fill="#2a1400" stroke="#ffd70066" strokeWidth="1"/>
+            <line x1="16" y1="10" x2="16" y2="13" stroke="#c8943a" strokeWidth="1.5" strokeLinecap="round"/>
+            <line x1="22" y1="9" x2="22" y2="13" stroke="#c8943a" strokeWidth="1.5" strokeLinecap="round"/>
+            <line x1="28" y1="10" x2="28" y2="13" stroke="#c8943a" strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
+          <div style={{flex:1}}>
+            <div style={{display:'flex',alignItems:'center',gap:5,marginBottom:1}}>
+              <span style={{background:'#ffd700',borderRadius:4,padding:'1px 6px',fontSize:8,fontWeight:700,color:'#1a0800'}}>THIS WEEK</span>
+              <span style={{fontSize:9,color:'#5a3a10'}}>{weeklyDateRange}</span>
+            </div>
+            <div style={{fontSize:11,fontWeight:700,color:'#f5e6d0'}}>Top scorer in <span style={{background:'linear-gradient(90deg,#ffd700,#fff8cc,#ffaa00,#ffd700)',backgroundSize:'200% auto',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',backgroundClip:'text',animation:'shimmerLB 2s linear infinite'}}>{GAME_NAMES[FEATURED_GAME]}</span></div>
+            <div style={{fontSize:9,color:'#a07030'}}>wins <span style={{color:'#ffd700',fontWeight:700}}>1 FREE DRINK</span></div>
+          </div>
+          {featuredLeader ? (
+            <div style={{textAlign:'center',flexShrink:0}}>
+              <div style={{width:28,height:28,borderRadius:'50%',background:'#2a1400',border:'2px solid #ffd700',display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,fontWeight:700,color:'#ffd700',margin:'0 auto 2px',boxShadow:'0 0 6px #ffd70088'}}>{featuredLeader.username.slice(0,2).toUpperCase()}</div>
+              <div style={{fontSize:9,color:'#ffd700',fontWeight:700,maxWidth:52,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{featuredLeader.username}</div>
+              <div style={{fontSize:8,color:'#7a5020'}}>{(featuredLeader.score||0).toLocaleString()} pts</div>
+            </div>
+          ) : (
+            <div style={{fontSize:9,color:'#4a3010',textAlign:'center',maxWidth:60}}>No scores yet!</div>
+          )}
+        </div>
+
+        {/* Game tabs */}
+        <div style={{display:'flex',overflowX:'auto',background:'#100600',borderRadius:8,padding:'0 4px',gap:1,scrollbarWidth:'none',marginBottom:8}}>
+          {GAME_LIST.map(g => (
+            <button key={g.id}
+              onClick={()=>setLbGame(g.id)}
+              style={{flexShrink:0,padding:'6px 11px',border:'none',fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'inherit',transition:'all 0.15s',borderBottom:`2px solid ${lbGame===g.id?'#ffe066':'transparent'}`,background:lbGame===g.id?'linear-gradient(180deg,#c8943a,#9a6010)':'transparent',color:lbGame===g.id?'#1a0800':'#6a4820'}}>
+              {g.title.split(' ')[0]}
+            </button>
+          ))}
+        </div>
+
+        {/* Podium top 3 */}
+        {lbLoading ? (
+          <div style={{textAlign:'center',color:'#4a3010',fontSize:11,padding:'16px 0',animation:'lbPulse 1s infinite'}}>Loading...</div>
+        ) : (
+          <>
+            <div style={{display:'flex',alignItems:'flex-end',justifyContent:'center',gap:5,marginBottom:8}}>
+              {[1,0,2].map((rankIdx) => {
+                const p = lbRows[rankIdx];
+                const mc = ['#ffd700','#c8d0dc','#cd7f32'][rankIdx];
+                const mg = ['#ffd70099','#c0c0c066','#cd7f3266'][rankIdx];
+                const isFirst = rankIdx===0;
+                const ph = [56,40,32][rankIdx];
+                return (
+                  <div key={rankIdx} style={{display:'flex',flexDirection:'column',alignItems:'center',flex:1,maxWidth:100,animation:`floatLB ${1.4+rankIdx*0.3}s ease-in-out infinite`}}>
+                    {isFirst ? <span style={{fontSize:14,filter:'drop-shadow(0 0 5px #ffd700)',animation:'crownSpin 2.5s ease-in-out infinite',display:'inline-block',marginBottom:1}}>&#128081;</span> : <div style={{height:17}}/>}
+                    <div style={{width:isFirst?34:26,height:isFirst?34:26,borderRadius:'50%',background:'#2a1400',border:`2px solid ${mc}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:isFirst?11:9,fontWeight:700,color:mc,flexShrink:0,boxShadow:`0 0 5px ${mg}`}}>{p?p.username.slice(0,2).toUpperCase():'?'}</div>
+                    <div style={{fontSize:isFirst?10:9,fontWeight:700,color:'#f0ddb0',margin:'3px 0 1px',maxWidth:86,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p?p.username:'---'}</div>
+                    <div style={{fontSize:isFirst?11:10,fontWeight:700,color:mc,marginBottom:3,filter:`drop-shadow(0 0 2px ${mc})`}}>{p?(p.score||0).toLocaleString():'---'}</div>
+                    <div style={{width:'100%',height:ph,background:`${mc}12`,border:`1px solid ${mc}44`,borderBottom:'none',borderRadius:'5px 5px 0 0',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                      <span style={{fontFamily:"'Cinzel',serif",fontSize:14,fontWeight:700,color:mc,opacity:0.7}}>{rankIdx===0?'1':rankIdx===1?'2':'3'}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Ranks 4+ */}
+            {lbRows.slice(3).map((p,idx) => (
+              <div key={idx} style={{display:'flex',alignItems:'center',gap:7,padding:'5px 8px',background:idx%2===0?'#1a0e00':'#120800',borderRadius:7,marginBottom:3,border:'0.5px solid #2a1400'}}>
+                <div style={{width:14,fontSize:10,fontWeight:700,color:'#4a3010',textAlign:'center'}}>{idx+4}</div>
+                <div style={{width:22,height:22,borderRadius:'50%',background:'#2a1400',border:'1.5px solid #5a3a10',display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,fontWeight:700,color:'#c8943a',flexShrink:0}}>{p.username.slice(0,2).toUpperCase()}</div>
+                <div style={{flex:1,fontSize:11,fontWeight:700,color:'#c89050'}}>{p.username}</div>
+                <div style={{fontSize:11,fontWeight:700,background:'linear-gradient(90deg,#c8943a,#ffd700,#c8943a)',backgroundSize:'200% auto',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',backgroundClip:'text',animation:'shimmerLB 2.5s linear infinite'}}>{(p.score||0).toLocaleString()}</div>
+              </div>
+            ))}
+            {lbRows.length===0 && <div style={{textAlign:'center',color:'#4a3010',fontSize:11,padding:'12px 0'}}>No scores yet. Be the first!</div>}
+          </>
+        )}
+      </div>
+
+      {/* ===== GAME GRID ===== */}
+      <div style={{height:2,background:'linear-gradient(90deg,transparent,#ff4400 20%,#ffcc00 50%,#ff4400 80%,transparent)'}}/>
+      <div style={{padding:'12px 12px 16px',background:'#0f0700',position:'relative',zIndex:2}}>
+        <div style={{fontSize:10,color:'#7a4a10',letterSpacing:'1.5px',textTransform:'uppercase',fontWeight:700,marginBottom:10,textAlign:'center'}}>Choose your game</div>
       <div style={S.grid}>
         {GAME_LIST.map(game => (
           <div key={game.id} style={S.card}
@@ -1282,12 +1450,19 @@ export default function GamesPage() {
             <div style={{position:'absolute',top:-1,left:'20%',right:'20%',height:2,borderRadius:2,background:'rgba(255,200,0,0.7)',boxShadow:'0 0 8px rgba(255,160,0,0.8)'}}/>
             <div style={S.cardTitle}>{game.title}</div>
             <div style={S.cardSub}>{game.sub}</div>
+            <div style={{fontSize:9,color:'#8a6030',marginTop:3,background:'#2a1200',border:'1px solid #4a2600',borderRadius:8,padding:'2px 7px',display:'inline-block'}}>{game.mode}</div>
             {localBests[game.id]>0 && <div style={S.cardBest}>Best: {localBests[game.id]}</div>}
           </div>
         ))}
       </div>
+      </div>
       <style>{`
         @keyframes logoGlow { from { filter: drop-shadow(0 0 6px #ff8800) drop-shadow(0 0 14px #ff4400); } to { filter: drop-shadow(0 0 14px #ffcc00) drop-shadow(0 0 28px #ff8800); } }
+        @keyframes lbTicker{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+        @keyframes shimmerLB{0%{background-position:-200% center}100%{background-position:200% center}}
+        @keyframes lbPulse{0%,100%{opacity:1}50%{opacity:0.3}}
+        @keyframes floatLB{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+        @keyframes crownSpin{0%,100%{transform:rotate(-8deg)}50%{transform:rotate(8deg)}}
         @keyframes floatUp { 0% { transform:translateY(100vh) scale(0); opacity:0; } 10% { opacity:0.8; } 90% { opacity:0.4; } 100% { transform:translateY(-40px) scale(1.5); opacity:0; } }
       `}</style>
     </div>
