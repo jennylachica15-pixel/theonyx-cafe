@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase/config';
-import { collection, onSnapshot, query, where, updateDoc, doc, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 
 const s = {
   page: { padding: '16px 16px 0', animation: 'fadeIn 0.3s ease' },
@@ -17,27 +17,27 @@ const s = {
   btnRow: { display: 'flex', gap: 8 },
   approveBtn: { flex: 1, padding: '10px', borderRadius: 10, background: '#d8f3dc', color: '#2d6a4f', fontWeight: 700, fontSize: 13, border: 'none', cursor: 'pointer' },
   rejectBtn: { flex: 1, padding: '10px', borderRadius: 10, background: '#ffe0e0', color: '#c1121f', fontWeight: 700, fontSize: 13, border: 'none', cursor: 'pointer' },
+  deleteBtn: { padding: '10px 14px', borderRadius: 10, background: '#1a0a00', color: '#ff6b6b', fontWeight: 700, fontSize: 13, border: 'none', cursor: 'pointer' },
   badge: (status) => ({
     display: 'inline-block', padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600,
     background: status === 'approved' ? '#d8f3dc' : status === 'rejected' ? '#ffe0e0' : '#faeeda',
     color: status === 'approved' ? '#2d6a4f' : status === 'rejected' ? '#c1121f' : '#854f0b',
   }),
   empty: { textAlign: 'center', padding: '40px 0', color: '#c8956c', fontSize: 13 },
+  confirmOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 },
+  confirmBox: { background: 'white', borderRadius: 16, padding: 24, width: '100%', maxWidth: 320, textAlign: 'center' },
 };
 
-export default function Approvals() {
+export default function Approvals({ role }) {
   const [pending, setPending] = useState([]);
   const [approved, setApproved] = useState([]);
   const [rejected, setRejected] = useState([]);
   const [activeTab, setActiveTab] = useState('pending');
   const [loading, setLoading] = useState({});
+  const [confirmDelete, setConfirmDelete] = useState(null); // { id, type }
 
   useEffect(() => {
-    // Pending
-    const q1 = query(collection(db, 'guestPhotos'), where('public', '==', true), where('approved', '==', null));
-    // Also catch docs where approved field doesn't exist yet
-    const q2 = query(collection(db, 'guestPhotos'), where('public', '==', true));
-    const unsub = onSnapshot(q2, snap => {
+    const unsub = onSnapshot(query(collection(db, 'guestPhotos'), where('public', '==', true)), snap => {
       const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       docs.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
       setPending(docs.filter(d => d.approved === undefined || d.approved === null));
@@ -65,6 +65,15 @@ export default function Approvals() {
     setLoading(prev => ({ ...prev, [id]: false }));
   };
 
+  const handleDelete = async () => {
+    if (!confirmDelete) return;
+    const { id } = confirmDelete;
+    setLoading(prev => ({ ...prev, [id]: true }));
+    await deleteDoc(doc(db, 'guestPhotos', id));
+    setLoading(prev => ({ ...prev, [id]: false }));
+    setConfirmDelete(null);
+  };
+
   const renderCards = (list, showActions, showUndo) => {
     if (list.length === 0) return (
       <div style={s.empty}>
@@ -82,24 +91,28 @@ export default function Approvals() {
             {photo.createdAt?.toDate ? photo.createdAt.toDate().toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Just now'}
           </div>
           {photo.feedback && <div style={s.cardFeedback}>"{photo.feedback}"</div>}
+
           {showActions && (
-            <div style={s.btnRow}>
-              <button style={s.approveBtn} onClick={() => handleApprove(photo.id)} disabled={loading[photo.id]}>
-                ✅ Approve
-              </button>
-              <button style={s.rejectBtn} onClick={() => handleReject(photo.id)} disabled={loading[photo.id]}>
-                ❌ Reject
-              </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={s.btnRow}>
+                <button style={s.approveBtn} onClick={() => handleApprove(photo.id)} disabled={loading[photo.id]}>Approve</button>
+                <button style={s.rejectBtn} onClick={() => handleReject(photo.id)} disabled={loading[photo.id]}>Reject</button>
+              </div>
+              {role === 'manager' && <button style={s.deleteBtn} onClick={() => setConfirmDelete({ id: photo.id })}>Delete Photo</button>}
             </div>
           )}
+
           {showUndo && (
-            <div style={{ ...s.btnRow, flexDirection: 'column', gap: 6 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <span style={s.badge(activeTab === 'approved' ? 'approved' : 'rejected')}>
-                {activeTab === 'approved' ? '✅ Approved' : '❌ Rejected'}
+                {activeTab === 'approved' ? 'Approved' : 'Rejected'}
               </span>
-              <button style={{ ...s.rejectBtn, background: '#f5ede4', color: '#6b3a1f', marginTop: 6 }} onClick={() => handleUndo(photo.id)} disabled={loading[photo.id]}>
-                ↩ Move back to Pending
-              </button>
+              <div style={s.btnRow}>
+                <button style={{ ...s.rejectBtn, background: '#f5ede4', color: '#6b3a1f' }} onClick={() => handleUndo(photo.id)} disabled={loading[photo.id]}>
+                  Move to Pending
+                </button>
+                {role === 'manager' && <button style={s.deleteBtn} onClick={() => setConfirmDelete({ id: photo.id })}>Delete</button>}
+              </div>
             </div>
           )}
         </div>
@@ -124,9 +137,30 @@ export default function Approvals() {
         </button>
       </div>
 
-      {activeTab === 'pending' && renderCards(pending, true, false)}
+      {activeTab === 'pending'  && renderCards(pending, true, false)}
       {activeTab === 'approved' && renderCards(approved, false, true)}
       {activeTab === 'rejected' && renderCards(rejected, false, true)}
+
+      {/* Delete confirm dialog */}
+      {confirmDelete && (
+        <div style={s.confirmOverlay}>
+          <div style={s.confirmBox}>
+            <div style={{ fontSize: 36, marginBottom: 10 }}>🗑️</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#1a0a00', marginBottom: 6 }}>Delete Photo?</div>
+            <div style={{ fontSize: 13, color: '#888', marginBottom: 20 }}>This cannot be undone.</div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => setConfirmDelete(null)}
+                style={{ flex: 1, padding: '11px', borderRadius: 10, background: '#f5ede4', border: 'none', color: '#6b3a1f', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+                Cancel
+              </button>
+              <button onClick={handleDelete}
+                style={{ flex: 1, padding: '11px', borderRadius: 10, background: '#c1121f', border: 'none', color: 'white', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div style={{ height: 80 }} />
     </div>
