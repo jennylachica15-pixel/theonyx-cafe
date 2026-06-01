@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase/config';
 import {
-  collection, query, where, orderBy, limit, getDocs
+  collection, getDocs
 } from 'firebase/firestore';
 
 const GAME_LIST = [
@@ -53,6 +53,34 @@ const CSS = `
 
 function Avatar({ name, size, borderColor, glowColor }) {
   const initials = (name || '??').slice(0, 2).toUpperCase();
+  const handleAuth = async () => {
+    if (!authName.trim() || !authPass.trim()) { setAuthErr('Fill in both fields.'); return; }
+    setAuthLoading(true); setAuthErr('');
+    try {
+      if (authMode === 'register') {
+        const { doc, getDoc, setDoc, serverTimestamp } = await import('firebase/firestore');
+        const ref = doc(db, 'gameUsers', authName.trim().toLowerCase());
+        const snap = await getDoc(ref);
+        if (snap.exists()) { setAuthErr('Username already taken!'); setAuthLoading(false); return; }
+        await setDoc(ref, { username: authName.trim(), password: authPass, createdAt: serverTimestamp() });
+      } else {
+        const { doc, getDoc } = await import('firebase/firestore');
+        const ref = doc(db, 'gameUsers', authName.trim().toLowerCase());
+        const snap = await getDoc(ref);
+        if (!snap.exists()) { setAuthErr('Username not found!'); setAuthLoading(false); return; }
+        if (snap.data().password !== authPass) { setAuthErr('Wrong password!'); setAuthLoading(false); return; }
+      }
+      setShowAuth(false);
+      setAuthErr('');
+      setAuthName('');
+      setAuthPass('');
+      setActiveGame(FEATURED_GAME);
+    } catch (e) {
+      setAuthErr('Something went wrong. Try again.');
+    }
+    setAuthLoading(false);
+  };
+
   return (
     <div style={{
       width: size, height: size, borderRadius: '50%',
@@ -73,6 +101,34 @@ function PodiumBlock({ player, rank, isFeatured, activeGame }) {
   const mg = MG[rank];
   const ph = PH[rank];
   const showDrink = isFirst && isFeatured && activeGame === FEATURED_GAME;
+
+  const handleAuth = async () => {
+    if (!authName.trim() || !authPass.trim()) { setAuthErr('Fill in both fields.'); return; }
+    setAuthLoading(true); setAuthErr('');
+    try {
+      if (authMode === 'register') {
+        const { doc, getDoc, setDoc, serverTimestamp } = await import('firebase/firestore');
+        const ref = doc(db, 'gameUsers', authName.trim().toLowerCase());
+        const snap = await getDoc(ref);
+        if (snap.exists()) { setAuthErr('Username already taken!'); setAuthLoading(false); return; }
+        await setDoc(ref, { username: authName.trim(), password: authPass, createdAt: serverTimestamp() });
+      } else {
+        const { doc, getDoc } = await import('firebase/firestore');
+        const ref = doc(db, 'gameUsers', authName.trim().toLowerCase());
+        const snap = await getDoc(ref);
+        if (!snap.exists()) { setAuthErr('Username not found!'); setAuthLoading(false); return; }
+        if (snap.data().password !== authPass) { setAuthErr('Wrong password!'); setAuthLoading(false); return; }
+      }
+      setShowAuth(false);
+      setAuthErr('');
+      setAuthName('');
+      setAuthPass('');
+      setActiveGame(FEATURED_GAME);
+    } catch (e) {
+      setAuthErr('Something went wrong. Try again.');
+    }
+    setAuthLoading(false);
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, maxWidth: 115, animation: `floatUp ${1.4 + rank * 0.3}s ease-in-out infinite` }}>
@@ -104,6 +160,12 @@ export default function Leaderboard() {
   const [rows, setRows]                 = useState([]);
   const [loading, setLoading]           = useState(true);
   const [muted, setMuted]               = useState(false);
+  const [showAuth, setShowAuth]         = useState(false);
+  const [authMode, setAuthMode]         = useState('login');
+  const [authName, setAuthName]         = useState('');
+  const [authPass, setAuthPass]         = useState('');
+  const [authErr, setAuthErr]           = useState('');
+  const [authLoading, setAuthLoading]   = useState(false);
   const audioRef                        = useRef(null);
 
   // Week label
@@ -119,7 +181,35 @@ export default function Leaderboard() {
     audioRef.current.loop   = true;
     audioRef.current.volume = 0.3;
     audioRef.current.play().catch(() => {});
-    return () => { if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; } };
+    const handleAuth = async () => {
+    if (!authName.trim() || !authPass.trim()) { setAuthErr('Fill in both fields.'); return; }
+    setAuthLoading(true); setAuthErr('');
+    try {
+      if (authMode === 'register') {
+        const { doc, getDoc, setDoc, serverTimestamp } = await import('firebase/firestore');
+        const ref = doc(db, 'gameUsers', authName.trim().toLowerCase());
+        const snap = await getDoc(ref);
+        if (snap.exists()) { setAuthErr('Username already taken!'); setAuthLoading(false); return; }
+        await setDoc(ref, { username: authName.trim(), password: authPass, createdAt: serverTimestamp() });
+      } else {
+        const { doc, getDoc } = await import('firebase/firestore');
+        const ref = doc(db, 'gameUsers', authName.trim().toLowerCase());
+        const snap = await getDoc(ref);
+        if (!snap.exists()) { setAuthErr('Username not found!'); setAuthLoading(false); return; }
+        if (snap.data().password !== authPass) { setAuthErr('Wrong password!'); setAuthLoading(false); return; }
+      }
+      setShowAuth(false);
+      setAuthErr('');
+      setAuthName('');
+      setAuthPass('');
+      setActiveGame(FEATURED_GAME);
+    } catch (e) {
+      setAuthErr('Something went wrong. Try again.');
+    }
+    setAuthLoading(false);
+  };
+
+  return () => { if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; } };
   }, []);
 
   const toggleMute = () => {
@@ -134,14 +224,13 @@ export default function Leaderboard() {
     const fetch = async () => {
       setLoading(true);
       try {
-        const q = query(
-          collection(db, 'leaderboard'),
-          where('gameId', '==', activeGame),
-          orderBy('score', 'desc'),
-          limit(10)
-        );
-        const snap = await getDocs(q);
-        setRows(snap.docs.map(d => d.data()));
+        const snap = await getDocs(collection(db, 'leaderboard'));
+        const filtered = snap.docs
+          .map(d => d.data())
+          .filter(d => d.gameId === activeGame)
+          .sort((a, b) => (b.score || 0) - (a.score || 0))
+          .slice(0, 10);
+        setRows(filtered);
       } catch (e) {
         setRows([]);
       }
@@ -154,6 +243,34 @@ export default function Leaderboard() {
   const rest    = rows.slice(3);
   const leader  = rows[0];
   const podiumOrder = [1, 0, 2]; // silver, gold, bronze
+
+  const handleAuth = async () => {
+    if (!authName.trim() || !authPass.trim()) { setAuthErr('Fill in both fields.'); return; }
+    setAuthLoading(true); setAuthErr('');
+    try {
+      if (authMode === 'register') {
+        const { doc, getDoc, setDoc, serverTimestamp } = await import('firebase/firestore');
+        const ref = doc(db, 'gameUsers', authName.trim().toLowerCase());
+        const snap = await getDoc(ref);
+        if (snap.exists()) { setAuthErr('Username already taken!'); setAuthLoading(false); return; }
+        await setDoc(ref, { username: authName.trim(), password: authPass, createdAt: serverTimestamp() });
+      } else {
+        const { doc, getDoc } = await import('firebase/firestore');
+        const ref = doc(db, 'gameUsers', authName.trim().toLowerCase());
+        const snap = await getDoc(ref);
+        if (!snap.exists()) { setAuthErr('Username not found!'); setAuthLoading(false); return; }
+        if (snap.data().password !== authPass) { setAuthErr('Wrong password!'); setAuthLoading(false); return; }
+      }
+      setShowAuth(false);
+      setAuthErr('');
+      setAuthName('');
+      setAuthPass('');
+      setActiveGame(FEATURED_GAME);
+    } catch (e) {
+      setAuthErr('Something went wrong. Try again.');
+    }
+    setAuthLoading(false);
+  };
 
   return (
     <>
@@ -259,7 +376,35 @@ export default function Leaderboard() {
             <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 6 }}>
               {podiumOrder.map((rankIdx, i) => {
                 const player = top3[rankIdx];
-                return (
+                const handleAuth = async () => {
+    if (!authName.trim() || !authPass.trim()) { setAuthErr('Fill in both fields.'); return; }
+    setAuthLoading(true); setAuthErr('');
+    try {
+      if (authMode === 'register') {
+        const { doc, getDoc, setDoc, serverTimestamp } = await import('firebase/firestore');
+        const ref = doc(db, 'gameUsers', authName.trim().toLowerCase());
+        const snap = await getDoc(ref);
+        if (snap.exists()) { setAuthErr('Username already taken!'); setAuthLoading(false); return; }
+        await setDoc(ref, { username: authName.trim(), password: authPass, createdAt: serverTimestamp() });
+      } else {
+        const { doc, getDoc } = await import('firebase/firestore');
+        const ref = doc(db, 'gameUsers', authName.trim().toLowerCase());
+        const snap = await getDoc(ref);
+        if (!snap.exists()) { setAuthErr('Username not found!'); setAuthLoading(false); return; }
+        if (snap.data().password !== authPass) { setAuthErr('Wrong password!'); setAuthLoading(false); return; }
+      }
+      setShowAuth(false);
+      setAuthErr('');
+      setAuthName('');
+      setAuthPass('');
+      setActiveGame(FEATURED_GAME);
+    } catch (e) {
+      setAuthErr('Something went wrong. Try again.');
+    }
+    setAuthLoading(false);
+  };
+
+  return (
                   <PodiumBlock key={i} player={player || null} rank={rankIdx} isFeatured={true} activeGame={activeGame} />
                 );
               })}
@@ -296,11 +441,18 @@ export default function Leaderboard() {
             Register free at the counter and play.<br />
             Top scorer wins a <span style={{ color: '#ffd700', fontWeight: 700 }}>free drink</span> every week.
           </div>
-          <button className="lb-cta">Register &amp; Play Now</button>
+          <button className="lb-cta" onClick={() => { setAuthMode('register'); setShowAuth(true); }}>Register &amp; Play Now</button>
           <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
             {['7 Games', 'Weekly Prize', 'Free to play'].map(t => (
               <span key={t} style={{ background: '#2a1400', border: '1px solid #4a2600', borderRadius: 20, padding: '4px 11px', fontSize: 10, color: '#c8943a', fontWeight: 700 }}>{t}</span>
             ))}
+          </div>
+          <div style={{ marginTop: 12, fontSize: 12, color: '#5a3a10' }}>
+            Already registered?{' '}
+            <button onClick={() => { setAuthMode('login'); setShowAuth(true); }}
+              style={{ background: 'none', border: 'none', color: '#ffd700', fontWeight: 700, cursor: 'pointer', fontSize: 12, padding: 0, textDecoration: 'underline', fontFamily: "'Quicksand',sans-serif" }}>
+              Sign in to play
+            </button>
           </div>
         </div>
 
@@ -309,6 +461,61 @@ export default function Leaderboard() {
         </div>
 
       </div>
+
+      {/* Auth Modal */}
+      {showAuth && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+          onClick={() => setShowAuth(false)}>
+          <div style={{ background: '#1a0900', border: '1.5px solid #c8943a', borderRadius: 20, padding: '28px 24px', width: '100%', maxWidth: 360 }}
+            onClick={e => e.stopPropagation()}>
+            {/* Crown */}
+            <div style={{ textAlign: 'center', fontSize: 32, marginBottom: 6, filter: 'drop-shadow(0 0 8px #ffd700aa)', animation: 'crownSpin 2.5s ease-in-out infinite', display: 'inline-block', width: '100%' }}>&#128081;</div>
+            <div style={{ fontFamily: "'Cinzel',serif", fontSize: 18, fontWeight: 700, textAlign: 'center', marginBottom: 4, background: 'linear-gradient(90deg,#ffd700,#fff8cc,#ffaa00,#ffd700)', backgroundSize: '200% auto', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', animation: 'shimmer 2s linear infinite' }}>
+              {authMode === 'register' ? 'Join the Game Corner' : 'Welcome Back'}
+            </div>
+            <div style={{ fontSize: 12, color: '#7a5020', textAlign: 'center', marginBottom: 20 }}>
+              {authMode === 'register' ? 'Create your player name to save scores globally' : 'Sign in to track your scores'}
+            </div>
+            {authErr && (
+              <div style={{ background: 'rgba(193,18,31,0.2)', color: '#ff8888', borderRadius: 8, padding: '8px 12px', fontSize: 12, marginBottom: 12, border: '1px solid rgba(193,18,31,0.3)' }}>
+                {authErr}
+              </div>
+            )}
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#7a5020', marginBottom: 5, textTransform: 'uppercase', letterSpacing: 0.5 }}>Username</div>
+            <input
+              value={authName}
+              onChange={e => setAuthName(e.target.value)}
+              placeholder="e.g. Latte, EspressoKing"
+              style={{ width: '100%', padding: '11px 13px', borderRadius: 10, border: '1px solid #5a3000', background: '#2a1200', color: '#f5e6d0', fontSize: 14, marginBottom: 10, outline: 'none', boxSizing: 'border-box', fontFamily: "'Quicksand',sans-serif" }}
+            />
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#7a5020', marginBottom: 5, textTransform: 'uppercase', letterSpacing: 0.5 }}>Password</div>
+            <input
+              type="password"
+              value={authPass}
+              onChange={e => setAuthPass(e.target.value)}
+              placeholder="Your password"
+              style={{ width: '100%', padding: '11px 13px', borderRadius: 10, border: '1px solid #5a3000', background: '#2a1200', color: '#f5e6d0', fontSize: 14, marginBottom: 16, outline: 'none', boxSizing: 'border-box', fontFamily: "'Quicksand',sans-serif" }}
+            />
+            <button
+              onClick={handleAuth}
+              disabled={authLoading}
+              style={{ width: '100%', padding: 13, borderRadius: 12, background: '#1a0900', border: '2px solid #ffd700', color: '#ffd700', fontSize: 15, fontWeight: 700, cursor: authLoading ? 'not-allowed' : 'pointer', fontFamily: "'Quicksand',sans-serif", animation: 'lbGlow 2s ease-in-out infinite', marginBottom: 8 }}>
+              {authLoading ? 'Please wait...' : authMode === 'register' ? 'Create Account' : 'Sign In'}
+            </button>
+            <button
+              onClick={() => { setAuthMode(authMode === 'login' ? 'register' : 'login'); setAuthErr(''); }}
+              style={{ width: '100%', padding: 10, borderRadius: 12, background: 'transparent', border: '1px solid #3a2000', color: '#7a5020', fontSize: 13, cursor: 'pointer', fontFamily: "'Quicksand',sans-serif" }}>
+              {authMode === 'login' ? 'New here? Create Account' : 'Already have one? Sign In'}
+            </button>
+            <button
+              onClick={() => setShowAuth(false)}
+              style={{ width: '100%', padding: 10, borderRadius: 12, background: 'transparent', border: 'none', color: '#4a3010', fontSize: 12, cursor: 'pointer', marginTop: 4, fontFamily: "'Quicksand',sans-serif" }}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
     </>
   );
 }
