@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { auth, db } from '../firebase/config';
 import { signOut } from 'firebase/auth';
-import { doc, getDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, collection, addDoc, serverTimestamp, onSnapshot, query, where, getDocs } from 'firebase/firestore';
 import Attendance from './Attendance';
 import Orders from './Orders';
 import Inventory from './Inventory';
@@ -25,25 +25,28 @@ const CHECKLIST_ITEMS = [
 const CLEANLINESS_FOLDER = '1U3nFpZ14aeprxCmFtNshpYFUUemQioM5';
 
 function CleanlinessCheck({ userName }) {
-  const [checks, setChecks] = useState({});
-  const [notes, setNotes] = useState('');
-  const [photos, setPhotos] = useState([]);
-  const [uploading, setUploading] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
-  const [error, setError] = useState('');
-  const fileRef = useRef(null);
+  const [checks, setChecks] = React.useState({});
+  const [photos, setPhotos] = React.useState({}); // { itemId: { file, url } }
+  const [notes, setNotes] = React.useState('');
+  const [uploading, setUploading] = React.useState(false);
+  const [submitted, setSubmitted] = React.useState(false);
+  const [error, setError] = React.useState('');
+  const fileRefs = React.useRef({});
+  const now = new Date();
 
   const toggle = (id) => setChecks(prev => ({ ...prev, [id]: !prev[id] }));
 
-  const handlePhotos = (e) => {
-    const files = Array.from(e.target.files);
-    const previews = files.map(f => ({ file: f, url: URL.createObjectURL(f), name: f.name }));
-    setPhotos(prev => [...prev, ...previews]);
+  const handlePhotoCapture = (itemId, e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setPhotos(prev => ({ ...prev, [itemId]: { file, url: URL.createObjectURL(file) } }));
   };
 
-  const removePhoto = (idx) => setPhotos(prev => prev.filter((_, i) => i !== idx));
+  const removePhoto = (itemId) => {
+    setPhotos(prev => { const n = {...prev}; delete n[itemId]; return n; });
+  };
 
-  const uploadToGoogleDrive = async (file) => {
+  const uploadToGoogleDrive = async (file, itemLabel) => {
     const token = await new Promise((resolve, reject) => {
       const client = window.google?.accounts?.oauth2?.initTokenClient({
         client_id: '596322682185-n5hm66hvol3nnqqllnuop995kcnefbgu.apps.googleusercontent.com',
@@ -52,19 +55,16 @@ function CleanlinessCheck({ userName }) {
       });
       client?.requestAccessToken();
     });
-
+    const dateStr = now.toISOString().split('T')[0];
     const metadata = {
-      name: `cleanliness_${Date.now()}_${file.name}`,
+      name: `clean_${dateStr}_${userName}_${itemLabel.replace(/\s/g,'_')}_${Date.now()}.jpg`,
       parents: [CLEANLINESS_FOLDER],
     };
     const form = new FormData();
     form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
     form.append('file', file);
-
     const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-      body: form,
+      method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form,
     });
     const data = await res.json();
     return `https://drive.google.com/file/d/${data.id}/view`;
@@ -75,21 +75,26 @@ function CleanlinessCheck({ userName }) {
     if (checked.length === 0) { setError('Please check at least one item.'); return; }
     setUploading(true); setError('');
     try {
-      let photoUrls = [];
-      for (const p of photos) {
-        try {
-          const url = await uploadToGoogleDrive(p.file);
-          photoUrls.push(url);
-        } catch {
-          photoUrls.push('(upload failed)');
+      const photoUrls = {};
+      for (const item of CHECKLIST_ITEMS) {
+        if (photos[item.id]) {
+          try {
+            const url = await uploadToGoogleDrive(photos[item.id].file, item.label);
+            photoUrls[item.id] = url;
+          } catch { photoUrls[item.id] = '(upload failed)'; }
         }
       }
+      const dateTimeStr = now.toLocaleDateString('en-PH', { weekday:'long', year:'numeric', month:'long', day:'numeric' })
+        + ' ' + now.toLocaleTimeString('en-PH', { hour:'2-digit', minute:'2-digit' });
+
       await addDoc(collection(db, 'cleanlinessChecks'), {
         staff: userName,
+        dateTime: dateTimeStr,
+        date: now.toDateString(),
         checkedItems: checked.map(i => i.label),
         uncheckedItems: CHECKLIST_ITEMS.filter(i => !checks[i.id]).map(i => i.label),
-        notes,
         photoUrls,
+        notes,
         submittedAt: serverTimestamp(),
       });
       setSubmitted(true);
@@ -99,13 +104,18 @@ function CleanlinessCheck({ userName }) {
     setUploading(false);
   };
 
+  const formatDate = now.toLocaleDateString('en-PH', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+  const formatTime = now.toLocaleTimeString('en-PH', { hour:'2-digit', minute:'2-digit' });
+  const doneCount = Object.values(checks).filter(Boolean).length;
+
   if (submitted) {
     return (
       <div style={{ padding: 28, textAlign: 'center' }}>
-        <div style={{ fontSize: 44, marginBottom: 12 }}>✅</div>
+        <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="#8bc34a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: 12 }}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
         <div style={{ fontSize: 18, fontWeight: 700, color: '#2a6000', marginBottom: 6 }}>Submitted!</div>
-        <div style={{ fontSize: 13, color: '#888', marginBottom: 24 }}>Cleanliness check saved.</div>
-        <button onClick={() => { setSubmitted(false); setChecks({}); setNotes(''); setPhotos([]); }}
+        <div style={{ fontSize: 13, color: '#888', marginBottom: 4 }}>Cleanliness check saved.</div>
+        <div style={{ fontSize: 12, color: '#a07850', marginBottom: 24 }}>{formatDate} · {formatTime} · {userName}</div>
+        <button onClick={() => { setSubmitted(false); setChecks({}); setNotes(''); setPhotos({}); }}
           style={{ background: '#c8943a', border: 'none', borderRadius: 10, padding: '10px 28px', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
           New Check
         </button>
@@ -113,36 +123,79 @@ function CleanlinessCheck({ userName }) {
     );
   }
 
-  const doneCount = Object.values(checks).filter(Boolean).length;
-
   return (
     <div style={{ padding: '16px 16px 32px' }}>
-      <div style={{ fontSize: 16, fontWeight: 700, color: '#2a1000', marginBottom: 4 }}>Cleanliness Check</div>
-      <div style={{ fontSize: 12, color: '#a07850', marginBottom: 16 }}>{new Date().toLocaleDateString('en-PH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div>
-
-      {/* Progress */}
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#888', marginBottom: 5 }}>
-          <span>{doneCount} of {CHECKLIST_ITEMS.length} checked</span>
-          <span style={{ color: doneCount === CHECKLIST_ITEMS.length ? '#2a6000' : '#888' }}>{Math.round(doneCount / CHECKLIST_ITEMS.length * 100)}%</span>
-        </div>
-        <div style={{ height: 6, background: '#f0e8d8', borderRadius: 3, overflow: 'hidden' }}>
-          <div style={{ height: '100%', width: `${doneCount / CHECKLIST_ITEMS.length * 100}%`, background: '#c8943a', borderRadius: 3, transition: 'width 0.3s' }} />
+      {/* Header */}
+      <div style={{ marginBottom: 4 }}>
+        <div style={{ fontSize: 18, fontWeight: 700, color: '#2a1000' }}>Cleanliness Check</div>
+        <div style={{ fontSize: 13, color: '#c8943a', marginTop: 2 }}>
+          Welcome, <b>{userName}</b>! Let's check the cafe.
         </div>
       </div>
+      <div style={{ fontSize: 11, color: '#a07850', marginBottom: 12 }}>
+        {formatDate} · {formatTime} · {userName}
+      </div>
 
-      {/* Checklist */}
+      {/* Progress */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#888', marginBottom: 5 }}>
+        <span>{doneCount} of {CHECKLIST_ITEMS.length} checked</span>
+        <span style={{ color: '#c8943a', fontWeight: 600 }}>{Math.round(doneCount / CHECKLIST_ITEMS.length * 100)}%</span>
+      </div>
+      <div style={{ height: 6, background: '#f0e8d8', borderRadius: 3, overflow: 'hidden', marginBottom: 16 }}>
+        <div style={{ height: '100%', width: `${doneCount / CHECKLIST_ITEMS.length * 100}%`, background: '#c8943a', borderRadius: 3, transition: 'width 0.3s' }} />
+      </div>
+
+      {/* Checklist with per-item photos */}
       <div style={{ marginBottom: 18 }}>
-        {CHECKLIST_ITEMS.map(item => (
-          <div key={item.id} onClick={() => toggle(item.id)}
-            style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', background: checks[item.id] ? '#f0fce8' : '#fff', border: `1px solid ${checks[item.id] ? '#8bc34a' : '#e8dfd0'}`, borderRadius: 10, marginBottom: 8, cursor: 'pointer', transition: 'all 0.15s' }}>
-            <div style={{ width: 22, height: 22, borderRadius: 6, border: `2px solid ${checks[item.id] ? '#8bc34a' : '#c8943a'}`, background: checks[item.id] ? '#8bc34a' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.15s' }}>
-              {checks[item.id] && <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+        {CHECKLIST_ITEMS.map(item => {
+          const isChecked = checks[item.id];
+          const hasPhoto = photos[item.id];
+          return (
+            <div key={item.id}
+              style={{ background: isChecked ? '#f0fce8' : '#fff', border: `1px solid ${isChecked ? '#8bc34a' : '#f0e8d8'}`, borderRadius: 12, padding: '12px 14px', marginBottom: 8, transition: 'all 0.15s' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                {/* Checkbox */}
+                <div onClick={() => toggle(item.id)}
+                  style={{ width: 24, height: 24, borderRadius: 6, border: `2px solid ${isChecked ? '#8bc34a' : '#c8943a'}`, background: isChecked ? '#8bc34a' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'pointer', transition: 'all 0.15s' }}>
+                  {isChecked && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                </div>
+
+                {/* Label */}
+                <span onClick={() => toggle(item.id)} style={{ fontSize: 14, color: isChecked ? '#2a6000' : '#2a1000', fontWeight: isChecked ? 600 : 400, flex: 1, cursor: 'pointer' }}>
+                  {item.label}
+                </span>
+
+                {/* Camera — only active when checked */}
+                {isChecked ? (
+                  hasPhoto ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <img src={hasPhoto.url} alt={item.label}
+                        style={{ width: 38, height: 38, borderRadius: 8, objectFit: 'cover', border: '1px solid #8bc34a' }} />
+                      <button onClick={() => fileRefs.current[item.id]?.click()}
+                        style={{ background: '#e8f5e9', border: '1px solid #8bc34a', borderRadius: 8, padding: '5px 9px', cursor: 'pointer', fontSize: 11, color: '#2d6a4f', fontWeight: 600 }}>
+                        Retake
+                      </button>
+                    </div>
+                  ) : (
+                    <button onClick={() => fileRefs.current[item.id]?.click()}
+                      style={{ background: '#fff8f0', border: '1.5px dashed #c8943a', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', fontSize: 11, color: '#c8943a', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#c8943a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                      Add Photo
+                    </button>
+                  )
+                ) : (
+                  <div style={{ width: 38, height: 38, borderRadius: 8, background: '#f5f0ea', border: '1px solid #e8dfd0', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.4 }}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#a07850" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                  </div>
+                )}
+
+                {/* Hidden file input per item */}
+                <input ref={el => fileRefs.current[item.id] = el} type="file" accept="image/*" capture="environment"
+                  onChange={e => handlePhotoCapture(item.id, e)} style={{ display: 'none' }} />
+              </div>
             </div>
-            <span style={{ fontSize: 14, color: checks[item.id] ? '#2a6000' : '#2a1000', fontWeight: checks[item.id] ? 600 : 400 }}>{item.label}</span>
-            {checks[item.id] && <span style={{ marginLeft: 'auto', fontSize: 11, color: '#8bc34a', fontWeight: 600 }}>Clean</span>}
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Notes */}
@@ -152,27 +205,9 @@ function CleanlinessCheck({ userName }) {
           style={{ width: '100%', minHeight: 72, border: '1px solid #e8dfd0', borderRadius: 10, padding: '10px 12px', fontSize: 13, color: '#2a1000', resize: 'vertical', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', background: '#fff' }} />
       </div>
 
-      {/* Photos */}
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 12, fontWeight: 600, color: '#2a1000', marginBottom: 8 }}>Photos</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
-          {photos.map((p, i) => (
-            <div key={i} style={{ position: 'relative', width: 80, height: 80, borderRadius: 10, overflow: 'hidden', border: '1px solid #e8dfd0' }}>
-              <img src={p.url} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              <button onClick={() => removePhoto(i)}
-                style={{ position: 'absolute', top: 3, right: 3, width: 20, height: 20, borderRadius: '50%', background: 'rgba(0,0,0,0.55)', border: 'none', color: '#fff', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>
-                x
-              </button>
-            </div>
-          ))}
-          <div onClick={() => fileRef.current?.click()}
-            style={{ width: 80, height: 80, border: '1.5px dashed #c8943a', borderRadius: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: '#fffaf4', gap: 4 }}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#c8943a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-            <span style={{ fontSize: 9, color: '#c8943a', fontWeight: 600 }}>Add Photo</span>
-          </div>
-        </div>
-        <input ref={fileRef} type="file" accept="image/*" multiple onChange={handlePhotos} style={{ display: 'none' }} />
-        <div style={{ fontSize: 11, color: '#a07850' }}>Photos will be saved to Google Drive.</div>
+      {/* Submit info */}
+      <div style={{ background: '#fff8f0', border: '1px solid #f0e8d8', borderRadius: 10, padding: '10px 14px', marginBottom: 12, fontSize: 12, color: '#a07850' }}>
+        Will be saved as: <b style={{ color: '#2a1000' }}>{formatDate} · {formatTime} · {userName}</b>
       </div>
 
       {error && <div style={{ color: '#cc3333', fontSize: 13, marginBottom: 10 }}>{error}</div>}
@@ -191,6 +226,8 @@ export default function AdminApp({ user, onSignOut }) {
   const [role, setRole] = useState('staff');
   const [userName, setUserName] = useState('');
   const [time, setTime] = useState(new Date());
+  const [pendingPhotos, setPendingPhotos] = useState(0);
+  const [cleanlinessAlert, setCleanlinessAlert] = useState(false);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -205,6 +242,34 @@ export default function AdminApp({ user, onSignOut }) {
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(timer);
+  }, []);
+
+  // Notifications: pending photos + cleanliness check
+  useEffect(() => {
+    // Watch pending photo approvals
+    const unsubPhotos = onSnapshot(
+      query(collection(db, 'guestPhotos'), where('public', '==', true)),
+      snap => {
+        const docs = snap.docs.map(d => d.data());
+        setPendingPhotos(docs.filter(d => d.approved === undefined || d.approved === null).length);
+      }
+    );
+
+    // Check if cleanliness submitted today (only alert after 3PM)
+    const checkCleanliness = async () => {
+      const now = new Date();
+      if (now.getHours() >= 15) {
+        const today = now.toDateString();
+        const snap = await getDocs(query(collection(db, 'cleanlinessChecks'), where('date', '==', today)));
+        setCleanlinessAlert(snap.empty);
+      } else {
+        setCleanlinessAlert(false);
+      }
+    };
+    checkCleanliness();
+    const cleanTimer = setInterval(checkCleanliness, 60000); // check every minute
+
+    return () => { unsubPhotos(); clearInterval(cleanTimer); };
   }, []);
 
   const handleSignOut = async () => { await signOut(auth); onSignOut(); };
@@ -272,6 +337,34 @@ export default function AdminApp({ user, onSignOut }) {
                 <div style={{ fontSize: 10, color: '#a07850' }}>{formatDate(time)}</div>
               </div>
             </div>
+
+            {/* Notification alerts */}
+            {(cleanlinessAlert || pendingPhotos > 0) && (
+              <div style={{ padding: '12px 16px 0' }}>
+                {cleanlinessAlert && (
+                  <div onClick={() => setActiveTab('cleanliness')}
+                    style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#fff3e0', border: '1px solid #ffb74d', borderRadius: 10, padding: '10px 14px', marginBottom: 8, cursor: 'pointer' }}>
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#ff9800', flexShrink: 0 }} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#e65100' }}>Cleanliness Check Pending</div>
+                      <div style={{ fontSize: 11, color: '#bf360c' }}>No cleanliness check submitted today. Tap to complete.</div>
+                    </div>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e65100" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                  </div>
+                )}
+                {pendingPhotos > 0 && (
+                  <div onClick={() => setActiveTab('approvals')}
+                    style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#e8f4fd', border: '1px solid #64b5f6', borderRadius: 10, padding: '10px 14px', marginBottom: 8, cursor: 'pointer' }}>
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#2196f3', flexShrink: 0 }} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#0d47a1' }}>Photos Pending Approval</div>
+                      <div style={{ fontSize: 11, color: '#1565c0' }}>{pendingPhotos} guest photo{pendingPhotos > 1 ? 's' : ''} waiting for review. Tap to approve.</div>
+                    </div>
+                    <div style={{ background: '#2196f3', color: '#fff', borderRadius: '50%', width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>{pendingPhotos}</div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Main panels */}
             <div style={{ padding: '16px 16px 8px' }}>
