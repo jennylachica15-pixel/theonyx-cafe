@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase/config';
-import { collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, deleteDoc, updateDoc, doc, onSnapshot, query, orderBy, serverTimestamp } from 'firebase/firestore';
 
 const SHEET_ID = '15o1OUhOO17s1ifKSlYonPrmtJEAP1qQRLoMCI7_N0DM';
 const ATTENDANCE_FOLDER_ID = '1xuC8werkmhShXi1qSjUPTuj_EtZzk9V3';
 const GOOGLE_CLIENT_ID = '596322682185-n5hm66hvol3nnqqllnuop995kcnefbgu.apps.googleusercontent.com';
 const SCOPES = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file';
 const STAFF_LIST = ['Kelly', 'Maryz'];
+const DAILY_RATE = 400;
 
 // ── palette (matches admin theme) ──
 const C = {
@@ -39,7 +40,8 @@ const s = {
   outBtn: { background: C.white, color: C.terra, border: `1.5px solid ${C.terra}` },
   doneBtn: { background: C.cream, color: '#8a6d3b', border: `1px solid ${C.border}`, cursor: 'default' },
   lockBtn: { background: C.soft, color: '#bca684', border: `1px solid ${C.border}`, cursor: 'not-allowed' },
-  // rest day
+  restTodayBox: { background: C.warnBg, border: `1px solid ${C.warnBorder}`, borderRadius: 11, padding: '14px', display: 'flex', alignItems: 'center', gap: 9, fontSize: 13.5, color: C.warn, fontWeight: 600 },
+  // rest day card
   restHead: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 },
   restTitle: { fontSize: 15, fontWeight: 700, color: C.ink },
   restSub: { fontSize: 11.5, color: C.muted, marginBottom: 14 },
@@ -48,6 +50,15 @@ const s = {
   setBtn: { padding: '10px 16px', borderRadius: 10, background: C.gold, color: C.white, border: 'none', fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' },
   restItem: (clash) => ({ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, marginBottom: 7,
     background: clash ? C.warnBg : C.cream, border: `1px solid ${clash ? C.warnBorder : C.border}` }),
+  // summary stats
+  statStrip: { display: 'flex', gap: 8, marginBottom: 16 },
+  statBox: { flex: 1, background: C.cream, border: `1px solid ${C.border}`, borderRadius: 10, padding: '11px 8px', textAlign: 'center' },
+  statBoxGold: { flex: 1.3, background: C.ink, borderRadius: 10, padding: '11px 8px', textAlign: 'center' },
+  statNum: { fontSize: 18, fontWeight: 700, color: C.ink },
+  statNumGold: { fontSize: 17, fontWeight: 700, color: C.gold },
+  statLbl: { fontSize: 9.5, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 3 },
+  statLblGold: { fontSize: 9.5, color: '#d8b87a', textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 3 },
+  restPill: { display: 'inline-block', fontSize: 11, fontWeight: 700, color: C.warn, background: C.warnBg, border: `1px solid ${C.warnBorder}`, borderRadius: 20, padding: '2px 10px' },
   // modals
   modal: { position: 'fixed', inset: 0, background: 'rgba(26,10,0,0.7)', zIndex: 300, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' },
   modalCard: { background: C.cream, borderRadius: '20px 20px 0 0', padding: '24px 22px 36px', width: '100%', maxWidth: 480, animation: 'slideUp 0.3s ease', maxHeight: '85vh', overflowY: 'auto' },
@@ -82,6 +93,19 @@ const prettyDate = (iso) => {
   const [y, m, d] = iso.split('-').map(Number);
   return new Date(y, m - 1, d).toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric' });
 };
+const peso = (n) => '\u20B1' + Number(n).toLocaleString('en-PH');
+
+// append a rest-day row to a staff's record sheet
+async function appendRestRow(staffName, sheetDate, token) {
+  const values = [[sheetDate, staffName, 'REST DAY', '', '', '']];
+  try {
+    const res = await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${staffName}!A:F:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
+      { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ values }) }
+    );
+    return res.ok;
+  } catch { return false; }
+}
 
 export default function Attendance({ role, userName }) {
   const [accessToken, setAccessToken] = useState(null);
@@ -100,6 +124,7 @@ export default function Attendance({ role, userName }) {
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryRows, setSummaryRows] = useState([]);
+  const [summaryStats, setSummaryStats] = useState({ worked: 0, rest: 0, salary: 0 });
 
   // rest days
   const [restDays, setRestDays] = useState([]);
@@ -137,6 +162,7 @@ export default function Attendance({ role, userName }) {
 
   const formatTime = d => d.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   const formatDate = d => d.toLocaleDateString('en-PH', { month: '2-digit', day: '2-digit', year: 'numeric' });
+  const sheetDateFromIso = iso => { const [y, m, d] = iso.split('-').map(Number); return formatDate(new Date(y, m - 1, d)); };
 
   const handleFile = e => {
     const file = e.target.files[0]; if (!file) return;
@@ -202,23 +228,30 @@ export default function Attendance({ role, userName }) {
     setLoading(false);
   };
 
-  // ── summary (reads the staff's log from the record sheet) ──
+  // ── summary: sync rest days into sheet, then read + compute pay ──
   const openSummary = async () => {
     if (!accessToken) { setError('Connect to record log first to view the summary.'); return; }
     if (!activeStaff) return;
-    setSummaryOpen(true); setSummaryLoading(true); setSummaryRows([]); setError('');
+    setSummaryOpen(true); setSummaryLoading(true); setSummaryRows([]); setSummaryStats({ worked: 0, rest: 0, salary: 0 }); setError('');
     try {
+      const toSync = restDays.filter(r => r.staff === activeStaff && r.inSheet !== true);
+      for (const r of toSync) {
+        const ok = await appendRestRow(activeStaff, sheetDateFromIso(r.date), accessToken);
+        if (ok) { try { await updateDoc(doc(db, 'restDays', r.id), { inSheet: true }); } catch {} }
+      }
       const res = await fetch(
         `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${activeStaff}!A:F`,
         { headers: { Authorization: `Bearer ${accessToken}` } }
       );
-      if (!res.ok) { setSummaryRows([]); setSummaryLoading(false); return; }
+      if (!res.ok) { setSummaryLoading(false); return; }
       const data = await res.json();
       const rows = (data.values || [])
         .filter(r => r && r[1] && String(r[1]).toLowerCase() !== 'name')
-        .map(r => ({ date: r[0] || '', name: r[1] || '', timeIn: r[2] || '—', timeOut: r[4] || '—' }))
-        .reverse();
-      setSummaryRows(rows);
+        .map(r => ({ isRest: String(r[2]).toUpperCase() === 'REST DAY', date: r[0] || '', timeIn: r[2] || '—', timeOut: r[4] || '—' }));
+      const workedDates = new Set(rows.filter(r => !r.isRest && r.timeIn && r.timeIn !== '—').map(r => r.date));
+      const restDates = new Set(rows.filter(r => r.isRest).map(r => r.date));
+      setSummaryStats({ worked: workedDates.size, rest: restDates.size, salary: workedDates.size * DAILY_RATE });
+      setSummaryRows(rows.reverse());
     } catch { setError('Could not load summary. Try reconnecting.'); }
     setSummaryLoading(false);
   };
@@ -228,6 +261,7 @@ export default function Attendance({ role, userName }) {
   restDays.forEach(r => { dateCounts[r.date] = (dateCounts[r.date] || 0) + 1; });
   const today = localIso();
   const upcoming = restDays.filter(r => r.date >= today);
+  const onRestToday = activeStaff ? restDays.some(r => r.staff === activeStaff && r.date === today) : false;
 
   const addRestDay = async () => {
     if (!activeStaff) { setRestWarning('No staff selected.'); return; }
@@ -238,7 +272,9 @@ export default function Attendance({ role, userName }) {
     const clash = restDays.find(r => r.date === restDate && r.staff !== activeStaff);
     setRestSaving(true);
     try {
-      await addDoc(collection(db, 'restDays'), { staff: activeStaff, date: restDate, createdAt: serverTimestamp() });
+      let inSheet = false;
+      if (accessToken) inSheet = await appendRestRow(activeStaff, sheetDateFromIso(restDate), accessToken);
+      await addDoc(collection(db, 'restDays'), { staff: activeStaff, date: restDate, inSheet, createdAt: serverTimestamp() });
       setRestWarning(clash ? `Heads up — ${clash.staff} also has a rest day on ${prettyDate(restDate)}.` : '');
       setRestDate('');
     } catch { setRestWarning('Could not save. Try again.'); }
@@ -283,27 +319,34 @@ export default function Attendance({ role, userName }) {
         <div style={s.card}>
           <div style={s.staffName}>{activeStaff}</div>
           <div style={s.statusText}>
-            <span style={s.dot(!!rec(activeStaff).timeIn && !rec(activeStaff).timeOut)} />
-            {rec(activeStaff).timeIn ? `In: ${rec(activeStaff).timeIn}` : 'Not clocked in today'}
-            {rec(activeStaff).timeOut ? `  ·  Out: ${rec(activeStaff).timeOut}` : ''}
+            <span style={s.dot(!!rec(activeStaff).timeIn && !rec(activeStaff).timeOut && !onRestToday)} />
+            {onRestToday ? 'Rest day today' : rec(activeStaff).timeIn ? `In: ${rec(activeStaff).timeIn}` : 'Not clocked in today'}
+            {!onRestToday && rec(activeStaff).timeOut ? `  ·  Out: ${rec(activeStaff).timeOut}` : ''}
           </div>
-          {!rec(activeStaff).timeIn
-            ? <button style={{ ...s.bigBtn, ...s.inBtn }} onClick={() => startAction(activeStaff, 'IN')}>{Ic.login} Clock In</button>
-            : <button style={{ ...s.bigBtn, ...s.doneBtn, marginBottom: 8 }} disabled>{Ic.check} Clocked In at {rec(activeStaff).timeIn}</button>
-          }
-          {rec(activeStaff).timeIn && !rec(activeStaff).timeOut
-            ? <button style={{ ...s.bigBtn, ...s.outBtn }} onClick={() => startAction(activeStaff, 'OUT')}>{Ic.logout} Clock Out</button>
-            : rec(activeStaff).timeOut
-              ? <button style={{ ...s.bigBtn, ...s.doneBtn }} disabled>{Ic.check} Clocked Out at {rec(activeStaff).timeOut}</button>
-              : <button style={{ ...s.bigBtn, ...s.lockBtn }} disabled>{Ic.lock} Clock Out</button>
-          }
+
+          {onRestToday ? (
+            <div style={s.restTodayBox}>{Ic.cal} It's {activeStaff}'s rest day today — Clock In / Out is off.</div>
+          ) : (
+            <>
+              {!rec(activeStaff).timeIn
+                ? <button style={{ ...s.bigBtn, ...s.inBtn }} onClick={() => startAction(activeStaff, 'IN')}>{Ic.login} Clock In</button>
+                : <button style={{ ...s.bigBtn, ...s.doneBtn, marginBottom: 8 }} disabled>{Ic.check} Clocked In at {rec(activeStaff).timeIn}</button>
+              }
+              {rec(activeStaff).timeIn && !rec(activeStaff).timeOut
+                ? <button style={{ ...s.bigBtn, ...s.outBtn }} onClick={() => startAction(activeStaff, 'OUT')}>{Ic.logout} Clock Out</button>
+                : rec(activeStaff).timeOut
+                  ? <button style={{ ...s.bigBtn, ...s.doneBtn }} disabled>{Ic.check} Clocked Out at {rec(activeStaff).timeOut}</button>
+                  : <button style={{ ...s.bigBtn, ...s.lockBtn }} disabled>{Ic.lock} Clock Out</button>
+              }
+            </>
+          )}
         </div>
       )}
 
       {/* rest days */}
       <div style={s.card}>
         <div style={s.restHead}>{Ic.cal}<span style={s.restTitle}>Rest Days</span></div>
-        <div style={s.restSub}>Pick your day off. Everyone can see the schedule, and a clash is flagged.</div>
+        <div style={s.restSub}>Pick your day off. On a rest day, clock in/out is disabled — and it shows in the summary and record sheet.</div>
 
         {activeStaff && (
           <>
@@ -380,6 +423,20 @@ export default function Attendance({ role, userName }) {
               </div>
               <button onClick={() => setSummaryOpen(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4, lineHeight: 0 }}>{Ic.close}</button>
             </div>
+
+            {!summaryLoading && (
+              <>
+                <div style={s.statStrip}>
+                  <div style={s.statBox}><div style={s.statNum}>{summaryStats.worked}</div><div style={s.statLbl}>Days Worked</div></div>
+                  <div style={s.statBox}><div style={s.statNum}>{summaryStats.rest}</div><div style={s.statLbl}>Rest Days</div></div>
+                  <div style={s.statBoxGold}><div style={s.statNumGold}>{peso(summaryStats.salary)}</div><div style={s.statLblGold}>Salary</div></div>
+                </div>
+                <div style={{ fontSize: 11, color: C.muted, marginBottom: 14, textAlign: 'center' }}>
+                  {summaryStats.worked} day{summaryStats.worked === 1 ? '' : 's'} × {peso(DAILY_RATE)}
+                </div>
+              </>
+            )}
+
             {summaryLoading
               ? <div style={{ fontSize: 13, color: C.muted, textAlign: 'center', padding: '20px 0' }}>Loading…</div>
               : summaryRows.length === 0
@@ -395,11 +452,9 @@ export default function Attendance({ role, userName }) {
                     </thead>
                     <tbody>
                       {summaryRows.map((r, i) => (
-                        <tr key={i}>
-                          <td style={s.sumTd}>{r.date}</td>
-                          <td style={s.sumTd}>{r.timeIn}</td>
-                          <td style={s.sumTd}>{r.timeOut}</td>
-                        </tr>
+                        r.isRest
+                          ? <tr key={i}><td style={s.sumTd}>{r.date}</td><td style={s.sumTd} colSpan={2}><span style={s.restPill}>Rest Day</span></td></tr>
+                          : <tr key={i}><td style={s.sumTd}>{r.date}</td><td style={s.sumTd}>{r.timeIn}</td><td style={s.sumTd}>{r.timeOut}</td></tr>
                       ))}
                     </tbody>
                   </table>
