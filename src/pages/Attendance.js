@@ -100,12 +100,38 @@ const prettyDate = (iso) => {
 };
 const peso = (n) => '\u20B1' + Number(n).toLocaleString('en-PH');
 
+// always MM/DD/YYYY
+const fmtMDY = (d) => `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`;
+// turn a Google Sheets serial number back into MM/DD/YYYY; pass strings through
+const displayDate = (val) => {
+  if (val === '' || val === null || val === undefined) return '';
+  const str = String(val).trim();
+  if (/^\d+(\.\d+)?$/.test(str)) {
+    const d = new Date(Date.UTC(1899, 11, 30) + Math.round(parseFloat(str)) * 86400000);
+    return `${String(d.getUTCMonth() + 1).padStart(2, '0')}/${String(d.getUTCDate()).padStart(2, '0')}/${d.getUTCFullYear()}`;
+  }
+  return str;
+};
+// turn a serial time fraction back into a clock time; pass strings through
+const displayTime = (val) => {
+  if (val === '' || val === null || val === undefined) return '—';
+  const str = String(val).trim();
+  if (str === '') return '—';
+  if (/^\d*\.\d+$/.test(str)) {
+    const frac = parseFloat(str) - Math.floor(parseFloat(str));
+    const total = Math.round(frac * 86400);
+    const h = Math.floor(total / 3600), m = Math.floor((total % 3600) / 60), sec = total % 60;
+    return `${(h % 12) || 12}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
+  }
+  return str;
+};
+
 // append a rest-day row to a staff's record sheet
 async function appendRestRow(staffName, sheetDate, token) {
   const values = [[sheetDate, staffName, 'REST DAY', '', '', '']];
   try {
     const res = await fetch(
-      `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${staffName}!A:F:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
+      `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${staffName}!A:F:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
       { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ values }) }
     );
     return res.ok;
@@ -115,7 +141,17 @@ async function appendRestRow(staffName, sheetDate, token) {
 export default function Attendance({ role, userName }) {
   const [accessToken, setAccessToken] = useState(null);
   const [activeStaff, setActiveStaff] = useState(null);
-  const [records, setRecords] = useState({});
+  const [records, setRecords] = useState(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed.dayKey === localIso()) return parsed.records || {};
+        localStorage.removeItem(STORAGE_KEY);
+      }
+    } catch {}
+    return {};
+  });
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
@@ -169,18 +205,6 @@ export default function Attendance({ role, userName }) {
     return () => unsub();
   }, []);
 
-  // restore today's clock records (keeps them if reopened same day, resets next day)
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed.dayKey === localIso()) setRecords(parsed.records || {});
-        else localStorage.removeItem(STORAGE_KEY);
-      }
-    } catch {}
-  }, []);
-
   // when connected, reconcile today's records from the sheet (covers other devices)
   useEffect(() => {
     if (!accessToken || visibleStaff.length === 0) return;
@@ -194,9 +218,9 @@ export default function Attendance({ role, userName }) {
           const data = await res.json();
           let found = null, foundRow = null;
           (data.values || []).forEach((r, i) => {
-            if (r && r[0] === todayStr && String(r[2]).toUpperCase() !== 'REST DAY') { found = r; foundRow = i + 1; }
+            if (r && displayDate(r[0]) === todayStr && String(r[2]).toUpperCase() !== 'REST DAY') { found = r; foundRow = i + 1; }
           });
-          if (found) restored[name] = { timeIn: found[2] || null, timeOut: found[4] || null, rowIndex: foundRow };
+          if (found) restored[name] = { timeIn: found[2] ? displayTime(found[2]) : null, timeOut: found[4] ? displayTime(found[4]) : null, rowIndex: foundRow };
         } catch {}
       }
       if (Object.keys(restored).length) {
@@ -207,7 +231,7 @@ export default function Attendance({ role, userName }) {
   }, [accessToken, role, userName]);
 
   const formatTime = d => d.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  const formatDate = d => d.toLocaleDateString('en-PH', { month: '2-digit', day: '2-digit', year: 'numeric' });
+  const formatDate = d => fmtMDY(d);
   const sheetDateFromIso = iso => { const [y, m, d] = iso.split('-').map(Number); return formatDate(new Date(y, m - 1, d)); };
 
   const handleFile = e => {
@@ -252,7 +276,7 @@ export default function Attendance({ role, userName }) {
       if (type === 'IN') {
         const values = [[today, staffName, timeNow, photoId, '', '']];
         const res = await fetch(
-          `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${staffName}!A:F:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
+          `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${staffName}!A:F:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
           { method: 'POST', headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ values }) }
         );
         const data = await res.json();
@@ -264,7 +288,7 @@ export default function Attendance({ role, userName }) {
         const rowIndex = records[staffName]?.rowIndex;
         if (rowIndex) {
           await fetch(
-            `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${staffName}!E${rowIndex}:F${rowIndex}?valueInputOption=USER_ENTERED`,
+            `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${staffName}!E${rowIndex}:F${rowIndex}?valueInputOption=RAW`,
             { method: 'PUT', headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ values: [[timeNow, photoId]] }) }
           );
         }
@@ -296,7 +320,7 @@ export default function Attendance({ role, userName }) {
       const data = await res.json();
       const rows = (data.values || [])
         .filter(r => r && r[1] && String(r[1]).toLowerCase() !== 'name')
-        .map(r => ({ isRest: String(r[2]).toUpperCase() === 'REST DAY', date: r[0] || '', timeIn: r[2] || '—', timeOut: r[4] || '—' }));
+        .map(r => ({ isRest: String(r[2]).toUpperCase() === 'REST DAY', date: displayDate(r[0]), timeIn: displayTime(r[2]), timeOut: displayTime(r[4]) }));
       const workedDates = new Set(rows.filter(r => !r.isRest && r.date).map(r => r.date));
       const restDates = new Set(rows.filter(r => r.isRest).map(r => r.date));
       setSummaryStats({ worked: workedDates.size, rest: restDates.size, salary: workedDates.size * DAILY_RATE });
