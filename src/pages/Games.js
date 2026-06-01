@@ -805,10 +805,10 @@ function GuessWordGame({ playerName, onScore }) {
           <div style={{ fontSize: 9, color: '#d4a853', marginTop: 2, letterSpacing: 1 }}>KELLY</div>
         </div>
         <div style={{ flex: 1, textAlign: 'center', paddingBottom: 14 }}>
-          {baristaState === 'wave' && <div style={{ fontSize: 11, color: '#d4a853', animation: 'fadeIn 0.3s' }}>👋 Hi {playerName}! Guess the word!</div>}
-          {baristaState === 'fight' && <div style={{ fontSize: 13, fontWeight: 'bold', color: '#ff4444', animation: 'popEffect 0.4s' }}>💥 WRONG!<br/><span style={{ fontSize: 10 }}>They're fighting!</span></div>}
-          {baristaState === 'cheer' && <div style={{ fontSize: 13, fontWeight: 'bold', color: '#538d4e', animation: 'fadeIn 0.3s' }}>🎉 CORRECT!<br/><span style={{ fontSize: 10, color: '#d4a853' }}>+{(MAX_GUESSES - guesses.length) * 50} pts!</span></div>}
-          {baristaState === 'sad' && <div style={{ fontSize: 11, color: '#818384' }}>😢 Aww...<br/><span style={{ fontSize: 10 }}>It was <b style={{ color: '#d4a853' }}>{word}</b></span></div>}
+          {baristaState === 'wave' && <div style={{ fontSize: 17, fontWeight: 'bold', color: '#ffd700', animation: 'neonWave 1.2s ease-in-out infinite', textShadow: '0 0 8px #ffd700, 0 0 20px #ffaa00, 0 0 35px #ff8800', letterSpacing: 0.5 }}>Hi {playerName}! Guess!</div>}
+          {baristaState === 'fight' && <div style={{ fontSize: 19, fontWeight: 'bold', color: '#ff4444', animation: 'neonRed 0.3s ease-in-out infinite', textShadow: '0 0 8px #ff4444, 0 0 20px #ff0000, 0 0 40px #cc0000', letterSpacing: 0.5 }}>WRONG!</div>}
+          {baristaState === 'cheer' && <div style={{ fontSize: 19, fontWeight: 'bold', color: '#44ff88', animation: 'neonGreen 0.5s ease-in-out infinite', textShadow: '0 0 8px #44ff88, 0 0 20px #00ff66, 0 0 40px #00cc44', letterSpacing: 0.5 }}>CORRECT!</div>}
+          {baristaState === 'sad' && <div style={{ fontSize: 17, fontWeight: 'bold', color: '#888', animation: 'fadeIn 0.3s' }}>Aww...<br/><span style={{ fontSize: 12, color: '#d4a853' }}>It was "{word}"</span></div>}
           <div style={{ display: 'flex', justifyContent: 'center', gap: 4, marginTop: 6 }}>
             {Array.from({ length: MAX_GUESSES }).map((_, i) => (
               <div key={i} style={{ width: 10, height: 10, borderRadius: '50%', background: i < (MAX_GUESSES - guesses.filter(g => g !== word || gameState !== 'playing').length) ? '#538d4e' : '#3a3a3c', border: '1px solid #555', transition: 'background 0.3s' }}/>
@@ -868,6 +868,9 @@ function GuessWordGame({ playerName, onScore }) {
         @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} }
         @keyframes popEffect { 0%{transform:translate(-50%,-50%) scale(0.5);opacity:0} 50%{transform:translate(-50%,-50%) scale(1.4);opacity:1} 100%{transform:translate(-50%,-50%) scale(1);opacity:0} }
         @keyframes fadeIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes neonWave { 0%,100%{text-shadow:0 0 6px #ffd700,0 0 14px #ffaa00,0 0 28px #ff8800;opacity:1} 50%{text-shadow:0 0 14px #ffd700,0 0 30px #ffcc00,0 0 55px #ff6600,0 0 80px #ff4400;opacity:0.88} }
+        @keyframes neonGreen { 0%,100%{text-shadow:0 0 6px #44ff88,0 0 14px #00ff66,0 0 28px #00cc44;opacity:1} 50%{text-shadow:0 0 14px #44ff88,0 0 30px #00ff88,0 0 60px #00ee55;opacity:0.85} }
+        @keyframes neonRed { 0%,100%{text-shadow:0 0 6px #ff4444,0 0 14px #ff0000,0 0 28px #cc0000;opacity:1} 50%{text-shadow:0 0 14px #ff6666,0 0 30px #ff2222,0 0 60px #cc0000;opacity:0.85} }
       `}</style>
     </div>
   );
