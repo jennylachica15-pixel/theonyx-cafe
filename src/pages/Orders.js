@@ -11,90 +11,93 @@ const PAYMENT_METHODS = ['Cash', 'GCash', 'Maya', 'Card'];
 const SIZES = ['mini', 'classic', 'upgrade', 'regular'];
 const SIZE_LABELS = { mini: 'Mini', classic: 'Classic', upgrade: 'Upgrade', regular: 'Regular' };
 
+// ── UPDATED MENU ──
 const MENU_GROUPS = [
   { id: 'espresso', label: 'Espresso based', items: [
-    { name: 'COFFEE LATTE', mini: 75, classic: 85, upgrade: 95 },
-    { name: 'CARAMEL MACCHIATO', mini: 99, classic: 120, upgrade: 150 },
-    { name: 'AMERICANO', mini: 50, classic: 75, upgrade: 99 },
-    { name: 'CAPUCCINO', mini: 50, classic: 85, upgrade: 120 },
-    { name: 'SPANISH LATTE', mini: 99, classic: 120, upgrade: 150 },
-    { name: 'MOCHA', mini: 99, classic: 120, upgrade: 150 },
-    { name: 'SEA SALT CARAMEL LATTE', mini: 99, classic: 120, upgrade: 150 },
-    { name: 'COFFEE MINT', mini: 99, classic: 120, upgrade: 150 },
-    { name: 'RHUMPUCCINO', mini: 99, classic: 135, upgrade: 150 },
-    { name: 'BREWED', mini: 25, classic: 50, upgrade: 85 },
+    { name: 'COFFEE LATTE',          mini: 75,  classic: 85,  upgrade: 95  },
+    { name: 'CARAMEL MACCHIATO',     mini: 99,  classic: 120, upgrade: 150 },
+    { name: 'AMERICANO',             mini: 50,  classic: 75,  upgrade: 99  },
+    { name: 'CAPUCCINO',             mini: 50,  classic: 85,  upgrade: 120 },
+    { name: 'SPANISH LATTE',         mini: 99,  classic: 120, upgrade: 150 },
+    { name: 'MOCHA',                 mini: 99,  classic: 120, upgrade: 150 },
+    { name: 'SEA SALT CARAMEL LATTE',mini: 99,  classic: 120, upgrade: 150 },
+    { name: 'COFFEE MINT',           mini: 99,  classic: 120, upgrade: 150 },
+    { name: 'RHUMPUCCINO',           mini: 99,  classic: 135, upgrade: 150 },
+    { name: 'BREWED',                mini: 25,  classic: 50,  upgrade: 85  },
   ]},
   { id: 'noncoffee', label: 'Non-coffee', items: [
-    { name: 'DIRTY MATCHA', classic: 120, upgrade: 150 },
-    { name: 'STRAWBERRY LATTE', classic: 120, upgrade: 150 },
-    { name: 'STRAWBERRY MATCHA', classic: 120, upgrade: 150 },
-    { name: 'MATCHA LATTE', classic: 120, upgrade: 150 },
-    { name: 'MILK CHOCOLATE', classic: 89, upgrade: 120 },
-    { name: 'OREO CHOCOMILKSHAKE', classic: 120, upgrade: 150 },
-    { name: 'FRAPPE STRAWBERRY', regular: 165 },
-    { name: 'FRAPPE UBE HALAYA', regular: 150 },
-    { name: 'FRAPPE CARAMEL MACCHIATO', regular: 150 },
+    { name: 'DIRTY MATCHA',            classic: 120, upgrade: 150 },
+    { name: 'STRAWBERRY LATTE',        classic: 120, upgrade: 150 },
+    { name: 'STRAWBERRY MATCHA',       classic: 120, upgrade: 150 },
+    { name: 'MATCHA LATTE',            classic: 120, upgrade: 150 },
+    { name: 'MILK CHOCOLATE',          classic: 89,  upgrade: 120 },
+    { name: 'OREO CHOCOMILKSHAKE',     classic: 120, upgrade: 150 },
+    { name: 'FRAPPE STRAWBERRY',       regular: 165 },
+    { name: 'FRAPPE UBE HALAYA',       regular: 150 },
+    { name: 'FRAPPE CHOCOLATE',        regular: 150 },
+    { name: 'FRAPPE CARAMEL MACCHIATO',regular: 150 },
   ]},
   { id: 'milktea', label: 'Milk tea', items: [
-    { name: 'M.T. - HOKKAIDO', regular: 55 },
-    { name: 'M.T. - OKINAWA', regular: 55 },
-    { name: 'M.T. - MANGO CHEESECAKE', regular: 60 },
-    { name: 'M.T. - RED VELVET', regular: 60 },
-    { name: 'M.T. - TARO', regular: 55 },
-    { name: 'M.T. - BLACK FOREST', regular: 60 },
+    { name: 'M.T. - HOKKAIDO',       regular: 55 },
+    { name: 'M.T. - OKINAWA',        regular: 55 },
+    { name: 'M.T. - MANGO CHEESECAKE',regular: 60 },
+    { name: 'M.T. - RED VELVET',     regular: 60 },
+    { name: 'M.T. - TARO',           regular: 55 },
+    { name: 'M.T. - BLACK FOREST',   regular: 60 },
     { name: 'M.T. - DARK CHOCOLATE', regular: 60 },
-    { name: 'M.T. -COOKIES AND CREAM', regular: 55 },
-    { name: 'M.T. - WHITE BUNNY', regular: 60 },
-    { name: 'M.T. - WINTERMELON', regular: 60 },
+    { name: 'M.T. - COOKIES AND CREAM',regular: 55 },
+    { name: 'M.T. - WHITE BUNNY',    regular: 60 },
+    { name: 'M.T. - WINTERMELON',    regular: 60 },
   ]},
   { id: 'soda', label: 'Soda & tea', items: [
-    { name: 'SODA - PASSION', classic: 50 },
-    { name: 'SODA - STRAWBERRY', classic: 50 },
-    { name: 'SODA - BLUEBERRY', classic: 50 },
-    { name: 'SODA - MANGO', classic: 50 },
-    { name: 'TEA - BREAKFAST IN PARIS', classic: 50 },
-    { name: 'TEA - CHAMOMILE', classic: 50 },
-    { name: 'TEA - HIBISCUS', classic: 50 },
+    { name: 'SODA - PASSION',          classic: 50 },
+    { name: 'SODA - STRAWBERRY',       classic: 50 },
+    { name: 'SODA - BLUEBERRY',        classic: 50 },
+    { name: 'SODA - MANGO',            classic: 50 },
+    { name: 'TEA - BREAKFAST IN PARIS',classic: 50 },
+    { name: 'TEA - CHAMOMILE',         classic: 50 },
+    { name: 'TEA - HIBISCUS',          classic: 80 },
   ]},
   { id: 'pasta', label: 'Pasta', items: [
-    { name: 'PASTA - CARBONARA', regular: 129 },
-    { name: 'PASTA - BOLOGNESE', regular: 129 },
+    { name: 'PASTA - CARBONARA', regular: 130 },
+    { name: 'PASTA - BOLOGNESE', regular: 130 },
   ]},
   { id: 'rice', label: 'Rice meals', items: [
-    { name: 'TAPSILOG', regular: 129 },
-    { name: 'CORNSILOG', regular: 129 },
-    { name: 'PORK SISIG RICE', regular: 190 },
-    { name: 'PORK EMBOTIDO RICE', regular: 129 },
-    { name: 'CHICKEN INASAL RICE', regular: 190 },
-    { name: 'LUMPIA RICE', regular: 129 },
-    { name: 'PORKCHOP', regular: 150 },
-    { name: 'RICE MEAL - C. TAPA', regular: 180 },
-    { name: 'RICE MEAL - C. HOTDOG', regular: 80 },
+    { name: 'TAPSILOG',               regular: 90  },
+    { name: 'CORNSILOG',              regular: 90  },
+    { name: 'SPAMSILOG',              regular: 80  },
+    { name: 'PORK SISIG RICE',        regular: 180 },
+    { name: 'PORK EMBOTIDO RICE',     regular: 129 },
+    { name: 'LUMPIA RICE',            regular: 80  },
+    { name: 'PORKCHOP',               regular: 150 },
+    { name: 'RICE MEAL - C. TAPA',    regular: 180 },
+    { name: 'RICE MEAL - C. HOTDOG',  regular: 90  },
     { name: 'RICE MEAL - C. PEPPER STEAK', regular: 180 },
-    { name: 'RICE MEAL - C. KOREAN', regular: 180 },
-    { name: 'RICE MEAL - C. INASAL', regular: 180 },
+    { name: 'RICE MEAL - C. KOREAN',  regular: 180 },
+    { name: 'RICE MEAL - C. INASAL',  regular: 180 },
   ]},
   { id: 'pastries', label: 'Pastries & sweets', items: [
-    { name: 'WAFFLE - MANGO', regular: 80 },
-    { name: 'WAFFLE - CHOCOLATE', regular: 80 },
-    { name: 'WAFFLE - OTHER', regular: 80 },
-    { name: 'PASTRY - COOKIES', regular: 50 },
-    { name: 'COOKIES V2', regular: 35 },
-    { name: 'SWEET BITES', regular: 15 },
+    { name: 'WAFFLE - MANGO',       regular: 80 },
+    { name: 'WAFFLE - CHOCOLATE',   regular: 80 },
+    { name: 'WAFFLE - BLUEBERRY',   regular: 80 },
+    { name: 'WAFFLE - OTHER',       regular: 80 },
+    { name: 'PASTRY - COOKIES',     regular: 50 },
+    { name: 'COOKIES SMALL',        regular: 35 },
+    { name: 'SWEET BITES',          regular: 15 },
     { name: 'GRILLED CHEESE SANDWICH', regular: 80 },
   ]},
   { id: 'snacks', label: 'Snacks', items: [
-    { name: 'CHEESE BURGER', regular: 50 },
-    { name: 'ONYX BURGER', regular: 150 },
-    { name: 'NACHOS', regular: 130 },
-    { name: 'FRIES - BBQ', regular: 30 },
+    { name: 'CHEESE BURGER',   regular: 50  },
+    { name: 'ONYX BURGER',     regular: 150 },
+    { name: 'NACHOS',          regular: 130 },
+    { name: 'FRIES - BBQ',     regular: 30  },
     { name: 'FRIES - SOUR CREAM', regular: 30 },
-    { name: 'FRIES - CHEESE', regular: 30 },
+    { name: 'FRIES - CHEESE',  regular: 30  },
   ]},
   { id: 'addons', label: 'Add-ons', items: [
-    { name: 'PEARL', regular: 10 },
-    { name: 'ESPRESSO SHOT', regular: 10 },
-    { name: 'RICE', regular: 15 },
+    { name: 'PEARL',        regular: 10 },
+    { name: 'ESPRESSO SHOT',regular: 10 },
+    { name: 'RICE',         regular: 15 },
   ]},
 ];
 
@@ -106,6 +109,7 @@ const C = {
   red: '#a3402d', redBg: '#fbeeea', redBorder: '#eccfc7', muteDash: '#d9c3a6',
   green: '#5a8a3a', greenBg: '#f1f7e9', greenBorder: '#d7e8c0',
   white: '#fff', input: '#fbf6ef', inputBorder: '#e3d0b4',
+  selectedBg: '#edf7e4', selectedBorder: '#8bc34a',
 };
 
 const s = {
@@ -117,10 +121,23 @@ const s = {
   groupCard: { background: C.card, borderRadius: 12, marginBottom: 8, border: `0.5px solid ${C.cardBorder}`, overflow: 'hidden' },
   groupHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 14px', cursor: 'pointer' },
   groupLabel: { fontSize: 14, fontWeight: 600, color: C.ink },
-  itemRow: { display: 'flex', alignItems: 'center', padding: '10px 14px', borderTop: `0.5px solid ${C.rowBorder}` },
+  // ── NEW: item row with selection state ──
+  itemRow: (selected) => ({
+    display: 'flex', alignItems: 'center', padding: '10px 14px',
+    borderTop: `0.5px solid ${C.rowBorder}`,
+    background: selected ? C.selectedBg : 'transparent',
+    transition: 'background 0.15s',
+  }),
   itemName: { fontSize: 12, fontWeight: 600, color: C.ink, flex: 1 },
-  sizeRow: { display: 'flex', gap: 5, flexWrap: 'wrap' },
-  sizeBtn: { padding: '5px 9px', borderRadius: 7, fontSize: 10.5, fontWeight: 600, cursor: 'pointer', border: `0.5px solid ${C.pillBorder}`, background: C.cream, color: C.goldDeep },
+  // ── NEW: size pill with selected state ──
+  sizeBtn: (selected) => ({
+    padding: '6px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700,
+    cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
+    border: selected ? `2px solid ${C.green}` : `1px solid ${C.pillBorder}`,
+    background: selected ? C.selectedBg : C.cream,
+    color: selected ? C.green : C.goldDeep,
+    position: 'relative',
+  }),
   input: { width: '100%', padding: '11px 13px', borderRadius: 10, border: `0.5px solid ${C.inputBorder}`, fontSize: 14, background: C.input, color: C.ink, outline: 'none', boxSizing: 'border-box', marginBottom: 10, fontFamily: 'inherit' },
   label: { display: 'block', fontSize: 11.5, fontWeight: 600, color: C.muted, marginBottom: 5 },
   orderPanel: { background: C.card, borderRadius: 14, padding: '14px', marginTop: 12, border: `0.5px solid ${C.cardBorder}` },
@@ -156,6 +173,9 @@ const s = {
 
 const Chev = ({ open }) => (
   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={C.gold} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}><polyline points="6 9 12 15 18 9" /></svg>
+);
+const CheckIcon = () => (
+  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={C.green} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
 );
 const EditIcon = () => (
   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={C.gold} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>
@@ -223,6 +243,13 @@ export default function Orders({ userName }) {
     return () => unsub();
   }, []);
 
+  // ── check if an item+size is in the order ──
+  const isSelected = (itemName, size) => order.some(o => o.key === `${itemName}_${size}`);
+  const getQty = (itemName, size) => {
+    const found = order.find(o => o.key === `${itemName}_${size}`);
+    return found ? found.qty : 0;
+  };
+
   const addToOrder = (item, size) => {
     const price = item[size];
     if (!price) return;
@@ -234,7 +261,23 @@ export default function Orders({ userName }) {
     });
   };
 
-  const updateQty = (key, delta) => setOrder(prev => prev.map(o => o.key === key ? { ...o, qty: Math.max(1, o.qty + delta) } : o));
+  // ── tap selected item: increase qty ──
+  const toggleOrAdd = (item, size) => {
+    const key = `${item.name}_${size}`;
+    const existing = order.find(o => o.key === key);
+    if (existing) {
+      setOrder(prev => prev.map(o => o.key === key ? { ...o, qty: o.qty + 1 } : o));
+    } else {
+      addToOrder(item, size);
+    }
+  };
+
+  const updateQty = (key, delta) => {
+    setOrder(prev => {
+      const updated = prev.map(o => o.key === key ? { ...o, qty: Math.max(0, o.qty + delta) } : o);
+      return updated.filter(o => o.qty > 0);
+    });
+  };
   const removeItem = (key) => setOrder(prev => prev.filter(o => o.key !== key));
   const total = order.reduce((sum, o) => sum + o.price * o.qty, 0);
 
@@ -288,42 +331,26 @@ export default function Orders({ userName }) {
         items: order, total, buyerName, paymentMethod, notes,
         cashier, hidden: false, createdAt: serverTimestamp(),
       });
-
       if (accessToken) {
-        const rows = order.map(o => [
-          dateStr, timeStr, buyerName || 'Walk-in',
-          o.name, o.size, o.qty, o.price, o.price * o.qty,
-          paymentMethod, cashier
-        ]);
+        const rows = order.map(o => [dateStr, timeStr, buyerName || 'Walk-in', o.name, o.size, o.qty, o.price, o.price * o.qty, paymentMethod, cashier]);
         await appendToSheet(rows);
-
-        const htmlContent = generateReceiptHTML();
-        const blob = new Blob([htmlContent], { type: 'text/html' });
+        const blob = new Blob([generateReceiptHTML()], { type: 'text/html' });
         const form = new FormData();
         form.append('metadata', new Blob([JSON.stringify({ name: `${pdfName}.html`, parents: [RECEIPT_FOLDER_ID], mimeType: 'text/html' })], { type: 'application/json' }));
         form.append('file', blob);
-        await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-          method: 'POST', headers: { Authorization: `Bearer ${accessToken}` }, body: form
-        });
+        await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', { method: 'POST', headers: { Authorization: `Bearer ${accessToken}` }, body: form });
       }
-
-      setSaved(true);
-      setOrder([]);
-      setBuyerName('');
-      setNotes('');
-      setShowPreview(false);
+      setSaved(true); setOrder([]); setBuyerName(''); setNotes(''); setShowPreview(false);
       setTimeout(() => setSaved(false), 4000);
     } catch (e) { console.error(e); }
     setSaving(false);
   };
 
-  // ── derived data ──
   const startToday = new Date(); startToday.setHours(0, 0, 0, 0);
   const startYesterday = new Date(startToday); startYesterday.setDate(startToday.getDate() - 1);
   const inWindow = (o, start) => { const d = tsToDate(o.createdAt); return d ? d >= start : true; };
   const todayList = allOrders.filter(o => !o.hidden && inWindow(o, startYesterday));
   const summaryList = allOrders.filter(o => !o.hidden && inWindow(o, startToday));
-
   const groups = [];
   todayList.forEach(o => {
     const d = tsToDate(o.createdAt);
@@ -332,21 +359,16 @@ export default function Orders({ userName }) {
     if (!g) { g = { label, orders: [] }; groups.push(g); }
     g.orders.push({ ...o, _date: d });
   });
-
   const tally = {}; let totalSales = 0;
   summaryList.forEach(o => (o.items || []).forEach(it => {
     const q = Number(it.qty) || 0, p = Number(it.price) || 0;
-    tally[it.name] = (tally[it.name] || 0) + q;
-    totalSales += p * q;
+    tally[it.name] = (tally[it.name] || 0) + q; totalSales += p * q;
   }));
   const tallyArr = Object.entries(tally).map(([name, qty]) => ({ name, qty })).sort((a, b) => b.qty - a.qty);
   const maxQty = tallyArr.length ? tallyArr[0].qty : 1;
   const totalOrders = summaryList.length;
 
-  const startEdit = (orderId, idx, qty) => {
-    setRemovingId(null);
-    setEditingKey(`${orderId}_${idx}`); setEditQty(String(qty)); setEditReason(''); setEditErr(false);
-  };
+  const startEdit = (orderId, idx, qty) => { setRemovingId(null); setEditingKey(`${orderId}_${idx}`); setEditQty(String(qty)); setEditReason(''); setEditErr(false); };
 
   const saveEdit = async (orderId, idx) => {
     if (!editReason.trim()) { setEditErr(true); return; }
@@ -361,45 +383,17 @@ export default function Orders({ userName }) {
         const editedAt = new Date();
         const editDateStr = editedAt.toLocaleDateString('en-PH', { month: '2-digit', day: '2-digit', year: '2-digit' });
         const editTimeStr = editedAt.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' });
-
-        let items = (ord.items || []).map((x, i) => i === idx
-          ? { ...x, qty: newQty, price: newPrice, edited: true, editReason: editReason.trim(), editedBy: cashier, editedAt: editedAt.toISOString(), prevQty: x.qty, prevPrice: x.price }
-          : x);
+        let items = (ord.items || []).map((x, i) => i === idx ? { ...x, qty: newQty, price: newPrice, edited: true, editReason: editReason.trim(), editedBy: cashier, editedAt: editedAt.toISOString(), prevQty: x.qty, prevPrice: x.price } : x);
         const itemRemoved = newQty === 0;
         items = items.filter(x => (Number(x.qty) || 0) > 0);
         const newTotal = items.reduce((sm, x) => sm + (Number(x.price) || 0) * (Number(x.qty) || 0), 0);
-
         if (items.length === 0) {
-          // Whole order removed via editing
-          await updateDoc(doc(db, 'orders', orderId), {
-            hidden: true, removeReason: editReason.trim(),
-            removedBy: cashier, removedAt: editedAt.toISOString()
-          });
-          // Log to sheet
-          await appendToSheet([[
-            editDateStr, editTimeStr,
-            ord.buyerName || 'Walk-in',
-            `[ORDER REMOVED] ${it.name}`,
-            it.size || '', 0, newPrice, 0,
-            ord.paymentMethod || '', cashier,
-            `Reason: ${editReason.trim()}`
-          ]]);
+          await updateDoc(doc(db, 'orders', orderId), { hidden: true, removeReason: editReason.trim(), removedBy: cashier, removedAt: editedAt.toISOString() });
+          await appendToSheet([[editDateStr, editTimeStr, ord.buyerName || 'Walk-in', `[ORDER REMOVED] ${it.name}`, it.size || '', 0, newPrice, 0, ord.paymentMethod || '', cashier, `Reason: ${editReason.trim()}`]]);
         } else {
           await updateDoc(doc(db, 'orders', orderId), { items, total: newTotal });
-          // Log the edit to sheet — one row per edited item
           const action = itemRemoved ? '[ITEM REMOVED]' : '[EDITED]';
-          await appendToSheet([[
-            editDateStr, editTimeStr,
-            ord.buyerName || 'Walk-in',
-            `${action} ${it.name}`,
-            it.size || '',
-            newQty,
-            newPrice,
-            newPrice * newQty,
-            ord.paymentMethod || '',
-            cashier,
-            `Reason: ${editReason.trim()} | Was: qty=${it.qty}`
-          ]]);
+          await appendToSheet([[editDateStr, editTimeStr, ord.buyerName || 'Walk-in', `${action} ${it.name}`, it.size || '', newQty, newPrice, newPrice * newQty, ord.paymentMethod || '', cashier, `Reason: ${editReason.trim()} | Was: qty=${it.qty}`]]);
         }
       }
       setEditingKey(null); setEditErr(false);
@@ -414,27 +408,11 @@ export default function Orders({ userName }) {
       const removedAt = new Date();
       const removeDateStr = removedAt.toLocaleDateString('en-PH', { month: '2-digit', day: '2-digit', year: '2-digit' });
       const removeTimeStr = removedAt.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' });
-
-      await updateDoc(doc(db, 'orders', orderId), {
-        hidden: true,
-        removeReason: removeReason.trim(),
-        removedBy: cashier,
-        removedAt: removedAt.toISOString()
-      });
-
-      // Log each item in the removed order to sheet
+      await updateDoc(doc(db, 'orders', orderId), { hidden: true, removeReason: removeReason.trim(), removedBy: cashier, removedAt: removedAt.toISOString() });
       if (ord && accessToken) {
-        const rows = (ord.items || []).map(it => ([
-          removeDateStr, removeTimeStr,
-          ord.buyerName || 'Walk-in',
-          `[ORDER REMOVED] ${it.name}`,
-          it.size || '', it.qty, it.price, it.price * it.qty,
-          ord.paymentMethod || '', cashier,
-          removeReason.trim() ? `Reason: ${removeReason.trim()}` : 'No reason given'
-        ]));
+        const rows = (ord.items || []).map(it => ([removeDateStr, removeTimeStr, ord.buyerName || 'Walk-in', `[ORDER REMOVED] ${it.name}`, it.size || '', it.qty, it.price, it.price * it.qty, ord.paymentMethod || '', cashier, removeReason.trim() ? `Reason: ${removeReason.trim()}` : 'No reason given']));
         await appendToSheet(rows);
       }
-
       setRemovingId(null); setRemoveReason(''); setExpandedId(null);
     } catch (e) { console.error('Remove error:', e); }
     setRemoveSaving(false);
@@ -446,9 +424,8 @@ export default function Orders({ userName }) {
       <div style={s.sub}>
         {tab === 1 ? `Tap a size to add · ${order.length} item${order.length !== 1 ? 's' : ''} in order`
           : tab === 2 ? 'One card per customer · tap to view, edit or remove'
-            : 'Totals and items sold today'}
+          : 'Totals and items sold today'}
       </div>
-
       <div style={s.tabBar}>
         <button style={s.tab(tab === 1)} onClick={() => setTab(1)}>Order taker</button>
         <button style={s.tab(tab === 2)} onClick={() => setTab(2)}>Today's orders</button>
@@ -457,21 +434,18 @@ export default function Orders({ userName }) {
 
       {tab === 1 && (
         <>
-          {/* ── CONNECT BUTTON / BADGE ── */}
           {!accessToken ? (
             <>
               <button style={s.connectBtn} onClick={() => tokenClientRef.current?.requestAccessToken()}>
                 <LinkIcon /> Connect Google (Sheets + Drive)
               </button>
-              {/* ── DISABLED OVERLAY when not connected ── */}
               <div style={s.disabledOverlay}>
                 <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke={C.muted} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: 10 }}>
                   <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
                 </svg>
                 <div style={{ fontSize: 15, fontWeight: 700, color: C.ink, marginBottom: 6 }}>Connect Google first</div>
                 <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>
-                  Tap <b style={{ color: C.goldDeep }}>Connect Google</b> above to enable the order taker.<br />
-                  Orders sync to Google Sheets and receipts save to Drive.
+                  Tap <b style={{ color: C.goldDeep }}>Connect Google</b> above to enable the order taker.
                 </div>
               </div>
             </>
@@ -481,13 +455,11 @@ export default function Orders({ userName }) {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.green} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                 Connected — orders sync to Sheets & Drive
               </div>
-
               {saved && (
                 <div style={{ background: C.greenBg, color: C.green, border: `0.5px solid ${C.greenBorder}`, borderRadius: 10, padding: '10px 14px', fontSize: 13, marginBottom: 12 }}>
                   Order saved successfully.
                 </div>
               )}
-
               <label style={s.label}>Buyer name (optional)</label>
               <input style={s.input} placeholder="Customer name..." value={buyerName} onChange={e => setBuyerName(e.target.value)} />
               <label style={s.label}>Payment method</label>
@@ -498,21 +470,46 @@ export default function Orders({ userName }) {
               {MENU_GROUPS.map(group => (
                 <div key={group.id} style={s.groupCard}>
                   <div style={s.groupHeader} onClick={() => setOpenGroup(openGroup === group.id ? null : group.id)}>
-                    <span style={s.groupLabel}>{group.label}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={s.groupLabel}>{group.label}</span>
+                      {/* badge showing how many items from this group are selected */}
+                      {group.items.some(item => SIZES.some(sz => isSelected(item.name, sz))) && (
+                        <span style={{ background: C.green, color: '#fff', borderRadius: 20, fontSize: 10, fontWeight: 700, padding: '2px 7px' }}>
+                          {group.items.reduce((count, item) => count + SIZES.filter(sz => isSelected(item.name, sz)).length, 0)}
+                        </span>
+                      )}
+                    </div>
                     <Chev open={openGroup === group.id} />
                   </div>
-                  {openGroup === group.id && group.items.map((item, i) => (
-                    <div key={i} style={s.itemRow}>
-                      <span style={s.itemName}>{item.name}</span>
-                      <div style={s.sizeRow}>
-                        {SIZES.filter(sz => item[sz]).map(size => (
-                          <button key={size} style={s.sizeBtn} onClick={() => addToOrder(item, size)}>
-                            {SIZE_LABELS[size]} P{item[size]}
-                          </button>
-                        ))}
+                  {openGroup === group.id && group.items.map((item, i) => {
+                    const anySelected = SIZES.some(sz => isSelected(item.name, sz));
+                    return (
+                      <div key={i} style={s.itemRow(anySelected)}>
+                        <div style={{ flex: 1 }}>
+                          <span style={{ ...s.itemName, color: anySelected ? C.green : C.ink }}>{item.name}</span>
+                        </div>
+                        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                          {SIZES.filter(sz => item[sz]).map(size => {
+                            const selected = isSelected(item.name, size);
+                            const qty = getQty(item.name, size);
+                            return (
+                              <button key={size} style={s.sizeBtn(selected)} onClick={() => toggleOrAdd(item, size)}>
+                                {selected && (
+                                  <span style={{ position: 'absolute', top: -5, right: -5, background: C.green, borderRadius: '50%', width: 14, height: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <CheckIcon />
+                                  </span>
+                                )}
+                                {SIZE_LABELS[size]} P{item[size]}
+                                {selected && qty > 1 && (
+                                  <span style={{ marginLeft: 4, background: C.green, color: '#fff', borderRadius: 10, fontSize: 9, fontWeight: 700, padding: '1px 5px' }}>x{qty}</span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ))}
 
@@ -589,7 +586,7 @@ export default function Orders({ userName }) {
                                     <div style={{ fontSize: 12, color: C.ink }}>{it.name} <span style={{ color: C.muted }}>{it.size ? `(${it.size}) ` : ''}x{it.qty}</span></div>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                       <span style={{ fontSize: 12, color: C.ink }}>P{(it.price * it.qty).toLocaleString()}</span>
-                                      <button style={s.smallEdit} aria-label="Edit item" onClick={() => editing ? setEditingKey(null) : startEdit(o.id, idx, it.qty)}><EditIcon /></button>
+                                      <button style={s.smallEdit} onClick={() => editing ? setEditingKey(null) : startEdit(o.id, idx, it.qty)}><EditIcon /></button>
                                     </div>
                                   </div>
                                   {it.edited && <div style={s.editTag}><EditIcon /> Edited{it.editedBy ? ` by ${it.editedBy}` : ''} — {it.editReason}</div>}
@@ -682,14 +679,11 @@ export default function Orders({ userName }) {
             ))}
             <div style={s.receiptTotal}><span>TOTAL</span><span>P{total.toLocaleString()}</span></div>
             {notes && <div style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>Notes: {notes}</div>}
-            <button style={s.primaryBtn} onClick={saveOrder} disabled={saving}>
-              {saving ? 'Saving...' : 'Confirm & save'}
-            </button>
+            <button style={s.primaryBtn} onClick={saveOrder} disabled={saving}>{saving ? 'Saving...' : 'Confirm & save'}</button>
             <button style={s.darkBtn} onClick={() => {
               const w = window.open('', '_blank');
               w.document.write(generateReceiptHTML());
-              w.document.close();
-              w.focus();
+              w.document.close(); w.focus();
               setTimeout(() => { w.print(); }, 500);
             }}>Print / save as PDF</button>
             <button style={s.cancelBtn} onClick={() => setShowPreview(false)}>Back to edit</button>
