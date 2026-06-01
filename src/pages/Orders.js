@@ -151,6 +151,7 @@ const s = {
   removeBtn: { width: '100%', marginTop: 9, background: 'transparent', border: `0.5px solid ${C.redBorder}`, borderRadius: 9, color: C.red, padding: '8px', fontSize: 12, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 },
   metricCard: { flex: 1, background: C.card, border: `0.5px solid ${C.cardBorder}`, borderRadius: 12, padding: '13px', textAlign: 'center' },
   metricDark: { flex: 1, background: C.darker, borderRadius: 12, padding: '13px', textAlign: 'center' },
+  disabledOverlay: { background: 'rgba(251,246,239,0.85)', borderRadius: 12, border: `1px dashed ${C.pillBorder}`, padding: '28px 20px', textAlign: 'center', marginTop: 8 },
 };
 
 const Chev = ({ open }) => (
@@ -167,6 +168,9 @@ const UserIcon = () => (
 );
 const TrashIcon = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.red} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6M14 11v6" /></svg>
+);
+const LinkIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={C.goldBright} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
 );
 
 const tsToDate = (ts) => (ts && ts.toDate ? ts.toDate() : (ts instanceof Date ? ts : null));
@@ -259,8 +263,8 @@ export default function Orders({ userName }) {
       ${buyerName ? `<div class="row"><span>Buyer:</span><span>${buyerName}</span></div>` : ''}
       <div class="row"><span>Payment:</span><span>${paymentMethod}</span></div>
       <div class="divider"></div>
-      ${order.map(o => `<div class="row"><span>${o.name} (${o.size}) x${o.qty}</span><span>₱${(o.price * o.qty).toLocaleString()}</span></div>`).join('')}
-      <div class="total-row"><span>TOTAL</span><span>₱${total.toLocaleString()}</span></div>
+      ${order.map(o => `<div class="row"><span>${o.name} (${o.size}) x${o.qty}</span><span>P${(o.price * o.qty).toLocaleString()}</span></div>`).join('')}
+      <div class="total-row"><span>TOTAL</span><span>P${total.toLocaleString()}</span></div>
       <div class="divider"></div>
       ${notes ? `<div class="row"><span>Notes:</span><span>${notes}</span></div>` : ''}
       <div class="footer">Thank you for visiting Theonyx Cafe!<br/>Follow us @theonyx.cafe</div>
@@ -274,7 +278,7 @@ export default function Orders({ userName }) {
         `https://sheets.googleapis.com/v4/spreadsheets/${SALES_SHEET_ID}/values/Sheet1!A:J:append?valueInputOption=USER_ENTERED`,
         { method: 'POST', headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ values: rows }) }
       );
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error('Sheet append error:', e); }
   };
 
   const saveOrder = async () => {
@@ -286,7 +290,11 @@ export default function Orders({ userName }) {
       });
 
       if (accessToken) {
-        const rows = order.map(o => [ dateStr, timeStr, buyerName || 'Walk-in', o.name, o.size, o.qty, o.price, o.price * o.qty, paymentMethod, cashier ]);
+        const rows = order.map(o => [
+          dateStr, timeStr, buyerName || 'Walk-in',
+          o.name, o.size, o.qty, o.price, o.price * o.qty,
+          paymentMethod, cashier
+        ]);
         await appendToSheet(rows);
 
         const htmlContent = generateReceiptHTML();
@@ -294,7 +302,9 @@ export default function Orders({ userName }) {
         const form = new FormData();
         form.append('metadata', new Blob([JSON.stringify({ name: `${pdfName}.html`, parents: [RECEIPT_FOLDER_ID], mimeType: 'text/html' })], { type: 'application/json' }));
         form.append('file', blob);
-        await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', { method: 'POST', headers: { Authorization: `Bearer ${accessToken}` }, body: form });
+        await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+          method: 'POST', headers: { Authorization: `Bearer ${accessToken}` }, body: form
+        });
       }
 
       setSaved(true);
@@ -324,7 +334,11 @@ export default function Orders({ userName }) {
   });
 
   const tally = {}; let totalSales = 0;
-  summaryList.forEach(o => (o.items || []).forEach(it => { const q = Number(it.qty) || 0, p = Number(it.price) || 0; tally[it.name] = (tally[it.name] || 0) + q; totalSales += p * q; }));
+  summaryList.forEach(o => (o.items || []).forEach(it => {
+    const q = Number(it.qty) || 0, p = Number(it.price) || 0;
+    tally[it.name] = (tally[it.name] || 0) + q;
+    totalSales += p * q;
+  }));
   const tallyArr = Object.entries(tally).map(([name, qty]) => ({ name, qty })).sort((a, b) => b.qty - a.qty);
   const maxQty = tallyArr.length ? tallyArr[0].qty : 1;
   const totalOrders = summaryList.length;
@@ -344,26 +358,52 @@ export default function Orders({ userName }) {
         const parsedQty = parseInt(editQty, 10);
         const newQty = Number.isNaN(parsedQty) ? it.qty : Math.max(0, parsedQty);
         const newPrice = Number(it.price) || 0;
+        const editedAt = new Date();
+        const editDateStr = editedAt.toLocaleDateString('en-PH', { month: '2-digit', day: '2-digit', year: '2-digit' });
+        const editTimeStr = editedAt.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' });
+
         let items = (ord.items || []).map((x, i) => i === idx
-          ? { ...x, qty: newQty, price: newPrice, edited: true, editReason: editReason.trim(), editedBy: cashier, editedAt: new Date().toISOString(), prevQty: x.qty, prevPrice: x.price }
+          ? { ...x, qty: newQty, price: newPrice, edited: true, editReason: editReason.trim(), editedBy: cashier, editedAt: editedAt.toISOString(), prevQty: x.qty, prevPrice: x.price }
           : x);
         const itemRemoved = newQty === 0;
         items = items.filter(x => (Number(x.qty) || 0) > 0);
         const newTotal = items.reduce((sm, x) => sm + (Number(x.price) || 0) * (Number(x.qty) || 0), 0);
+
         if (items.length === 0) {
-          await updateDoc(doc(db, 'orders', orderId), { hidden: true, removeReason: editReason.trim(), removedBy: cashier, removedAt: new Date().toISOString() });
+          // Whole order removed via editing
+          await updateDoc(doc(db, 'orders', orderId), {
+            hidden: true, removeReason: editReason.trim(),
+            removedBy: cashier, removedAt: editedAt.toISOString()
+          });
+          // Log to sheet
           await appendToSheet([[
-            dateStr, timeStr, ord.buyerName || 'Walk-in', 'ORDER REMOVED', '', '', '', ord.total || 0, ord.paymentMethod || '', cashier
+            editDateStr, editTimeStr,
+            ord.buyerName || 'Walk-in',
+            `[ORDER REMOVED] ${it.name}`,
+            it.size || '', 0, newPrice, 0,
+            ord.paymentMethod || '', cashier,
+            `Reason: ${editReason.trim()}`
           ]]);
         } else {
           await updateDoc(doc(db, 'orders', orderId), { items, total: newTotal });
+          // Log the edit to sheet — one row per edited item
+          const action = itemRemoved ? '[ITEM REMOVED]' : '[EDITED]';
           await appendToSheet([[
-            dateStr, timeStr, ord.buyerName || 'Walk-in', `${it.name}${itemRemoved ? ' (ITEM REMOVED)' : ' (EDITED)'}`, it.size || '', newQty, newPrice, newPrice * newQty, ord.paymentMethod || '', cashier
+            editDateStr, editTimeStr,
+            ord.buyerName || 'Walk-in',
+            `${action} ${it.name}`,
+            it.size || '',
+            newQty,
+            newPrice,
+            newPrice * newQty,
+            ord.paymentMethod || '',
+            cashier,
+            `Reason: ${editReason.trim()} | Was: qty=${it.qty}`
           ]]);
         }
       }
       setEditingKey(null); setEditErr(false);
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error('Edit error:', e); }
     setEditSaving(false);
   };
 
@@ -371,14 +411,32 @@ export default function Orders({ userName }) {
     setRemoveSaving(true);
     try {
       const ord = allOrders.find(o => o.id === orderId);
-      await updateDoc(doc(db, 'orders', orderId), { hidden: true, removeReason: removeReason.trim(), removedBy: cashier, removedAt: new Date().toISOString() });
-      if (ord) {
-        await appendToSheet([[
-          dateStr, timeStr, ord.buyerName || 'Walk-in', 'ORDER REMOVED', '', '', '', ord.total || 0, ord.paymentMethod || '', cashier
-        ]]);
+      const removedAt = new Date();
+      const removeDateStr = removedAt.toLocaleDateString('en-PH', { month: '2-digit', day: '2-digit', year: '2-digit' });
+      const removeTimeStr = removedAt.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' });
+
+      await updateDoc(doc(db, 'orders', orderId), {
+        hidden: true,
+        removeReason: removeReason.trim(),
+        removedBy: cashier,
+        removedAt: removedAt.toISOString()
+      });
+
+      // Log each item in the removed order to sheet
+      if (ord && accessToken) {
+        const rows = (ord.items || []).map(it => ([
+          removeDateStr, removeTimeStr,
+          ord.buyerName || 'Walk-in',
+          `[ORDER REMOVED] ${it.name}`,
+          it.size || '', it.qty, it.price, it.price * it.qty,
+          ord.paymentMethod || '', cashier,
+          removeReason.trim() ? `Reason: ${removeReason.trim()}` : 'No reason given'
+        ]));
+        await appendToSheet(rows);
       }
+
       setRemovingId(null); setRemoveReason(''); setExpandedId(null);
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error('Remove error:', e); }
     setRemoveSaving(false);
   };
 
@@ -399,66 +457,93 @@ export default function Orders({ userName }) {
 
       {tab === 1 && (
         <>
-          {!accessToken
-            ? <button style={s.connectBtn} onClick={() => tokenClientRef.current?.requestAccessToken()}>Connect Google (Sheets + Drive)</button>
-            : <div style={s.connectedBadge}>Connected — orders sync to Sheets</div>
-          }
-          {saved && <div style={{ background: C.greenBg, color: C.green, border: `0.5px solid ${C.greenBorder}`, borderRadius: 10, padding: '10px 14px', fontSize: 13, marginBottom: 12 }}>Order saved successfully.</div>}
-
-          <label style={s.label}>Buyer name (optional)</label>
-          <input style={s.input} placeholder="Customer name…" value={buyerName} onChange={e => setBuyerName(e.target.value)} />
-          <label style={s.label}>Payment method</label>
-          <select style={s.input} value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)}>
-            {PAYMENT_METHODS.map(m => <option key={m}>{m}</option>)}
-          </select>
-
-          {MENU_GROUPS.map(group => (
-            <div key={group.id} style={s.groupCard}>
-              <div style={s.groupHeader} onClick={() => setOpenGroup(openGroup === group.id ? null : group.id)}>
-                <span style={s.groupLabel}>{group.label}</span>
-                <Chev open={openGroup === group.id} />
+          {/* ── CONNECT BUTTON / BADGE ── */}
+          {!accessToken ? (
+            <>
+              <button style={s.connectBtn} onClick={() => tokenClientRef.current?.requestAccessToken()}>
+                <LinkIcon /> Connect Google (Sheets + Drive)
+              </button>
+              {/* ── DISABLED OVERLAY when not connected ── */}
+              <div style={s.disabledOverlay}>
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke={C.muted} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: 10 }}>
+                  <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                </svg>
+                <div style={{ fontSize: 15, fontWeight: 700, color: C.ink, marginBottom: 6 }}>Connect Google first</div>
+                <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>
+                  Tap <b style={{ color: C.goldDeep }}>Connect Google</b> above to enable the order taker.<br />
+                  Orders sync to Google Sheets and receipts save to Drive.
+                </div>
               </div>
-              {openGroup === group.id && group.items.map((item, i) => (
-                <div key={i} style={s.itemRow}>
-                  <span style={s.itemName}>{item.name}</span>
-                  <div style={s.sizeRow}>
-                    {SIZES.filter(sz => item[sz]).map(size => (
-                      <button key={size} style={s.sizeBtn} onClick={() => addToOrder(item, size)}>
-                        {SIZE_LABELS[size]} ₱{item[size]}
-                      </button>
-                    ))}
+            </>
+          ) : (
+            <>
+              <div style={s.connectedBadge}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.green} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                Connected — orders sync to Sheets & Drive
+              </div>
+
+              {saved && (
+                <div style={{ background: C.greenBg, color: C.green, border: `0.5px solid ${C.greenBorder}`, borderRadius: 10, padding: '10px 14px', fontSize: 13, marginBottom: 12 }}>
+                  Order saved successfully.
+                </div>
+              )}
+
+              <label style={s.label}>Buyer name (optional)</label>
+              <input style={s.input} placeholder="Customer name..." value={buyerName} onChange={e => setBuyerName(e.target.value)} />
+              <label style={s.label}>Payment method</label>
+              <select style={s.input} value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)}>
+                {PAYMENT_METHODS.map(m => <option key={m}>{m}</option>)}
+              </select>
+
+              {MENU_GROUPS.map(group => (
+                <div key={group.id} style={s.groupCard}>
+                  <div style={s.groupHeader} onClick={() => setOpenGroup(openGroup === group.id ? null : group.id)}>
+                    <span style={s.groupLabel}>{group.label}</span>
+                    <Chev open={openGroup === group.id} />
                   </div>
+                  {openGroup === group.id && group.items.map((item, i) => (
+                    <div key={i} style={s.itemRow}>
+                      <span style={s.itemName}>{item.name}</span>
+                      <div style={s.sizeRow}>
+                        {SIZES.filter(sz => item[sz]).map(size => (
+                          <button key={size} style={s.sizeBtn} onClick={() => addToOrder(item, size)}>
+                            {SIZE_LABELS[size]} P{item[size]}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ))}
-            </div>
-          ))}
 
-          {order.length > 0 && (
-            <div style={s.orderPanel}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <span style={{ fontSize: 14, fontWeight: 600, color: C.ink }}>Order summary</span>
-                <button style={{ background: 'none', border: 'none', color: C.red, fontSize: 12, cursor: 'pointer' }} onClick={() => setOrder([])}>Clear all</button>
-              </div>
-              {order.map(o => (
-                <div key={o.key} style={s.orderRow}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: C.ink }}>{o.name}</div>
-                    <div style={{ fontSize: 11, color: C.muted }}>{o.size} · ₱{o.price}</div>
+              {order.length > 0 && (
+                <div style={s.orderPanel}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: C.ink }}>Order summary</span>
+                    <button style={{ background: 'none', border: 'none', color: C.red, fontSize: 12, cursor: 'pointer' }} onClick={() => setOrder([])}>Clear all</button>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.gold, fontSize: 16, padding: '0 4px' }} onClick={() => updateQty(o.key, -1)}>−</button>
-                    <span style={{ fontSize: 13, fontWeight: 600, minWidth: 16, textAlign: 'center', color: C.ink }}>{o.qty}</span>
-                    <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.gold, fontSize: 16, padding: '0 4px' }} onClick={() => updateQty(o.key, 1)}>+</button>
-                    <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.red, fontSize: 14, padding: '0 4px' }} onClick={() => removeItem(o.key)}>×</button>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: C.ink, minWidth: 50, textAlign: 'right' }}>₱{(o.price * o.qty).toLocaleString()}</span>
-                  </div>
+                  {order.map(o => (
+                    <div key={o.key} style={s.orderRow}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: C.ink }}>{o.name}</div>
+                        <div style={{ fontSize: 11, color: C.muted }}>{o.size} · P{o.price}</div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.gold, fontSize: 16, padding: '0 4px' }} onClick={() => updateQty(o.key, -1)}>-</button>
+                        <span style={{ fontSize: 13, fontWeight: 600, minWidth: 16, textAlign: 'center', color: C.ink }}>{o.qty}</span>
+                        <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.gold, fontSize: 16, padding: '0 4px' }} onClick={() => updateQty(o.key, 1)}>+</button>
+                        <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.red, fontSize: 14, padding: '0 4px' }} onClick={() => removeItem(o.key)}>x</button>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: C.ink, minWidth: 50, textAlign: 'right' }}>P{(o.price * o.qty).toLocaleString()}</span>
+                      </div>
+                    </div>
+                  ))}
+                  <div style={s.total}><span>TOTAL</span><span>P{total.toLocaleString()}</span></div>
+                  <label style={{ ...s.label, marginTop: 10 }}>Notes (optional)</label>
+                  <input style={s.input} placeholder="Special instructions..." value={notes} onChange={e => setNotes(e.target.value)} />
+                  <button style={s.primaryBtn} onClick={() => setShowPreview(true)}>Preview & save order</button>
                 </div>
-              ))}
-              <div style={s.total}><span>TOTAL</span><span>₱{total.toLocaleString()}</span></div>
-              <label style={{ ...s.label, marginTop: 10 }}>Notes (optional)</label>
-              <input style={s.input} placeholder="Special instructions…" value={notes} onChange={e => setNotes(e.target.value)} />
-              <button style={s.primaryBtn} onClick={() => setShowPreview(true)}>Preview & save order</button>
-            </div>
+              )}
+            </>
           )}
         </>
       )}
@@ -487,7 +572,7 @@ export default function Orders({ userName }) {
                             <div style={s.metaLine}>{items.length} item{items.length !== 1 ? 's' : ''} · {summary}</div>
                           </div>
                           <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 5 }}>
-                            <div style={s.totalTop}>₱{(o.total || 0).toLocaleString()}</div>
+                            <div style={s.totalTop}>P{(o.total || 0).toLocaleString()}</div>
                             <Chev open={expanded} />
                           </div>
                         </div>
@@ -501,9 +586,9 @@ export default function Orders({ userName }) {
                               return (
                                 <div key={idx}>
                                   <div style={s.detItem}>
-                                    <div style={{ fontSize: 12, color: C.ink }}>{it.name} <span style={{ color: C.muted }}>{it.size ? `(${it.size}) ` : ''}×{it.qty}</span></div>
+                                    <div style={{ fontSize: 12, color: C.ink }}>{it.name} <span style={{ color: C.muted }}>{it.size ? `(${it.size}) ` : ''}x{it.qty}</span></div>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                      <span style={{ fontSize: 12, color: C.ink }}>₱{(it.price * it.qty).toLocaleString()}</span>
+                                      <span style={{ fontSize: 12, color: C.ink }}>P{(it.price * it.qty).toLocaleString()}</span>
                                       <button style={s.smallEdit} aria-label="Edit item" onClick={() => editing ? setEditingKey(null) : startEdit(o.id, idx, it.qty)}><EditIcon /></button>
                                     </div>
                                   </div>
@@ -511,14 +596,14 @@ export default function Orders({ userName }) {
                                   {editing && (
                                     <div style={{ background: C.input, border: `0.5px solid ${C.rowBorder}`, borderRadius: 9, padding: 10, margin: '6px 0' }}>
                                       <div style={{ marginBottom: 8 }}>
-                                        <div style={{ fontSize: 10.5, color: C.muted, marginBottom: 4 }}>Quantity <span style={{ opacity: 0.75 }}>(set to 0 to remove)</span></div>
+                                        <div style={{ fontSize: 10.5, color: C.muted, marginBottom: 4 }}>Quantity <span style={{ opacity: 0.75 }}>(set to 0 to remove item)</span></div>
                                         <input type="number" min="0" value={editQty} onChange={e => setEditQty(e.target.value)} style={{ ...s.input, marginBottom: 0, padding: '7px 9px', background: '#fff' }} />
                                       </div>
                                       <div style={{ fontSize: 10.5, color: C.muted, marginBottom: 4 }}>Reason for edit (required)</div>
                                       <textarea value={editReason} onChange={e => { setEditReason(e.target.value); setEditErr(false); }} placeholder="Why was this changed?" style={{ width: '100%', boxSizing: 'border-box', minHeight: 42, background: '#fff', border: `0.5px solid ${C.inputBorder}`, borderRadius: 8, padding: '7px 9px', fontSize: 12, color: C.ink, fontFamily: 'inherit', resize: 'vertical' }} />
                                       {editErr && <div style={{ color: C.red, fontSize: 11, marginTop: 5 }}>Please add a reason before saving.</div>}
                                       <div style={{ display: 'flex', gap: 8, marginTop: 9 }}>
-                                        <button style={{ flex: 1, background: C.gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }} onClick={() => saveEdit(o.id, idx)} disabled={editSaving}>{editSaving ? 'Saving…' : 'Save'}</button>
+                                        <button style={{ flex: 1, background: C.gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }} onClick={() => saveEdit(o.id, idx)} disabled={editSaving}>{editSaving ? 'Saving...' : 'Save'}</button>
                                         <button style={{ flex: 1, background: 'transparent', color: C.muted, border: `0.5px solid ${C.inputBorder}`, borderRadius: 8, padding: '8px', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }} onClick={() => setEditingKey(null)}>Cancel</button>
                                       </div>
                                     </div>
@@ -526,14 +611,14 @@ export default function Orders({ userName }) {
                                 </div>
                               );
                             })}
-                            <div style={s.totalPaid}><span style={{ fontSize: 12.5, fontWeight: 600, color: C.ink }}>Total paid</span><span style={{ fontSize: 13.5, fontWeight: 700, color: C.ink }}>₱{(o.total || 0).toLocaleString()}</span></div>
+                            <div style={s.totalPaid}><span style={{ fontSize: 12.5, fontWeight: 600, color: C.ink }}>Total paid</span><span style={{ fontSize: 13.5, fontWeight: 700, color: C.ink }}>P{(o.total || 0).toLocaleString()}</span></div>
                             <button style={s.removeBtn} onClick={() => setRemovingId(removingId === o.id ? null : o.id)}><TrashIcon /> Remove order</button>
                             {removingId === o.id && (
                               <div style={{ background: C.redBg, border: `0.5px solid ${C.redBorder}`, borderRadius: 9, padding: 10, marginTop: 8 }}>
-                                <div style={{ fontSize: 11, color: C.red, marginBottom: 6 }}>This hides the order from the list (kept in records, and logged to the sheet).</div>
+                                <div style={{ fontSize: 11, color: C.red, marginBottom: 6 }}>This hides the order from the list (kept in records, logged to sheet).</div>
                                 <input placeholder="Reason (optional)" value={removeReason} onChange={e => setRemoveReason(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', background: '#fff', border: `0.5px solid ${C.inputBorder}`, borderRadius: 8, padding: '7px 9px', fontSize: 12, color: C.ink, fontFamily: 'inherit', marginBottom: 8 }} />
                                 <div style={{ display: 'flex', gap: 8 }}>
-                                  <button style={{ flex: 1, background: C.red, color: '#fff', border: 'none', borderRadius: 8, padding: '8px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }} onClick={() => removeOrder(o.id)} disabled={removeSaving}>{removeSaving ? 'Removing…' : 'Hide order'}</button>
+                                  <button style={{ flex: 1, background: C.red, color: '#fff', border: 'none', borderRadius: 8, padding: '8px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }} onClick={() => removeOrder(o.id)} disabled={removeSaving}>{removeSaving ? 'Removing...' : 'Hide order'}</button>
                                   <button style={{ flex: 1, background: 'transparent', color: C.muted, border: `0.5px solid ${C.inputBorder}`, borderRadius: 8, padding: '8px', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }} onClick={() => { setRemovingId(null); setRemoveReason(''); }}>Cancel</button>
                                 </div>
                               </div>
@@ -558,7 +643,7 @@ export default function Orders({ userName }) {
           <div style={s.dateHdr}><CalIcon /> {fmtDateLabel(new Date())}</div>
           <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
             <div style={s.metricCard}><div style={{ fontSize: 22, fontWeight: 700, color: C.ink }}>{totalOrders}</div><div style={{ fontSize: 11, color: C.muted, marginTop: 3 }}>Total orders</div></div>
-            <div style={s.metricDark}><div style={{ fontSize: 20, fontWeight: 700, color: C.goldBright }}>₱{totalSales.toLocaleString()}</div><div style={{ fontSize: 11, color: '#b08a5a', marginTop: 3 }}>Total sales</div></div>
+            <div style={s.metricDark}><div style={{ fontSize: 20, fontWeight: 700, color: C.goldBright }}>P{totalSales.toLocaleString()}</div><div style={{ fontSize: 11, color: '#b08a5a', marginTop: 3 }}>Total sales</div></div>
           </div>
           <div style={{ fontSize: 11, color: C.muted, marginBottom: 10 }}>Items ordered</div>
           {tallyArr.length === 0
@@ -567,7 +652,7 @@ export default function Orders({ userName }) {
               <div key={t.name} style={{ marginBottom: 11 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
                   <span style={{ fontSize: 12, color: C.ink }}>{t.name}</span>
-                  <span style={{ fontSize: 12, color: C.goldDeep, fontWeight: 600 }}>×{t.qty}</span>
+                  <span style={{ fontSize: 12, color: C.goldDeep, fontWeight: 600 }}>x{t.qty}</span>
                 </div>
                 <div style={{ height: 5, background: C.pill, borderRadius: 3, overflow: 'hidden' }}>
                   <div style={{ height: '100%', width: `${Math.round(t.qty / maxQty * 100)}%`, background: C.gold }} />
@@ -592,13 +677,13 @@ export default function Orders({ userName }) {
             {order.map(o => (
               <div key={o.key} style={s.receiptRow}>
                 <span>{o.name} ({o.size}) x{o.qty}</span>
-                <span>₱{(o.price * o.qty).toLocaleString()}</span>
+                <span>P{(o.price * o.qty).toLocaleString()}</span>
               </div>
             ))}
-            <div style={s.receiptTotal}><span>TOTAL</span><span>₱{total.toLocaleString()}</span></div>
+            <div style={s.receiptTotal}><span>TOTAL</span><span>P{total.toLocaleString()}</span></div>
             {notes && <div style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>Notes: {notes}</div>}
             <button style={s.primaryBtn} onClick={saveOrder} disabled={saving}>
-              {saving ? 'Saving…' : 'Confirm & save'}
+              {saving ? 'Saving...' : 'Confirm & save'}
             </button>
             <button style={s.darkBtn} onClick={() => {
               const w = window.open('', '_blank');
