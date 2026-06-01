@@ -87,7 +87,7 @@ async function getLeaderboard(gameId) {
 
 function AuthModal({ onAuth, onClose }) {
   const [mode, setMode] = useState('login');
-  const [username, setUsername] = useState('');
+  const [username, setUsername] = useState(()=>{try{return localStorage.getItem('cafeGameUser')||null;}catch{return null;}});
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
