@@ -3,7 +3,7 @@ import { db, auth } from '../firebase/config';
 import { collection, onSnapshot, addDoc, serverTimestamp, query, orderBy, updateDoc, doc } from 'firebase/firestore';
 
 const GOOGLE_CLIENT_ID = '596322682185-n5hm66hvol3nnqqllnuop995kcnefbgu.apps.googleusercontent.com';
-const SALES_SHEET_ID = '1UvI6I6aZkaPzcIf3qwcrENWaiPR3ibKMxjWwLRYSFfY';
+const SALES_SHEET_ID = '1yadv9UgY8mFQzSwLsw3Qk3EepZeLL8dNl3YRtYsGZQU';
 const RECEIPT_FOLDER_ID = '16FGEhlHtHObYC0pBg0jfphsNxksdWF1m';
 const SCOPES = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file';
 
@@ -172,6 +172,7 @@ const TrashIcon = () => (
 const tsToDate = (ts) => (ts && ts.toDate ? ts.toDate() : (ts instanceof Date ? ts : null));
 const fmtTime12 = (d) => (d ? d.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' }) : '—');
 const fmtDateLabel = (d) => (d ? d.toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric' }) : 'Today');
+const itemsToStr = (items) => (items || []).map(x => x.name + (x.size ? ' (' + x.size + ')' : '') + ' x' + x.qty + ' ₱' + (x.price * x.qty)).join('; ');
 
 export default function Orders({ userName }) {
   const [tab, setTab] = useState(1);
@@ -287,10 +288,7 @@ export default function Orders({ userName }) {
       });
 
       if (accessToken) {
-        const rows = order.map(o => [
-          dateStr, o.name, o.size, o.qty, paymentMethod, cashier, o.price * o.qty, notes || ''
-        ]);
-        await appendToSheet(rows);
+        await appendToSheet([[ dateStr, timeStr, buyerName || 'Walk-in', itemsToStr(order), total, paymentMethod, cashier, notes || '' ]]);
 
         const htmlContent = generateReceiptHTML();
         const blob = new Blob([htmlContent], { type: 'text/html' });
@@ -352,8 +350,8 @@ export default function Orders({ userName }) {
         const newTotal = items.reduce((sm, x) => sm + x.price * x.qty, 0);
         await updateDoc(doc(db, 'orders', orderId), { items, total: newTotal });
         await appendToSheet([[
-          dateStr, `${it.name} (EDITED)`, it.size || '', newQty, ord.paymentMethod || '', cashier, newPrice * newQty,
-          `EDITED — was qty ${it.qty} @ ₱${it.price} = ₱${it.price * it.qty}; reason: ${editReason.trim()}`
+          dateStr, timeStr, ord.buyerName || 'Walk-in', itemsToStr(items), newTotal, ord.paymentMethod || '', cashier,
+          `EDITED (was ₱${ord.total != null ? ord.total : (ord.items || []).reduce((sm, x) => sm + x.price * x.qty, 0)}) — ${it.name}: was qty ${it.qty} @ ₱${it.price}; reason: ${editReason.trim()}`
         ]]);
       }
       setEditingKey(null); setEditErr(false);
@@ -369,8 +367,8 @@ export default function Orders({ userName }) {
       if (ord) {
         const summary = (ord.items || []).map(x => `${x.name}×${x.qty}`).join(', ');
         await appendToSheet([[
-          dateStr, 'ORDER REMOVED', '', '', ord.paymentMethod || '', cashier, ord.total || 0,
-          `REMOVED — ${ord.buyerName || 'Walk-in'}: ${summary}; reason: ${removeReason.trim() || '(none)'}`
+          dateStr, timeStr, ord.buyerName || 'Walk-in', summary, ord.total || 0, ord.paymentMethod || '', cashier,
+          `ORDER REMOVED — reason: ${removeReason.trim() || '(none)'}`
         ]]);
       }
       setRemovingId(null); setRemoveReason(''); setExpandedId(null);
