@@ -8,6 +8,7 @@ const GOOGLE_CLIENT_ID = '596322682185-n5hm66hvol3nnqqllnuop995kcnefbgu.apps.goo
 const SCOPES = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file';
 const STAFF_LIST = ['Kelly', 'Maryz'];
 const DAILY_RATE = 400;
+const STORAGE_KEY = 'theonyx_attendance';
 
 // ── palette (matches admin theme) ──
 const C = {
@@ -59,6 +60,10 @@ const s = {
   statLbl: { fontSize: 9.5, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 3 },
   statLblGold: { fontSize: 9.5, color: '#d8b87a', textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 3 },
   restPill: { display: 'inline-block', fontSize: 11, fontWeight: 700, color: C.warn, background: C.warnBg, border: `1px solid ${C.warnBorder}`, borderRadius: 20, padding: '2px 10px' },
+  salaryBar: { background: C.ink, borderRadius: 12, padding: '13px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
+  salaryLabel: { fontSize: 11.5, color: '#d8b87a', textTransform: 'uppercase', letterSpacing: 0.8, fontWeight: 700 },
+  salaryNum: { fontSize: 23, fontWeight: 800, color: C.gold, lineHeight: 1 },
+  salaryNote: { fontSize: 10.5, color: '#b89868', marginTop: 3 },
   // modals
   modal: { position: 'fixed', inset: 0, background: 'rgba(26,10,0,0.7)', zIndex: 300, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' },
   modalCard: { background: C.cream, borderRadius: '20px 20px 0 0', padding: '24px 22px 36px', width: '100%', maxWidth: 480, animation: 'slideUp 0.3s ease', maxHeight: '85vh', overflowY: 'auto' },
@@ -134,6 +139,10 @@ export default function Attendance({ role, userName }) {
 
   const visibleStaff = role === 'manager' ? STAFF_LIST : (userName ? [userName] : []);
 
+  const persistRecords = (recs) => {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ dayKey: localIso(), records: recs })); } catch {}
+  };
+
   useEffect(() => {
     if (visibleStaff.length > 0) setActiveStaff(visibleStaff[0]);
   }, [userName, role]);
@@ -160,6 +169,43 @@ export default function Attendance({ role, userName }) {
     return () => unsub();
   }, []);
 
+  // restore today's clock records (keeps them if reopened same day, resets next day)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed.dayKey === localIso()) setRecords(parsed.records || {});
+        else localStorage.removeItem(STORAGE_KEY);
+      }
+    } catch {}
+  }, []);
+
+  // when connected, reconcile today's records from the sheet (covers other devices)
+  useEffect(() => {
+    if (!accessToken || visibleStaff.length === 0) return;
+    const todayStr = formatDate(new Date());
+    (async () => {
+      const restored = {};
+      for (const name of visibleStaff) {
+        try {
+          const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${name}!A:F`, { headers: { Authorization: `Bearer ${accessToken}` } });
+          if (!res.ok) continue;
+          const data = await res.json();
+          let found = null, foundRow = null;
+          (data.values || []).forEach((r, i) => {
+            if (r && r[0] === todayStr && String(r[2]).toUpperCase() !== 'REST DAY') { found = r; foundRow = i + 1; }
+          });
+          if (found) restored[name] = { timeIn: found[2] || null, timeOut: found[4] || null, rowIndex: foundRow };
+        } catch {}
+      }
+      if (Object.keys(restored).length) {
+        setRecords(prev => { const next = { ...prev, ...restored }; persistRecords(next); return next; });
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accessToken, role, userName]);
+
   const formatTime = d => d.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   const formatDate = d => d.toLocaleDateString('en-PH', { month: '2-digit', day: '2-digit', year: 'numeric' });
   const sheetDateFromIso = iso => { const [y, m, d] = iso.split('-').map(Number); return formatDate(new Date(y, m - 1, d)); };
@@ -174,6 +220,9 @@ export default function Attendance({ role, userName }) {
 
   const startAction = (staffName, type) => {
     if (!accessToken) { setError('Connect to record log first.'); return; }
+    const r = records[staffName] || {};
+    if (type === 'IN' && r.timeIn) { setError('Already clocked in today.'); return; }
+    if (type === 'OUT' && (r.timeOut || !r.timeIn)) { setError(r.timeOut ? 'Already clocked out today.' : 'Clock in first.'); return; }
     setPendingAction({ staffName, type });
     setPhoto(null); setPhotoFile(null);
   };
@@ -210,7 +259,7 @@ export default function Attendance({ role, userName }) {
         const range = data.updates?.updatedRange || '';
         const rowMatch = range.match(/(\d+)$/);
         const rowIndex = rowMatch ? parseInt(rowMatch[1]) : null;
-        setRecords(prev => ({ ...prev, [staffName]: { timeIn: timeNow, timeOut: null, rowIndex } }));
+        setRecords(prev => { const next = { ...prev, [staffName]: { timeIn: timeNow, timeOut: null, rowIndex } }; persistRecords(next); return next; });
       } else {
         const rowIndex = records[staffName]?.rowIndex;
         if (rowIndex) {
@@ -219,7 +268,7 @@ export default function Attendance({ role, userName }) {
             { method: 'PUT', headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ values: [[timeNow, photoId]] }) }
           );
         }
-        setRecords(prev => ({ ...prev, [staffName]: { ...prev[staffName], timeOut: timeNow } }));
+        setRecords(prev => { const next = { ...prev, [staffName]: { ...prev[staffName], timeOut: timeNow } }; persistRecords(next); return next; });
       }
       setSuccess(`${staffName} clocked ${type} at ${timeNow}`);
       setPendingAction(null); setPhoto(null); setPhotoFile(null);
@@ -248,7 +297,7 @@ export default function Attendance({ role, userName }) {
       const rows = (data.values || [])
         .filter(r => r && r[1] && String(r[1]).toLowerCase() !== 'name')
         .map(r => ({ isRest: String(r[2]).toUpperCase() === 'REST DAY', date: r[0] || '', timeIn: r[2] || '—', timeOut: r[4] || '—' }));
-      const workedDates = new Set(rows.filter(r => !r.isRest && r.timeIn && r.timeIn !== '—').map(r => r.date));
+      const workedDates = new Set(rows.filter(r => !r.isRest && r.date).map(r => r.date));
       const restDates = new Set(rows.filter(r => r.isRest).map(r => r.date));
       setSummaryStats({ worked: workedDates.size, rest: restDates.size, salary: workedDates.size * DAILY_RATE });
       setSummaryRows(rows.reverse());
@@ -429,10 +478,13 @@ export default function Attendance({ role, userName }) {
                 <div style={s.statStrip}>
                   <div style={s.statBox}><div style={s.statNum}>{summaryStats.worked}</div><div style={s.statLbl}>Days Worked</div></div>
                   <div style={s.statBox}><div style={s.statNum}>{summaryStats.rest}</div><div style={s.statLbl}>Rest Days</div></div>
-                  <div style={s.statBoxGold}><div style={s.statNumGold}>{peso(summaryStats.salary)}</div><div style={s.statLblGold}>Salary</div></div>
                 </div>
-                <div style={{ fontSize: 11, color: C.muted, marginBottom: 14, textAlign: 'center' }}>
-                  {summaryStats.worked} day{summaryStats.worked === 1 ? '' : 's'} × {peso(DAILY_RATE)}
+                <div style={s.salaryBar}>
+                  <div>
+                    <div style={s.salaryLabel}>Salary</div>
+                    <div style={s.salaryNote}>{summaryStats.worked} day{summaryStats.worked === 1 ? '' : 's'} × {peso(DAILY_RATE)}</div>
+                  </div>
+                  <div style={s.salaryNum}>{peso(summaryStats.salary)}</div>
                 </div>
               </>
             )}
