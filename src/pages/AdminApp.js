@@ -338,34 +338,6 @@ export default function AdminApp({ user, onSignOut }) {
               </div>
             </div>
 
-            {/* Notification alerts */}
-            {(cleanlinessAlert || pendingPhotos > 0) && (
-              <div style={{ padding: '12px 16px 0' }}>
-                {cleanlinessAlert && (
-                  <div onClick={() => setActiveTab('cleanliness')}
-                    style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#fff3e0', border: '1px solid #ffb74d', borderRadius: 10, padding: '10px 14px', marginBottom: 8, cursor: 'pointer' }}>
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#ff9800', flexShrink: 0 }} />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: '#e65100' }}>Cleanliness Check Pending</div>
-                      <div style={{ fontSize: 11, color: '#bf360c' }}>No cleanliness check submitted today. Tap to complete.</div>
-                    </div>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e65100" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-                  </div>
-                )}
-                {pendingPhotos > 0 && (
-                  <div onClick={() => setActiveTab('approvals')}
-                    style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#e8f4fd', border: '1px solid #64b5f6', borderRadius: 10, padding: '10px 14px', marginBottom: 8, cursor: 'pointer' }}>
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#2196f3', flexShrink: 0 }} />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: '#0d47a1' }}>Photos Pending Approval</div>
-                      <div style={{ fontSize: 11, color: '#1565c0' }}>{pendingPhotos} guest photo{pendingPhotos > 1 ? 's' : ''} waiting for review. Tap to approve.</div>
-                    </div>
-                    <div style={{ background: '#2196f3', color: '#fff', borderRadius: '50%', width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>{pendingPhotos}</div>
-                  </div>
-                )}
-              </div>
-            )}
-
             {/* Main panels */}
             <div style={{ padding: '16px 16px 8px' }}>
               <div style={{ fontSize: 10, color: '#a07850', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>Panels</div>
@@ -389,20 +361,30 @@ export default function AdminApp({ user, onSignOut }) {
             <div style={{ padding: '4px 16px 8px' }}>
               <div style={{ fontSize: 10, color: '#a07850', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>More</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                {morePanels.map(p => (
-                  <div key={p.id} onClick={() => setActiveTab(p.id)}
-                    style={{ background: '#fff8f0', border: '1px solid #f0e8d8', borderRadius: 10, padding: '11px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, transition: 'border-color 0.15s' }}
-                    onMouseOver={e => e.currentTarget.style.borderColor = '#c8943a'}
-                    onMouseOut={e => e.currentTarget.style.borderColor = '#f0e8d8'}>
-                    <div style={{ width: 30, height: 30, background: '#fff', border: '1px solid #f0e8d8', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      {p.icon}
+                {morePanels.map(p => {
+                  const badge = p.id === 'approvals' && pendingPhotos > 0 ? pendingPhotos
+                    : p.id === 'cleanliness' && cleanlinessAlert ? '!' : null;
+                  return (
+                    <div key={p.id} onClick={() => setActiveTab(p.id)}
+                      style={{ background: '#fff8f0', border: `1px solid ${badge ? '#ffb74d' : '#f0e8d8'}`, borderRadius: 10, padding: '11px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, transition: 'border-color 0.15s', position: 'relative' }}
+                      onMouseOver={e => e.currentTarget.style.borderColor = '#c8943a'}
+                      onMouseOut={e => e.currentTarget.style.borderColor = badge ? '#ffb74d' : '#f0e8d8'}>
+                      <div style={{ width: 30, height: 30, background: '#fff', border: '1px solid #f0e8d8', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        {p.icon}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#2a1000' }}>{p.label}</div>
+                        <div style={{ fontSize: 10, color: '#a07850' }}>{p.desc}</div>
+                      </div>
+                      {badge && (
+                        <div style={{ background: '#2196f3', color: '#fff', borderRadius: '50%', width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, flexShrink: 0,
+                          ...(p.id === 'cleanliness' ? { background: '#ff9800' } : {}) }}>
+                          {badge}
+                        </div>
+                      )}
                     </div>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: '#2a1000' }}>{p.label}</div>
-                      <div style={{ fontSize: 10, color: '#a07850' }}>{p.desc}</div>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
