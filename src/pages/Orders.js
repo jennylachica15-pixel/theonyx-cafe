@@ -172,7 +172,6 @@ const TrashIcon = () => (
 const tsToDate = (ts) => (ts && ts.toDate ? ts.toDate() : (ts instanceof Date ? ts : null));
 const fmtTime12 = (d) => (d ? d.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' }) : '—');
 const fmtDateLabel = (d) => (d ? d.toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric' }) : 'Today');
-const itemsToStr = (items) => (items || []).map(x => x.name + (x.size ? ' (' + x.size + ')' : '') + ' x' + x.qty + ' ₱' + (x.price * x.qty)).join('; ');
 
 export default function Orders({ userName }) {
   const [tab, setTab] = useState(1);
@@ -273,7 +272,7 @@ export default function Orders({ userName }) {
     if (!accessToken) return;
     try {
       await fetch(
-        `https://sheets.googleapis.com/v4/spreadsheets/${SALES_SHEET_ID}/values/Sheet1!A:H:append?valueInputOption=USER_ENTERED`,
+        `https://sheets.googleapis.com/v4/spreadsheets/${SALES_SHEET_ID}/values/Sheet1!A:J:append?valueInputOption=USER_ENTERED`,
         { method: 'POST', headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ values: rows }) }
       );
     } catch (e) { console.error(e); }
@@ -288,7 +287,8 @@ export default function Orders({ userName }) {
       });
 
       if (accessToken) {
-        await appendToSheet([[ dateStr, timeStr, buyerName || 'Walk-in', itemsToStr(order), total, paymentMethod, cashier, notes || '' ]]);
+        const rows = order.map(o => [ dateStr, timeStr, buyerName || 'Walk-in', o.name, o.size, o.qty, o.price, o.price * o.qty, paymentMethod, cashier ]);
+        await appendToSheet(rows);
 
         const htmlContent = generateReceiptHTML();
         const blob = new Blob([htmlContent], { type: 'text/html' });
@@ -325,7 +325,7 @@ export default function Orders({ userName }) {
   });
 
   const tally = {}; let totalSales = 0;
-  summaryList.forEach(o => (o.items || []).forEach(it => { tally[it.name] = (tally[it.name] || 0) + it.qty; totalSales += it.price * it.qty; }));
+  summaryList.forEach(o => (o.items || []).forEach(it => { const q = Number(it.qty) || 0, p = Number(it.price) || 0; tally[it.name] = (tally[it.name] || 0) + q; totalSales += p * q; }));
   const tallyArr = Object.entries(tally).map(([name, qty]) => ({ name, qty })).sort((a, b) => b.qty - a.qty);
   const maxQty = tallyArr.length ? tallyArr[0].qty : 1;
   const totalOrders = summaryList.length;
@@ -350,8 +350,7 @@ export default function Orders({ userName }) {
         const newTotal = items.reduce((sm, x) => sm + x.price * x.qty, 0);
         await updateDoc(doc(db, 'orders', orderId), { items, total: newTotal });
         await appendToSheet([[
-          dateStr, timeStr, ord.buyerName || 'Walk-in', itemsToStr(items), newTotal, ord.paymentMethod || '', cashier,
-          `EDITED (was ₱${ord.total != null ? ord.total : (ord.items || []).reduce((sm, x) => sm + x.price * x.qty, 0)}) — ${it.name}: was qty ${it.qty} @ ₱${it.price}; reason: ${editReason.trim()}`
+          dateStr, timeStr, ord.buyerName || 'Walk-in', `${it.name} (EDITED)`, it.size || '', newQty, newPrice, newPrice * newQty, ord.paymentMethod || '', cashier
         ]]);
       }
       setEditingKey(null); setEditErr(false);
@@ -365,10 +364,8 @@ export default function Orders({ userName }) {
       const ord = allOrders.find(o => o.id === orderId);
       await updateDoc(doc(db, 'orders', orderId), { hidden: true, removeReason: removeReason.trim(), removedBy: cashier, removedAt: new Date().toISOString() });
       if (ord) {
-        const summary = (ord.items || []).map(x => `${x.name}×${x.qty}`).join(', ');
         await appendToSheet([[
-          dateStr, timeStr, ord.buyerName || 'Walk-in', summary, ord.total || 0, ord.paymentMethod || '', cashier,
-          `ORDER REMOVED — reason: ${removeReason.trim() || '(none)'}`
+          dateStr, timeStr, ord.buyerName || 'Walk-in', 'ORDER REMOVED', '', '', '', ord.total || 0, ord.paymentMethod || '', cashier
         ]]);
       }
       setRemovingId(null); setRemoveReason(''); setExpandedId(null);
