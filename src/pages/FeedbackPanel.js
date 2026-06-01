@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase/config';
-import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, deleteDoc, doc } from 'firebase/firestore';
 
 function Stars({ value }) {
   return (
@@ -34,10 +34,11 @@ const s = {
   empty: { textAlign: 'center', padding: '40px 20px', color: 'var(--brown-light)', fontSize: 14 },
 };
 
-export default function FeedbackPanel() {
+export default function FeedbackPanel({ role }) {
   const [feedbacks, setFeedbacks] = useState([]);
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState(null);
 
   useEffect(() => {
     const unsub = onSnapshot(
@@ -46,6 +47,12 @@ export default function FeedbackPanel() {
     );
     return () => unsub();
   }, []);
+
+  const handleDelete = async () => {
+    if (!confirmDelete) return;
+    await deleteDoc(doc(db, 'feedbacks', confirmDelete));
+    setConfirmDelete(null);
+  };
 
   const avg = (key) => {
     const vals = feedbacks.map(f => Number(f[key])).filter(v => v > 0);
@@ -163,8 +170,38 @@ export default function FeedbackPanel() {
               {f.drinkCreaminess > 0 && <span style={{ fontSize: 11, color: 'var(--brown-light)' }}>Cream {f.drinkCreaminess}/5</span>}
             </div>
           )}
+
+          {/* Delete button — manager only */}
+          {role === 'manager' && (
+            <div style={{ marginTop: 10, display: 'flex', justifyContent: 'flex-end' }}>
+              <button onClick={() => setConfirmDelete(f.id)}
+                style={{ padding: '6px 14px', borderRadius: 8, background: '#fff0f0', border: '1px solid #ffcccc', color: '#c1121f', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                Delete
+              </button>
+            </div>
+          )}
         </div>
       ))}
+      {/* Delete confirm dialog */}
+      {confirmDelete && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <div style={{ background: 'white', borderRadius: 16, padding: 24, width: '100%', maxWidth: 320, textAlign: 'center' }}>
+            <div style={{ fontSize: 36, marginBottom: 10 }}>🗑️</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#1a0a00', marginBottom: 6 }}>Delete Feedback?</div>
+            <div style={{ fontSize: 13, color: '#888', marginBottom: 20 }}>This cannot be undone.</div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => setConfirmDelete(null)}
+                style={{ flex: 1, padding: '11px', borderRadius: 10, background: '#f5ede4', border: 'none', color: '#6b3a1f', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+                Cancel
+              </button>
+              <button onClick={handleDelete}
+                style={{ flex: 1, padding: '11px', borderRadius: 10, background: '#c1121f', border: 'none', color: 'white', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
