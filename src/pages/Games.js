@@ -521,11 +521,12 @@ function FlappyBarista({ playerName, onScore }) {
   const [score, setScore]   = useState(0);
   const [best,  setBest]    = useState(() => { try { return parseInt(localStorage.getItem('flappyBest')||'0',10); } catch { return 0; } });
 
-  const W = 340, H = 560;
-  const GRAVITY   = 0.28;
-  const FLAP_VEL  = -6.8;
+  const W = 340, H = 620;
+  const GRAVITY   = 0.34;
+  const FLAP_VEL  = -7.2;
   const PIPE_W    = 52;
   const PIPE_INT  = 220;
+  const flapCoolRef = useRef(0);
 
   const initState = () => ({
     by: H / 2, bv: 0,
@@ -536,6 +537,9 @@ function FlappyBarista({ playerName, onScore }) {
   useEffect(() => { stateRef.current = initState(); }, []);
 
   const flap = useCallback(() => {
+    const now = Date.now();
+    if (now - flapCoolRef.current < 180) return; // 180ms cooldown prevents double jump
+    flapCoolRef.current = now;
     const st = stateRef.current;
     if (!st) return;
     if (phase === 'idle') {
@@ -560,6 +564,7 @@ function FlappyBarista({ playerName, onScore }) {
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(angle);
+    ctx.scale(0.7, 0.7); // smaller barista
     // Body — apron shape
     ctx.fillStyle = '#1a0800';
     ctx.beginPath(); ctx.ellipse(0, 0, 18, 20, 0, 0, Math.PI * 2); ctx.fill();
@@ -684,7 +689,7 @@ function FlappyBarista({ playerName, onScore }) {
         }).filter(p => p.x + PIPE_W > 0);
 
         // Collision - pipes
-        const bx = 60, br = 16;
+        const bx = 60, br = 11;
         const hit = st.pipes.some(p => {
           const inX = bx + br > p.x + 4 && bx - br < p.x + PIPE_W - 4;
           const inY = st.by - br < p.gapY - dynGap / 2 || st.by + br > p.gapY + dynGap / 2;
