@@ -6,7 +6,7 @@ const SLIDES = [
 ];
 
 const MENU_CATEGORIES = [
-  { id: 'espresso', label: 'Espresso Based', count: 10,
+  { id: 'espresso', label: 'Espresso Based', count: 12,
     items: [
       { name: 'Coffee Latte', mini: 75, classic: 85, upgrade: 95 },
       { name: 'Caramel Macchiato', mini: 99, classic: 120, upgrade: 150 },
@@ -18,11 +18,12 @@ const MENU_CATEGORIES = [
       { name: 'Coffee Mint', mini: 99, classic: 120, upgrade: 150 },
       { name: 'Rhumpuccino', mini: 99, classic: 135, upgrade: 150 },
       { name: 'Brewed', mini: 25, classic: 50, upgrade: 85 },
+      { name: 'Dirty Matcha', classic: 120, upgrade: 150 },
+       { name: 'Frappe Caramel Macchiato', regular: 150 },
     ]
   },
   { id: 'noncoffee', label: 'Non-Coffee',
     items: [
-      { name: 'Dirty Matcha', classic: 120, upgrade: 150 },
       { name: 'Strawberry Latte', classic: 120, upgrade: 150 },
       { name: 'Strawberry Matcha', classic: 120, upgrade: 150 },
       { name: 'Matcha Latte', classic: 120, upgrade: 150 },
@@ -30,7 +31,6 @@ const MENU_CATEGORIES = [
       { name: 'Oreo Chocomilkshake', classic: 120, upgrade: 150 },
       { name: 'Frappe Strawberry', regular: 165 },
       { name: 'Frappe Ube Halaya', regular: 150 },
-      { name: 'Frappe Caramel Macchiato', regular: 150 },
     ]
   },
   { id: 'milktea', label: 'Milk Tea',
@@ -55,26 +55,26 @@ const MENU_CATEGORIES = [
       { name: 'Soda - Mango', classic: 50 },
       { name: 'Tea - Breakfast in Paris', classic: 50 },
       { name: 'Tea - Chamomile', classic: 50 },
-      { name: 'Tea - Hibiscus', classic: 50 },
+      { name: 'Tea - Hibiscus', classic: 80 },
     ]
   },
   { id: 'pasta', label: 'Pasta',
     items: [
-      { name: 'Pasta - Carbonara', regular: 129 },
-      { name: 'Pasta - Bolognese', regular: 129 },
+      { name: 'Pasta - Carbonara', regular: 130 },
+      { name: 'Pasta - Bolognese', regular: 130 },
     ]
   },
   { id: 'rice', label: 'Rice Meals',
     items: [
-      { name: 'Tapsilog', regular: 129 },
-      { name: 'Cornsilog', regular: 129 },
-      { name: 'Pork Sisig Rice', regular: 190 },
+      { name: 'Tapsilog', regular: 90 },
+      { name: 'Cornsilog', regular: 90 },
+      { name: 'Spamsilog', regular: 90 },
+      { name: 'Pork Sisig Rice', regular: 180 },
       { name: 'Pork Embotido Rice', regular: 129 },
-      { name: 'Chicken Inasal Rice', regular: 190 },
-      { name: 'Lumpia Rice', regular: 129 },
+      { name: 'Lumpia Rice', regular: 80 },
       { name: 'Porkchop', regular: 150 },
       { name: 'Rice Meal - C. Tapa', regular: 180 },
-      { name: 'Rice Meal - C. Hotdog', regular: 80 },
+      { name: 'Rice Meal - C. Hotdog', regular: 90 },
       { name: 'Rice Meal - C. Pepper Steak', regular: 180 },
       { name: 'Rice Meal - C. Korean', regular: 180 },
       { name: 'Rice Meal - C. Inasal', regular: 180 },
@@ -84,9 +84,9 @@ const MENU_CATEGORIES = [
     items: [
       { name: 'Waffle - Mango', regular: 80 },
       { name: 'Waffle - Chocolate', regular: 80 },
-      { name: 'Waffle - Other', regular: 80 },
+      { name: 'Waffle - Blueberry', regular: 80 },
       { name: 'Pastry - Cookies', regular: 50 },
-      { name: 'Cookies V2', regular: 35 },
+      { name: 'Cookies Small', regular: 35 },
       { name: 'Sweet Bites', regular: 15 },
       { name: 'Grilled Cheese Sandwich', regular: 80 },
     ]
