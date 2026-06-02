@@ -522,8 +522,8 @@ function FlappyBarista({ playerName, onScore }) {
   const [best,  setBest]    = useState(() => { try { return parseInt(localStorage.getItem('flappyBest')||'0',10); } catch { return 0; } });
 
   const W = 340, H = 560;
-  const GRAVITY   = 0.42;
-  const FLAP_VEL  = -8.2;
+  const GRAVITY   = 0.28;
+  const FLAP_VEL  = -6.8;
   const PIPE_W    = 52;
   const PIPE_INT  = 220;
 
