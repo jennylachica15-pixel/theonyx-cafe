@@ -1,10 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { db } from '../firebase/config';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-
-const FEEDBACK_SHEET_ID = '1VW1FxwFRI2uR9Ud5hu-SmaDb5ti8kS0rRcludFnrlhM';
-const GOOGLE_CLIENT_ID = '596322682185-n5hm66hvol3nnqqllnuop995kcnefbgu.apps.googleusercontent.com';
-const SCOPES = 'https://www.googleapis.com/auth/spreadsheets';
 
 const MENU_ITEMS = [
   'Coffee Latte','Caramel Macchiato','Americano','Capuccino','Spanish Latte','Mocha',
@@ -38,6 +34,14 @@ const SODA_TEA_ITEMS = [
   'Tea - Chamomile','Tea - Hibiscus',
 ];
 
+// ── Submit (paper plane) icon ────────────────────────────────────────────────
+const IC_SEND = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1a0a00" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="22" y1="2" x2="11" y2="13" />
+    <polygon points="22 2 15 22 11 13 2 9 22 2" />
+  </svg>
+);
+
 function StarRating({ value, onChange, label, color = '#d4a853', disabled = false }) {
   return (
     <div style={{ marginBottom: 16, opacity: disabled ? 0.35 : 1 }}>
@@ -64,13 +68,27 @@ const s = {
   input: { width: '100%', padding: '11px 14px', borderRadius: 10, border: '1px solid rgba(212,168,83,0.25)', background: 'rgba(255,255,255,0.06)', color: 'white', fontSize: 14, outline: 'none', boxSizing: 'border-box', marginBottom: 12 },
   textarea: { width: '100%', padding: '11px 14px', borderRadius: 10, border: '1px solid rgba(212,168,83,0.25)', background: 'rgba(255,255,255,0.06)', color: 'white', fontSize: 13, outline: 'none', boxSizing: 'border-box', minHeight: 80, resize: 'none' },
   select: { width: '100%', padding: '11px 14px', borderRadius: 10, border: '1px solid rgba(212,168,83,0.25)', background: 'rgba(30,12,0,0.8)', color: 'white', fontSize: 14, outline: 'none', boxSizing: 'border-box', marginBottom: 12 },
-  submitBtn: { width: '100%', padding: '14px', borderRadius: 12, background: '#d4a853', color: '#1a0a00', fontSize: 15, fontWeight: 700, border: 'none', cursor: 'pointer', marginTop: 8 },
-  connectBtn: { padding: '8px 14px', borderRadius: 10, background: '#6b3a1f', color: '#f0d080', fontSize: 12, fontWeight: 600, border: '1px solid rgba(212,168,83,0.3)', cursor: 'pointer', marginBottom: 14, display: 'inline-flex', alignItems: 'center', gap: 6 },
-  connectedBadge: { display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(45,106,79,0.3)', color: '#6fcf97', borderRadius: 10, padding: '6px 12px', fontSize: 12, fontWeight: 500, marginBottom: 14, border: '1px solid rgba(45,106,79,0.3)' },
-  successBox: { background: 'rgba(45,106,79,0.25)', color: '#6fcf97', borderRadius: 12, padding: '20px', textAlign: 'center', border: '1px solid rgba(45,106,79,0.3)', marginBottom: 16 },
+  submitBtn: { width: '100%', padding: '14px', borderRadius: 12, background: '#d4a853', color: '#1a0a00', fontSize: 15, fontWeight: 700, border: 'none', cursor: 'pointer', marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 },
   tagRow: { display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 },
   tag: (active) => ({ padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500, cursor: 'pointer', border: '1px solid', borderColor: active ? '#d4a853' : 'rgba(255,255,255,0.15)', background: active ? 'rgba(212,168,83,0.2)' : 'transparent', color: active ? '#d4a853' : 'rgba(255,255,255,0.5)' }),
 };
+
+// ── Thank-you popup styles ────────────────────────────────────────────────────
+const pop = {
+  overlay: { position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(26,10,0,0.62)', backdropFilter: 'blur(3px)', WebkitBackdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, animation: 'ty-fade 0.25s ease' },
+  card: { position: 'relative', width: '100%', maxWidth: 360, boxSizing: 'border-box', background: 'var(--cream, #fffaf4)', borderRadius: 24, padding: '40px 28px 28px', textAlign: 'center', boxShadow: '0 24px 60px rgba(26,10,0,0.4)', animation: 'ty-pop 0.45s cubic-bezier(0.18,0.89,0.32,1.28)', overflow: 'hidden' },
+  glow: { position: 'absolute', top: -70, left: '50%', transform: 'translateX(-50%)', width: 220, height: 220, borderRadius: '50%', background: 'radial-gradient(circle, rgba(212,168,83,0.30), transparent 70%)', pointerEvents: 'none' },
+  badge: { width: 84, height: 84, borderRadius: '50%', margin: '0 auto 18px', background: 'linear-gradient(135deg, #d4a853, #b8862f)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 22px rgba(184,134,47,0.45)', animation: 'ty-badge 0.6s cubic-bezier(0.34,1.56,0.64,1) 0.1s both' },
+  title: { fontSize: 25, fontWeight: 700, color: 'var(--brown-dark, #2a1206)', fontFamily: 'var(--font-display, Georgia, serif)', letterSpacing: '-0.3px', margin: '0 0 10px', animation: 'ty-rise 0.5s ease 0.25s both' },
+  msg: { fontSize: 14.5, color: 'var(--brown-light, #8a6a52)', lineHeight: 1.6, margin: '0 4px 24px', animation: 'ty-rise 0.5s ease 0.35s both' },
+  btn: { width: '100%', padding: '14px', borderRadius: 14, border: 'none', cursor: 'pointer', background: 'var(--brown-dark, #2a1206)', color: 'var(--gold-light, #f5e6c8)', fontSize: 15, fontWeight: 700, letterSpacing: '0.2px', fontFamily: 'inherit', animation: 'ty-rise 0.5s ease 0.45s both' },
+};
+
+const Sparkle = ({ top, left, right, size, delay }) => (
+  <svg style={{ position: 'absolute', top, left, right, width: size, height: size, color: '#d4a853', animation: `ty-twinkle 1.9s ease ${delay}s infinite`, pointerEvents: 'none' }} viewBox="0 0 24 24" fill="currentColor">
+    <path d="M12 0l2.2 7.8L22 10l-7.8 2.2L12 20l-2.2-7.8L2 10l7.8-2.2z" />
+  </svg>
+);
 
 const BLANK = {
   customerName: '',
@@ -84,10 +102,9 @@ const BLANK = {
 
 export default function Snapshots() {
   const [form, setForm] = useState(BLANK);
-  const [accessToken, setAccessToken] = useState(null);
   const [saving, setSaving] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const tokenClientRef = useRef(null);
+  const [submittedName, setSubmittedName] = useState('');
 
   const now = new Date();
   const dateTimeStr = now.toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' }) + ' · ' + now.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' });
@@ -97,19 +114,13 @@ export default function Snapshots() {
   const selectedDrinks = form.orders.filter(o => DRINK_ITEMS.includes(o));
   const isSodaTeaOnly = selectedDrinks.length > 0 && selectedDrinks.every(o => SODA_TEA_ITEMS.includes(o));
 
+  // Lock background scroll while the thank-you popup is open
   useEffect(() => {
-    const script = document.createElement('script');
-    script.src = 'https://accounts.google.com/gsi/client'; script.async = true;
-    script.onload = () => {
-      if (!window.google) return;
-      tokenClientRef.current = window.google.accounts.oauth2.initTokenClient({
-        client_id: GOOGLE_CLIENT_ID, scope: SCOPES,
-        callback: res => { if (res.access_token) setAccessToken(res.access_token); },
-      });
-    };
-    document.body.appendChild(script);
-    return () => document.body.removeChild(script);
-  }, []);
+    if (!submitted) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, [submitted]);
 
   const toggleOrder = (item) => {
     setForm(prev => ({
@@ -124,27 +135,7 @@ export default function Snapshots() {
     if (!form.customerName) { alert('Please enter your name.'); return; }
     if (form.orders.length === 0) { alert('Please select at least one item you ordered.'); return; }
     setSaving(true);
-    const row = [
-      dateTimeStr,
-      form.customerName,
-      form.orders.join(', '),
-      hasDrink ? form.drinkRatings.overall : 'N/A',
-      hasDrink ? form.drinkRatings.sweetness : 'N/A',
-      hasDrink ? form.drinkRatings.bitterness : 'N/A',
-      hasDrink ? form.drinkRatings.creaminess : 'N/A',
-      hasDrink ? form.drinkComment : 'N/A',
-      form.staffRating,
-      form.placeRating,
-      form.overallComment,
-    ];
     try {
-      if (accessToken) {
-        await fetch(
-          `https://sheets.googleapis.com/v4/spreadsheets/${FEEDBACK_SHEET_ID}/values/Sheet1!A:K:append?valueInputOption=USER_ENTERED`,
-          { method: 'POST', headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ values: [row] }) }
-        );
-      }
-      // Also save to Firestore for Reports summary
       await addDoc(collection(db, 'feedbacks'), {
         customerName: form.customerName,
         orders: form.orders,
@@ -158,9 +149,9 @@ export default function Snapshots() {
         overallComment: form.overallComment,
         createdAt: serverTimestamp(),
       });
-      setSubmitted(true);
+      setSubmittedName(form.customerName);  // keep the name before clearing the form
       setForm(BLANK);
-      setTimeout(() => setSubmitted(false), 5000);
+      setSubmitted(true);                   // show the big thank-you popup
     } catch (e) { alert('Failed to submit. Please try again.'); }
     setSaving(false);
   };
@@ -170,22 +161,6 @@ export default function Snapshots() {
       <div style={s.title}>Share Your Experience</div>
       <div style={s.sub}>We'd love to hear your feedback!</div>
 
-      {!accessToken
-        ? <button style={s.connectBtn} onClick={() => tokenClientRef.current?.requestAccessToken()}>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-            Connect to Submit Feedback
-          </button>
-        : <div style={s.connectedBadge}>✅ Connected — feedback saves to spreadsheet</div>
-      }
-
-      {submitted && (
-        <div style={s.successBox}>
-          <div style={{ fontSize: 32, marginBottom: 8 }}>🙏</div>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: 17, fontWeight: 700, marginBottom: 4 }}>Thank you!</div>
-          <div style={{ fontSize: 13, opacity: 0.8 }}>Your feedback means a lot to us at Theonyx Cafe.</div>
-        </div>
-      )}
-
       {/* Privacy notice */}
       <div style={{ background: 'rgba(212,168,83,0.1)', border: '1px solid rgba(212,168,83,0.25)', borderRadius: 10, padding: '10px 14px', marginBottom: 14, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d4a853" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
@@ -193,6 +168,7 @@ export default function Snapshots() {
           Your privacy is important to us. <strong style={{ color: '#d4a853' }}>No personal email addresses are collected or stored</strong> in this form. Only your name and feedback responses are recorded.
         </div>
       </div>
+
       <div style={s.section}>
         <div style={s.sectionTitle}>Customer Information</div>
         <label style={s.label}>Your Name</label>
@@ -235,8 +211,45 @@ export default function Snapshots() {
       </div>
 
       <button style={{ ...s.submitBtn, opacity: saving ? 0.7 : 1 }} onClick={handleSubmit} disabled={saving}>
-        {saving ? 'Submitting...' : '📩 Submit Feedback'}
+        {saving ? 'Submitting...' : <>{IC_SEND} Submit Feedback</>}
       </button>
+
+      {/* ── BIG THANK-YOU POPUP ── */}
+      {submitted && (
+        <div style={pop.overlay} onClick={() => setSubmitted(false)}>
+          <style>{`
+            @keyframes ty-fade    { from { opacity:0 } to { opacity:1 } }
+            @keyframes ty-pop     { 0% { transform:scale(0.82); opacity:0 } 100% { transform:scale(1); opacity:1 } }
+            @keyframes ty-badge   { 0% { transform:scale(0) rotate(-25deg) } 100% { transform:scale(1) rotate(0) } }
+            @keyframes ty-rise    { from { opacity:0; transform:translateY(10px) } to { opacity:1; transform:translateY(0) } }
+            @keyframes ty-twinkle { 0%,100% { opacity:0.2; transform:scale(0.7) } 50% { opacity:1; transform:scale(1) } }
+          `}</style>
+
+          <div style={pop.card} onClick={e => e.stopPropagation()}>
+            <div style={pop.glow} />
+            <Sparkle top={20} left={34}  size={15} delay={0} />
+            <Sparkle top={34} right={34} size={11} delay={0.5} />
+            <Sparkle top={72} left={26}  size={9}  delay={1} />
+
+            <div style={pop.badge}>
+              <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#fffaf0" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            </div>
+
+            <div style={pop.title}>
+              Thank You{submittedName ? `, ${submittedName}` : ''}!
+            </div>
+
+            <div style={pop.msg}>
+              Thank you for taking the time to share your feedback with us.
+              Your thoughts mean a lot and help make Theonyx Cafe even better.
+            </div>
+
+            <button style={pop.btn} onClick={() => setSubmitted(false)}>Done</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
