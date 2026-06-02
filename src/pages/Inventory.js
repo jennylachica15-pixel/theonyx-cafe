@@ -22,6 +22,9 @@ const SCOPES =
 const CATEGORIES = ['Beans & Coffee','Milk & Cream','Syrups','Food & Pastries','Cups & Packaging','Equipment','Other'];
 const UNITS      = ['kg','g','liters','ml','pcs','bottles','boxes','bags'];
 
+// Staff who can upload receipts (used for the filename + "Uploaded by").
+const STAFF_NAMES = ['Kelly','Maryz','Jenny','Aaron'];
+
 // Sheet columns (A..J). One row per item — updated in place, not appended every time.
 const SHEET_HEADERS = ['Code','Item','Category','Quantity','Unit','Status','Threshold','Last Restocked','Updated','Notes'];
 
@@ -141,6 +144,7 @@ const s = {
   rcptActions:{ display:'flex', gap:7, marginTop:10 },
   approveBtn:{ flex:1, padding:'9px', borderRadius:10, background:'#f0faf4', color:'#2d7a4f', fontSize:12.5, fontWeight:700, border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:5 },
   rejectBtn: { flex:1, padding:'9px', borderRadius:10, background:'#fff0ee', color:'#c94030', fontSize:12.5, fontWeight:700, border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:5 },
+  rcptDelBtn:{ width:28, height:28, borderRadius:8, background:'#f7f7f7', color:'#b03228', border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 },
 };
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
@@ -266,8 +270,21 @@ async function uploadReceiptToDrive(token, file, filename) {
   return r.json(); // { id, name, webViewLink, thumbnailLink }
 }
 
+async function deleteDriveFile(token, fileId) {
+  if (!token || !fileId) return;
+  // Best-effort: app can delete files it created (drive.file) or any file (drive).
+  await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
+    method:'DELETE', headers:{ Authorization:`Bearer ${token}` },
+  });
+}
+
 // ── MAIN COMPONENT ────────────────────────────────────────────────────────────
-export default function Inventory() {
+// Pass the logged-in user from your auth, e.g.:
+//   <Inventory role={currentUser.role} userName={currentUser.name} />
+// role defaults to 'staff' (least privilege) so wire it up to unlock Manager tools.
+export default function Inventory({ role = 'staff', userName = '' }) {
+  const isManager = String(role).toLowerCase() === 'manager';
+
   const [items,       setItems]       = useState([]);
   const [showModal,   setShowModal]   = useState(false);
   const [showRestock, setShowRestock] = useState(false);
@@ -291,6 +308,7 @@ export default function Inventory() {
   const [receiptPreview,  setReceiptPreview]  = useState('');
   const [receiptNote,     setReceiptNote]     = useState('');
   const [receiptAmount,   setReceiptAmount]   = useState('');
+  const [uploader,        setUploader]        = useState('');     // who is submitting
   const [uploadingReceipt,setUploadingReceipt]= useState(false);
 
   const tokenClientRef = React.useRef(null);
@@ -422,6 +440,9 @@ export default function Inventory() {
   // ── Receipts ──
   const openReceipt = () => {
     setReceiptFile(null); setReceiptPreview(''); setReceiptNote(''); setReceiptAmount('');
+    // Prefill uploader from the logged-in user if their name is in the list.
+    const match = STAFF_NAMES.find(n => n.toLowerCase() === String(userName).toLowerCase());
+    setUploader(match || '');
     setShowReceipt(true);
   };
 
@@ -438,11 +459,15 @@ export default function Inventory() {
   const submitReceipt = async () => {
     if (!accessToken)  { alert('Connect Google muna (para sa Drive upload).'); return; }
     if (!receiptFile)  { alert('Kumuha o pumili muna ng larawan ng resibo.'); return; }
+    if (!uploader)     { alert('Piliin kung sino ang nag-upload.'); return; }
     setUploadingReceipt(true);
     try {
-      const stamp = new Date().toISOString().replace(/[:.]/g,'-');
-      const tag   = (receiptNote||'item').slice(0,24).replace(/[^\w]+/g,'_');
-      const fname = `receipt_${stamp}_${tag}.jpg`;
+      // Filename: date-time-uploader  → e.g. 2026-06-02_14-30-05_Kelly.jpg
+      const d = new Date();
+      const p = (n) => String(n).padStart(2,'0');
+      const stamp = `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}_${p(d.getHours())}-${p(d.getMinutes())}-${p(d.getSeconds())}`;
+      const safeName = uploader.replace(/[^\w]+/g,'');
+      const fname = `${stamp}_${safeName}.jpg`;
       const up = await uploadReceiptToDrive(accessToken, receiptFile, fname);
       await addDoc(collection(db,'receipts'), {
         fileId:   up.id || '',
@@ -451,11 +476,12 @@ export default function Inventory() {
         thumb:    up.thumbnailLink || '',
         note:     receiptNote || '',
         amount:   receiptAmount ? Number(receiptAmount) : null,
+        uploader: uploader,
         status:   'pending',
         createdAt: serverTimestamp(),
       });
       setShowReceipt(false);
-      setReceiptFile(null); setReceiptPreview(''); setReceiptNote(''); setReceiptAmount('');
+      setReceiptFile(null); setReceiptPreview(''); setReceiptNote(''); setReceiptAmount(''); setUploader('');
     } catch(e) {
       console.error(e);
       alert('Hindi na-upload ang resibo. I-check ang Google permission o subukan ulit.');
@@ -466,6 +492,18 @@ export default function Inventory() {
   const reviewReceipt = async (r, status) => {
     try { await updateDoc(doc(db,'receipts',r.id), { status, reviewedAt: serverTimestamp() }); }
     catch(e) { console.error(e); }
+  };
+
+  const deleteReceipt = async (r) => {
+    if (!isManager) return;
+    if (!window.confirm('Delete this receipt? Tatanggalin din ang file sa Drive.')) return;
+    try {
+      await deleteDoc(doc(db,'receipts',r.id));
+      if (accessToken && r.fileId) {
+        try { await deleteDriveFile(accessToken, r.fileId); }
+        catch (err) { console.error('Drive delete:', err); } // record gone na kahit pa-fail dito
+      }
+    } catch(e) { console.error(e); }
   };
 
   // ── Derived ──
@@ -509,11 +547,13 @@ export default function Inventory() {
         <button style={s.receiptBtn} onClick={openReceipt}>{IC.camera} Receipt</button>
       </div>
 
-      {/* Review receipts (Manager) */}
-      <button style={s.reviewBtn(pendingCount>0)} onClick={()=>setShowReceipts(true)}>
-        {IC.receipt} Review Receipts
-        {pendingCount>0 && <span style={s.pendCount}>{pendingCount}</span>}
-      </button>
+      {/* Review receipts — Manager only */}
+      {isManager && (
+        <button style={s.reviewBtn(pendingCount>0)} onClick={()=>setShowReceipts(true)}>
+          {IC.receipt} Review Receipts
+          {pendingCount>0 && <span style={s.pendCount}>{pendingCount}</span>}
+        </button>
+      )}
 
       {/* Search by name or code */}
       <div style={s.searchWrap}>
@@ -589,9 +629,11 @@ export default function Inventory() {
                   <button style={s.actionBtn('edit')} onClick={(e)=>{e.stopPropagation();openEdit(item);}}>
                     {IC.edit} Edit
                   </button>
-                  <button style={s.actionBtn('danger')} onClick={(e)=>{e.stopPropagation();handleDelete(item);}}>
-                    {IC.trash} Delete
-                  </button>
+                  {isManager && (
+                    <button style={s.actionBtn('danger')} onClick={(e)=>{e.stopPropagation();handleDelete(item);}}>
+                      {IC.trash} Delete
+                    </button>
+                  )}
                 </div>
 
                 {item.updatedAt?.toDate && (
@@ -723,13 +765,19 @@ export default function Inventory() {
               </>
             )}
 
+            <label style={s.label}>Uploaded by</label>
+            <select style={s.input} value={uploader} onChange={e=>setUploader(e.target.value)}>
+              <option value="" disabled>Select your name…</option>
+              {STAFF_NAMES.map(n=><option key={n} value={n}>{n}</option>)}
+            </select>
+
             <label style={s.label}>What was purchased</label>
             <input style={s.input} placeholder="e.g. Milk + cups from supplier" value={receiptNote} onChange={e=>setReceiptNote(e.target.value)}/>
 
             <label style={s.label}>Amount (₱, optional)</label>
             <input style={s.input} type="number" placeholder="e.g. 1250" value={receiptAmount} onChange={e=>setReceiptAmount(e.target.value)}/>
 
-            <button style={s.saveBtn} onClick={submitReceipt} disabled={uploadingReceipt||!receiptFile||!accessToken}>
+            <button style={s.saveBtn} onClick={submitReceipt} disabled={uploadingReceipt||!receiptFile||!accessToken||!uploader}>
               {uploadingReceipt?'Uploading…':'Submit for Approval'}
             </button>
             <button style={s.cancelBtn} onClick={()=>setShowReceipt(false)}>Cancel</button>
@@ -737,8 +785,8 @@ export default function Inventory() {
         </div>
       )}
 
-      {/* ── RECEIPT REVIEW MODAL (Manager) ── */}
-      {showReceipts && (
+      {/* ── RECEIPT REVIEW MODAL (Manager only) ── */}
+      {showReceipts && isManager && (
         <div style={s.modal} onClick={()=>setShowReceipts(false)}>
           <div style={s.modalCard} onClick={e=>e.stopPropagation()}>
             <div style={s.modalTitle}>{IC.receipt} Receipts &nbsp;<span style={{fontSize:13,color:'#aaa',fontWeight:500}}>{pendingCount} pending</span></div>
@@ -758,9 +806,13 @@ export default function Inventory() {
                         <span style={{fontSize:14,fontWeight:600,color:'#1a1a1a',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
                           {r.note || 'Receipt'}
                         </span>
-                        <span style={{...s.badge('ok'),background:st.bg,color:st.color}}>{st.label}</span>
+                        <div style={{display:'flex',alignItems:'center',gap:6,flexShrink:0}}>
+                          <span style={{...s.badge('ok'),background:st.bg,color:st.color}}>{st.label}</span>
+                          <button style={s.rcptDelBtn} title="Delete receipt" onClick={()=>deleteReceipt(r)}>{IC.trash}</button>
+                        </div>
                       </div>
                       <div style={{fontSize:12,color:'#aaa',margin:'3px 0 6px'}}>
+                        {r.uploader ? `by ${r.uploader} · ` : ''}
                         {r.amount!=null ? `₱${Number(r.amount).toLocaleString('en-PH')} · ` : ''}
                         {r.createdAt?.toDate ? r.createdAt.toDate().toLocaleString('en-PH',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : 'just now'}
                       </div>
