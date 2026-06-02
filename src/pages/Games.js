@@ -80,19 +80,35 @@ async function loginUser(username, password) {
   return snap.data().username;
 }
 
+const LEADERBOARD_RESET_DAYS = 5;
+
 async function saveScore(username, gameId, score) {
   const key = `${username}_${gameId}`;
   const ref = doc(db, 'leaderboard', key);
   const snap = await getDoc(ref);
-  if (!snap.exists() || snap.data().score < score) {
+  const now = Date.now();
+  const resetMs = LEADERBOARD_RESET_DAYS * 24 * 60 * 60 * 1000;
+  // If score exists but it's older than 5 days, treat as expired (reset)
+  const isExpired = snap.exists() && snap.data().updatedAt?.toMillis &&
+    (now - snap.data().updatedAt.toMillis() > resetMs);
+  if (!snap.exists() || snap.data().score < score || isExpired) {
     await setDoc(ref, { username, gameId, score, updatedAt: serverTimestamp() });
   }
 }
 
 async function getLeaderboard(gameId) {
-  const q = query(collection(db, 'leaderboard'), where('gameId','==',gameId), orderBy('score','desc'), limit(10));
+  const q = query(collection(db, 'leaderboard'), where('gameId','==',gameId), orderBy('score','desc'), limit(20));
   const snaps = await getDocs(q);
-  return snaps.docs.map(d => d.data());
+  const now = Date.now();
+  const resetMs = LEADERBOARD_RESET_DAYS * 24 * 60 * 60 * 1000;
+  // Filter out scores older than 5 days
+  return snaps.docs
+    .map(d => d.data())
+    .filter(d => {
+      if (!d.updatedAt?.toMillis) return true; // keep if no timestamp
+      return (now - d.updatedAt.toMillis()) <= resetMs;
+    })
+    .slice(0, 10);
 }
 
 function AuthModal({ onAuth, onClose }) {
@@ -916,13 +932,19 @@ function GuessWordGame({ playerName, onScore }) {
   const [round, setRound] = useState(1);
   const [streak, setStreak] = useState(0);
   const [shake, setShake] = useState(false);
-  const [usedWords, setUsedWords] = useState([]);
+  const [usedWords, setUsedWords] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('gwUsedWords') || '[]'); } catch { return []; }
+  });
   const [mistakes, setMistakes] = useState(0);
   const [baristaMsg, setBaristaMsg] = useState('wave');
 
   const pickWord = useCallback((used = []) => {
     const avail = PLAYABLE.filter(w => !used.includes(w.word));
+    // Reset used list if all words exhausted
     const list = avail.length > 0 ? avail : PLAYABLE;
+    if (avail.length === 0) {
+      try { localStorage.removeItem('gwUsedWords'); } catch {}
+    }
     setWordData(list[Math.floor(Math.random() * list.length)]);
     setGuesses([]); setCurrent(''); setGameState('playing');
     setMistakes(0); setBaristaMsg('wave');
@@ -969,10 +991,13 @@ function GuessWordGame({ playerName, onScore }) {
       setScore(s => s + pts); setStreak(s => s + 1);
       setBaristaMsg('cheer'); setGameState('won'); onScore(score + pts);
     } else {
+      // -15 points per wrong guess, score can't go below 0
+      const penalty = 15;
+      setScore(s => Math.max(0, s - penalty));
       setMistakes(newMistakes);
       setBaristaMsg('fight');
       if (newMistakes >= MAX_MISTAKES) {
-        setGameState('lost'); setBaristaMsg('sad'); setStreak(0); onScore(score);
+        setGameState('lost'); setBaristaMsg('sad'); setStreak(0); onScore(Math.max(0, score - penalty));
       } else {
         setTimeout(() => { setBaristaMsg(newMistakes === MAX_MISTAKES - 1 ? 'sad' : 'wave'); }, 700);
       }
@@ -997,7 +1022,13 @@ function GuessWordGame({ playerName, onScore }) {
     return () => window.removeEventListener('keydown', k);
   }, [current, gameState, word, WL, mistakes]);
 
-  const nextRound = () => { const nu = [...usedWords, word]; setUsedWords(nu); setRound(r => r + 1); pickWord(nu); };
+  const nextRound = () => {
+    const nu = [...usedWords, word];
+    setUsedWords(nu);
+    try { localStorage.setItem('gwUsedWords', JSON.stringify(nu)); } catch {}
+    setRound(r => r + 1);
+    pickWord(nu);
+  };
 
   const tileColors = {
     correct: { bg: '#538d4e', border: '#538d4e', color: '#fff' },
@@ -1013,7 +1044,7 @@ function GuessWordGame({ playerName, onScore }) {
 
   const msgMap = {
     wave:  { text: `Guess the word!`, color: '#ffd700' },
-    fight: { text: mistakes >= MAX_MISTAKES - 1 ? 'Last chance!' : 'WRONG!', color: mistakes >= MAX_MISTAKES - 1 ? '#ff8800' : '#ff4444' },
+    fight: { text: mistakes >= MAX_MISTAKES - 1 ? 'Last chance! -15pts' : 'WRONG! -15pts', color: mistakes >= MAX_MISTAKES - 1 ? '#ff8800' : '#ff4444' },
     cheer: { text: 'CORRECT!', color: '#44ff88' },
     sad:   { text: 'Game Over!', color: '#888' },
   };
