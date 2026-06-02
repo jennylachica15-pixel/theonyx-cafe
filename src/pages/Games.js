@@ -1031,22 +1031,15 @@ function GuessWordGame({ playerName, onScore }) {
         <div style={{ fontSize: 10, color: '#6b3a1f', marginTop: 2 }}>{wordData.category} · {WL} letters</div>
       </div>
 
-      {/* Barista row — small baristas on sides, message in center */}
+      {/* Barista row — real photos on sides, message in center */}
       <div style={{ background: '#1a0800', borderBottom: '2px solid #3d1f00', padding: '4px 8px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
-        {/* Left mini barista */}
-        <svg width="36" height="48" viewBox="0 0 36 48" style={{flexShrink:0}}>
-          <circle cx="18" cy="12" r="10" fill="#e8b89a"/>
-          <rect x="10" y="6" width="16" height="5" rx="2.5" fill="#1a0800"/>
-          <circle cx="18" cy="4" r="4" fill="#d4a853"/>
-          <circle cx="14" cy="11" r="2" fill="#333"/>
-          <circle cx="22" cy="11" r="2" fill="#333"/>
-          <path d="M15 15 Q18 18 21 15" stroke="#333" strokeWidth="1.2" fill="none"/>
-          <rect x="10" y="22" width="16" height="18" rx="3" fill="#1a0800"/>
-          <rect x="12" y="22" width="12" height="6" rx="2" fill="#d4a853"/>
-          <rect x="26" y="24" width="6" height="10" rx="3" fill="#c8943a"/>
-          <rect x="0" y="40" width="16" height="8" rx="3" fill="#3a2010"/>
-          <rect x="20" y="40" width="16" height="8" rx="3" fill="#3a2010"/>
-        </svg>
+        {/* Left barista — Kelly */}
+        <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+          <div style={{ width: 42, height: 42, borderRadius: '50%', overflow: 'hidden', border: '2px solid #d4a853' }}>
+            <img src={KELLY_FACE_B64} alt="Kelly" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: '50% 20%' }} />
+          </div>
+          <span style={{ fontSize: 9, color: '#c8943a', fontWeight: 'bold', letterSpacing: 0.5 }}>KELLY</span>
+        </div>
 
         {/* Center: mistake boxes + message */}
         <div style={{ flex: 1, textAlign: 'center' }}>
@@ -1060,20 +1053,13 @@ function GuessWordGame({ playerName, onScore }) {
           <div style={{ fontSize: 13, fontWeight: 'bold', color: msg.color }}>{msg.text}</div>
         </div>
 
-        {/* Right mini barista */}
-        <svg width="36" height="48" viewBox="0 0 36 48" style={{flexShrink:0,transform:'scaleX(-1)'}}>
-          <circle cx="18" cy="12" r="10" fill="#e8b89a"/>
-          <rect x="10" y="6" width="16" height="5" rx="2.5" fill="#1a0800"/>
-          <circle cx="18" cy="4" r="4" fill="#d4a853"/>
-          <circle cx="14" cy="11" r="2" fill="#333"/>
-          <circle cx="22" cy="11" r="2" fill="#333"/>
-          <path d="M15 15 Q18 18 21 15" stroke="#333" strokeWidth="1.2" fill="none"/>
-          <rect x="10" y="22" width="16" height="18" rx="3" fill="#1a0800"/>
-          <rect x="12" y="22" width="12" height="6" rx="2" fill="#d4a853"/>
-          <rect x="26" y="24" width="6" height="10" rx="3" fill="#c8943a"/>
-          <rect x="0" y="40" width="16" height="8" rx="3" fill="#3a2010"/>
-          <rect x="20" y="40" width="16" height="8" rx="3" fill="#3a2010"/>
-        </svg>
+        {/* Right barista — Maryz */}
+        <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+          <div style={{ width: 42, height: 42, borderRadius: '50%', overflow: 'hidden', border: '2px solid #d4a853' }}>
+            <img src={MARYZ_FACE_B64} alt="Maryz" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: '50% 20%' }} />
+          </div>
+          <span style={{ fontSize: 9, color: '#c8943a', fontWeight: 'bold', letterSpacing: 0.5 }}>MARYZ</span>
+        </div>
       </div>
 
       {/* Tile grid */}
@@ -1117,8 +1103,8 @@ function GuessWordGame({ playerName, onScore }) {
         </div>
       )}
 
-      {/* Keyboard — hidden when not playing */}
-      <div style={{ background: '#1a1a1b', borderTop: '1px solid #3a3a3c', padding: '8px 4px 14px', flexShrink: 0 }}>
+      {/* Keyboard */}
+      <div style={{ background: '#2a1400', borderTop: '1px solid #3d1f00', padding: '8px 4px 14px', flexShrink: 0 }}>
         {KEYBOARD_ROWS.map((row, ri) => (
           <div key={ri} style={{ display: 'flex', justifyContent: 'center', gap: 5, marginBottom: 6 }}>
             {ri === 2 && <button onPointerDown={e => { e.preventDefault(); pressKey('ENTER'); }} style={{ background: '#818384', border: 'none', borderRadius: 6, padding: '16px 8px', color: '#fff', fontSize: 11, fontWeight: 'bold', cursor: 'pointer', minWidth: 44, userSelect: 'none' }}>ENTER</button>}
