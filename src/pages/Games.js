@@ -997,7 +997,9 @@ function GuessWordGame({ playerName, onScore }) {
       setMistakes(newMistakes);
       setBaristaMsg('fight');
       if (newMistakes >= MAX_MISTAKES) {
-        setGameState('lost'); setBaristaMsg('sad'); setStreak(0); onScore(Math.max(0, score - penalty));
+        setGameState('lost'); setBaristaMsg('sad'); setStreak(0);
+        setScore(0); // reset score to 0 on game over
+        onScore(0);
       } else {
         setTimeout(() => { setBaristaMsg(newMistakes === MAX_MISTAKES - 1 ? 'sad' : 'wave'); }, 700);
       }
@@ -1124,18 +1126,51 @@ function GuessWordGame({ playerName, onScore }) {
         )}
       </div>
 
-      {/* Result panel — only shown when not playing */}
-      {gameState !== 'playing' && (
-        <div style={{ textAlign: 'center', padding: '14px 14px 16px', background: gameState === 'won' ? '#0a1f0a' : '#1f0a0a', borderTop: `2px solid ${gameState === 'won' ? '#44ff88' : '#ff4444'}`, flexShrink: 0 }}>
-          <div style={{ fontSize: gameState==='won' ? 22 : 17, fontWeight: 'bold', color: gameState==='won' ? '#44ff88' : '#ff6b6b', marginBottom: 6 }}>
-            {gameState === 'won'
-              ? (mistakes === 0 ? 'PERFECT!!' : mistakes === 1 ? 'GREAT!' : 'GOT IT!')
-              : `It was "${word}"`}
+      {/* Result panel — WIN only (small bar at bottom) */}
+      {gameState === 'won' && (
+        <div style={{ textAlign: 'center', padding: '14px 14px 16px', background: '#0a1f0a', borderTop: '2px solid #44ff88', flexShrink: 0 }}>
+          <div style={{ fontSize: 22, fontWeight: 'bold', color: '#44ff88', marginBottom: 6 }}>
+            {mistakes === 0 ? 'PERFECT!!' : mistakes === 1 ? 'GREAT!' : 'GOT IT!'}
           </div>
-          {gameState === 'won' && <div style={{ fontSize: 13, color: '#ffd700', marginBottom: 10 }}>+{Math.max(10, 100 - mistakes * 20) + streak * 15} pts{streak > 1 ? ` · ${streak}x streak` : ''}</div>}
-          <button onClick={nextRound} style={{ background: gameState==='won' ? '#44cc66' : '#d4a853', border: 'none', borderRadius: 12, padding: '11px 32px', color: gameState==='won' ? '#fff' : '#1a0a00', fontWeight: 'bold', fontSize: 15, cursor: 'pointer' }}>
+          <div style={{ fontSize: 13, color: '#ffd700', marginBottom: 10 }}>+{Math.max(10, 100 - mistakes * 20) + streak * 15} pts{streak > 1 ? ` · ${streak}x streak` : ''}</div>
+          <button onClick={nextRound} style={{ background: '#44cc66', border: 'none', borderRadius: 12, padding: '11px 32px', color: '#fff', fontWeight: 'bold', fontSize: 15, cursor: 'pointer' }}>
             Next Word
           </button>
+        </div>
+      )}
+
+      {/* GAME OVER — big centered popup overlay */}
+      {gameState === 'lost' && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(10,4,0,0.82)', zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'fadeInOverlay 0.3s ease' }}>
+          <div style={{ background: 'linear-gradient(160deg,#2a0a0a,#1a0000)', border: '2px solid #ff4444', borderRadius: 24, padding: '36px 28px 28px', width: 290, textAlign: 'center', animation: 'popIn 0.4s cubic-bezier(.34,1.56,.64,1)' }}>
+            {/* X marks */}
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginBottom: 14 }}>
+              {Array.from({ length: MAX_MISTAKES }).map((_, i) => (
+                <div key={i} style={{ width: 28, height: 28, borderRadius: 6, background: '#ff4444', border: '1.5px solid #ff2222', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 'bold', color: '#fff' }}>X</div>
+              ))}
+            </div>
+            <div style={{ fontSize: 30, fontWeight: 800, color: '#ff4444', marginBottom: 6, letterSpacing: 1, textShadow: '0 0 16px #ff000088' }}>
+              GAME OVER!
+            </div>
+            <div style={{ fontSize: 14, color: '#f5e6d0', marginBottom: 4 }}>
+              The word was
+            </div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: '#ffd700', marginBottom: 6, letterSpacing: 2, textShadow: '0 0 10px #ffaa0066' }}>
+              "{word}"
+            </div>
+            <div style={{ fontSize: 12, color: '#a07850', marginBottom: 20 }}>
+              Score reset to 0
+            </div>
+            <button
+              onClick={() => { setScore(0); setStreak(0); nextRound(); }}
+              style={{ width: '100%', padding: '14px', background: 'linear-gradient(135deg,#d4a853,#ffd700)', border: 'none', borderRadius: 14, color: '#1a0800', fontSize: 16, fontWeight: 800, cursor: 'pointer', marginBottom: 0, letterSpacing: 0.5 }}>
+              Want to Try Again?
+            </button>
+          </div>
+          <style>{`
+            @keyframes fadeInOverlay { from{opacity:0} to{opacity:1} }
+            @keyframes popIn { 0%{transform:scale(0.7);opacity:0} 70%{transform:scale(1.05)} 100%{transform:scale(1);opacity:1} }
+          `}</style>
         </div>
       )}
 
