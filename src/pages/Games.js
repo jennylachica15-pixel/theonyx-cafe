@@ -510,55 +510,139 @@ function RacingGame({ playerName, onScore }) {
 }
 
 const WORD_LIST = [
-  { word:'LATTE',     hint:'Espresso + steamed milk',           category:'Drinks' },
-  { word:'MOCHA',     hint:'Coffee with chocolate syrup',       category:'Drinks' },
-  { word:'FRAPPE',    hint:'Blended iced coffee drink',         category:'Drinks' },
-  { word:'MATCHA',    hint:'Finely ground green tea powder',    category:'Drinks' },
-  { word:'BARISTA',   hint:'The person who makes your coffee',  category:'Cafe' },
-  { word:'ALMOND',    hint:'Nut used for plant-based milk',     category:'Food' },
-  { word:'MUFFIN',    hint:'Domed cup-baked treat',             category:'Food' },
-  { word:'CARAMEL',   hint:'Sweet golden-brown sauce',          category:'Food' },
-  { word:'VANILLA',   hint:'Classic white flavoring pod',       category:'Food' },
-  { word:'COCONUT',   hint:'Tropical nut with white flesh',     category:'Food' },
-  { word:'CINNAMON',  hint:'Bark spice sprinkled on lattes',    category:'Food' },
-  { word:'ESPRESSO',  hint:'Strong short concentrated coffee',  category:'Drinks' },
-  { word:'TIRAMISU',  hint:'Italian pick-me-up dessert',        category:'Food' },
-  { word:'SMOOTHIE',  hint:'Blended fruit drink',               category:'Drinks' },
-  { word:'PANCAKE',   hint:'Flat round griddle cake',           category:'Food' },
-  { word:'BROWNIE',   hint:'Dense chocolate dessert square',    category:'Food' },
-  { word:'WAFFLE',    hint:'Grid-patterned baked cake',         category:'Food' },
-  { word:'AMERICANO', hint:'Espresso diluted with hot water',   category:'Drinks' },
-  { word:'AFFOGATO',  hint:'Ice cream drowned in espresso',     category:'Drinks' },
-  { word:'CROISSANT', hint:'Buttery crescent French pastry',    category:'Food' },
-  { word:'MACCHIATO', hint:'Espresso stained with milk',        category:'Drinks' },
-  { word:'COASTER',   hint:'Small mat placed under your cup',   category:'Cafe' },
-  { word:'JOURNAL',   hint:'Notebook cafe visitors write in',   category:'Cafe' },
-  { word:'CHEESECAKE',hint:'Creamy dessert on biscuit base',    category:'Food' },
-  { word:'SANDWICH',  hint:'Two bread slices with filling',     category:'Food' },
-  { word:'SAMPAGUITA', hint:'National flower of the Philippines, white and fragrant', category:'PH Plants' },
-  { word:'WALING',     hint:'Queen of Philippine flowers, a rare orchid',             category:'PH Plants' },
-  { word:'YLANGYLANG', hint:'Fragrant yellow flower used in perfumes',                category:'PH Plants' },
-  { word:'BANABA',     hint:'Philippine tree with purple flowers, herbal tea source', category:'PH Plants' },
-  { word:'ANAHAW',     hint:'National leaf of the Philippines, a fan palm',           category:'PH Plants' },
-  { word:'NARRA',      hint:'National tree of the Philippines',                       category:'PH Plants' },
-  { word:'BAMBOO',     hint:'Tall grass used in Philippine crafts and building',      category:'PH Plants' },
-  { word:'KAMIAS',     hint:'Sour small green fruit used in sinigang',                category:'PH Plants' },
-  { word:'TAMARAW',    hint:'Critically endangered dwarf buffalo of Mindoro',         category:'PH Animals' },
-  { word:'TARSIER',    hint:'Tiny big-eyed primate found in Bohol',                  category:'PH Animals' },
-  { word:'PAWIKAN',    hint:'Sea turtle that nests on Philippine beaches',            category:'PH Animals' },
-  { word:'DUGONG',     hint:'Sea cow marine mammal found in Palawan waters',          category:'PH Animals' },
-  { word:'KALAW',      hint:'Philippine hornbill whose call sounds like its name',    category:'PH Animals' },
-  { word:'AGILA',      hint:'Philippine Eagle, the national bird',                    category:'PH Animals' },
-  { word:'BUTIKI',     hint:'Common house lizard found on Philippine walls',          category:'PH Animals' },
-  { word:'BUWAYA',     hint:'Philippine crocodile, critically endangered reptile',    category:'PH Animals' },
-  { word:'BANGUS',     hint:'National fish of the Philippines, also called milkfish', category:'PH Animals' },
-  { word:'KALABAW',    hint:'Water buffalo, the national animal of the Philippines',  category:'PH Animals' },
-  { word:'MANOK',      hint:'Filipino word for chicken, found in every barangay',     category:'PH Animals' },
+  { word:'LATTE',      hint:'Espresso + steamed milk',                         category:'Drinks' },
+  { word:'MOCHA',      hint:'Coffee with chocolate syrup',                     category:'Drinks' },
+  { word:'FRAPPE',     hint:'Blended iced coffee drink',                       category:'Drinks' },
+  { word:'MATCHA',     hint:'Finely ground green tea powder',                  category:'Drinks' },
+  { word:'BARISTA',    hint:'The person who makes your coffee',                category:'Cafe' },
+  { word:'ALMOND',     hint:'Nut used for plant-based milk',                   category:'Food' },
+  { word:'MUFFIN',     hint:'Domed cup-baked treat',                           category:'Food' },
+  { word:'CARAMEL',    hint:'Sweet golden-brown sauce',                        category:'Food' },
+  { word:'VANILLA',    hint:'Classic white flavoring pod',                     category:'Food' },
+  { word:'COCONUT',    hint:'Tropical nut with white flesh',                   category:'Food' },
+  { word:'CINNAMON',   hint:'Bark spice sprinkled on lattes',                  category:'Food' },
+  { word:'ESPRESSO',   hint:'Strong short concentrated coffee',                category:'Drinks' },
+  { word:'TIRAMISU',   hint:'Italian pick-me-up dessert',                      category:'Food' },
+  { word:'SMOOTHIE',   hint:'Blended fruit drink',                             category:'Drinks' },
+  { word:'PANCAKE',    hint:'Flat round griddle cake',                         category:'Food' },
+  { word:'BROWNIE',    hint:'Dense chocolate dessert square',                  category:'Food' },
+  { word:'WAFFLE',     hint:'Grid-patterned baked cake',                       category:'Food' },
+  { word:'AMERICANO',  hint:'Espresso diluted with hot water',                 category:'Drinks' },
+  { word:'AFFOGATO',   hint:'Ice cream drowned in espresso',                   category:'Drinks' },
+  { word:'CROISSANT',  hint:'Buttery crescent French pastry',                  category:'Food' },
+  { word:'MACCHIATO',  hint:'Espresso stained with milk',                      category:'Drinks' },
+  { word:'COASTER',    hint:'Small mat placed under your cup',                 category:'Cafe' },
+  { word:'JOURNAL',    hint:'Notebook cafe visitors write in',                 category:'Cafe' },
+  { word:'CHEESECAKE', hint:'Creamy dessert on biscuit base',                  category:'Food' },
+  { word:'SANDWICH',   hint:'Two bread slices with filling',                   category:'Food' },
+  { word:'SAMPAGUITA', hint:'National flower of the Philippines',               category:'PH Plants' },
+  { word:'WALING',     hint:'Queen of Philippine flowers, a rare orchid',      category:'PH Plants' },
+  { word:'YLANGYLANG', hint:'Fragrant yellow flower used in perfumes',         category:'PH Plants' },
+  { word:'BANABA',     hint:'Philippine tree with purple flowers',             category:'PH Plants' },
+  { word:'ANAHAW',     hint:'National leaf of the Philippines, a fan palm',    category:'PH Plants' },
+  { word:'NARRA',      hint:'National tree of the Philippines',                category:'PH Plants' },
+  { word:'BAMBOO',     hint:'Tall grass used in Philippine crafts',            category:'PH Plants' },
+  { word:'KAMIAS',     hint:'Sour small green fruit used in sinigang',         category:'PH Plants' },
+  { word:'TAMARAW',    hint:'Critically endangered dwarf buffalo of Mindoro',  category:'PH Animals' },
+  { word:'TARSIER',    hint:'Tiny big-eyed primate found in Bohol',            category:'PH Animals' },
+  { word:'PAWIKAN',    hint:'Sea turtle that nests on Philippine beaches',     category:'PH Animals' },
+  { word:'DUGONG',     hint:'Sea cow mammal found in Palawan waters',          category:'PH Animals' },
+  { word:'KALAW',      hint:'Philippine hornbill, call sounds like its name',  category:'PH Animals' },
+  { word:'AGILA',      hint:'Philippine Eagle, the national bird',             category:'PH Animals' },
+  { word:'BUTIKI',     hint:'Common house lizard on Philippine walls',         category:'PH Animals' },
+  { word:'BUWAYA',     hint:'Philippine crocodile, critically endangered',     category:'PH Animals' },
+  { word:'BANGUS',     hint:'National fish of the Philippines, milkfish',      category:'PH Animals' },
+  { word:'KALABAW',    hint:'Water buffalo, national animal of the PH',        category:'PH Animals' },
+  { word:'MANOK',      hint:'Filipino word for chicken',                       category:'PH Animals' },
+  { word:'LAPU',       hint:'First Filipino hero who defeated Magellan',       category:'PH History' },
+  { word:'RIZAL',      hint:'National hero, wrote Noli Me Tangere',            category:'PH History' },
+  { word:'BATAAN',     hint:'Province known for the Death March in WW2',       category:'PH History' },
+  { word:'KATIPUNAN',  hint:'Secret revolutionary society founded in 1892',    category:'PH History' },
+  { word:'AGUINALDO',  hint:'First President of the Philippines',              category:'PH History' },
+  { word:'CAVITE',     hint:'Province where the Cry of revolution happened',   category:'PH History' },
+  { word:'MAGELLAN',   hint:'Portuguese explorer who arrived in PH in 1521',   category:'PH History' },
+  { word:'LEYTE',      hint:'Island where MacArthur returned in WW2',          category:'PH History' },
+  { word:'INTRAMUROS', hint:'Walled city built by Spanish in Manila',          category:'PH History' },
+  { word:'MABINI',     hint:'Brains of the Philippine Revolution, paralyzed',  category:'PH History' },
+  { word:'BONIFACIO',  hint:'Supremo of the Katipunan',                        category:'PH History' },
+  { word:'BULAKAN',    hint:'Province where the Cry of 1896 took place',       category:'PH History' },
+  { word:'EDSA',       hint:'Highway famous for the 1986 People Power revolt', category:'PH History' },
+  { word:'CORREGIDOR', hint:'Island fortress at the mouth of Manila Bay',      category:'PH History' },
+  { word:'LUNA',       hint:'General Antonio, brilliant PH military leader',   category:'PH History' },
+  { word:'SINIGANG',   hint:'Sour Filipino soup with tamarind broth',          category:'PH Food' },
+  { word:'ADOBO',      hint:'Most famous Filipino dish, vinegar and soy',      category:'PH Food' },
+  { word:'KARE',       hint:'Filipino peanut-based stew with oxtail',          category:'PH Food' },
+  { word:'LECHON',     hint:'Whole roasted pig, centerpiece of fiestas',       category:'PH Food' },
+  { word:'PANCIT',     hint:'Filipino noodle dish symbolizing long life',      category:'PH Food' },
+  { word:'LUMPIA',     hint:'Filipino spring roll, fried or fresh',            category:'PH Food' },
+  { word:'BIBINGKA',   hint:'Rice cake cooked in a clay pot, Christmas food',  category:'PH Food' },
+  { word:'HALO',       hint:'Popular Filipino shaved ice dessert',             category:'PH Food' },
+  { word:'BALUT',      hint:'Fertilized duck egg, popular street food',        category:'PH Food' },
+  { word:'TINOLA',     hint:'Ginger chicken soup with green papaya',           category:'PH Food' },
+  { word:'KINILAW',    hint:'Filipino ceviche, raw fish cured in vinegar',     category:'PH Food' },
+  { word:'TOCINO',     hint:'Sweet cured pork, popular breakfast meat',        category:'PH Food' },
+  { word:'DINUGUAN',   hint:'Pork blood stew, also called chocolate meat',     category:'PH Food' },
+  { word:'PUTO',       hint:'Steamed rice cake, sweet and fluffy',             category:'PH Food' },
+  { word:'ILOILO',     hint:'City in Visayas known as the City of Love',       category:'PH Places' },
+  { word:'BATANES',    hint:'Northernmost province, stone house island group', category:'PH Places' },
+  { word:'PALAWAN',    hint:'Last ecological frontier of the Philippines',     category:'PH Places' },
+  { word:'BORACAY',    hint:'Famous white sand beach island in Aklan',         category:'PH Places' },
+  { word:'TAGAYTAY',   hint:'Cool highland city overlooking Taal Volcano',     category:'PH Places' },
+  { word:'VIGAN',      hint:'UNESCO heritage city with Spanish cobblestones',  category:'PH Places' },
+  { word:'CEBU',       hint:'Queen City of the South, oldest city in PH',      category:'PH Places' },
+  { word:'DAVAO',      hint:'Largest city by area in the Philippines',         category:'PH Places' },
+  { word:'BAGUIO',     hint:'Summer capital, City of Pines in Benguet',        category:'PH Places' },
+  { word:'TAAL',       hint:'Volcano inside a lake inside a lake, Batangas',   category:'PH Places' },
+  { word:'TUBBATAHA',  hint:'UNESCO reef in Sulu Sea, no-take marine park',    category:'PH Places' },
+  { word:'MAYON',      hint:'Most active volcano, perfect cone shape',         category:'PH Places' },
+  { word:'CHOCOLATE',  hint:'Hills of Bohol that look like this dessert',      category:'PH Places' },
+  { word:'TAGALOG',    hint:'Main language of Luzon, basis of Filipino',       category:'PH Culture' },
+  { word:'BAYANIHAN',  hint:'Filipino spirit of communal unity and helping',   category:'PH Culture' },
+  { word:'JEEPNEY',    hint:'Colorful PH public transport, king of the road',  category:'PH Culture' },
+  { word:'TINIKLING',  hint:'Philippine national dance with bamboo poles',     category:'PH Culture' },
+  { word:'BARONG',     hint:'Sheer embroidered formal shirt, national wear',   category:'PH Culture' },
+  { word:'PAROL',      hint:'Star-shaped Christmas lantern from Pampanga',     category:'PH Culture' },
+  { word:'SINULOG',    hint:'Grand festival in Cebu honoring Santo Nino',      category:'PH Culture' },
+  { word:'ATI',        hint:'Annual festival in Kalibo, Aklan, pre-Lenten',    category:'PH Culture' },
+  { word:'ALIBATA',    hint:'Ancient Philippine writing script, also Baybayin',category:'PH Culture' },
+  { word:'BALAGTASAN', hint:'Filipino verbal joust debate in verse form',      category:'PH Culture' },
+  { word:'KULINTANG',  hint:'Mindanao gong ensemble, traditional music',       category:'PH Culture' },
+  { word:'BANIG',      hint:'Woven sleeping mat, Filipino traditional craft',  category:'PH Culture' },
+  { word:'PASKO',      hint:'Filipino word for Christmas',                     category:'PH Culture' },
+  { word:'FIESTA',     hint:'Town festival celebrating the patron saint',      category:'PH Culture' },
+  { word:'HARANA',     hint:'Traditional Filipino serenade under a window',    category:'PH Culture' },
+  { word:'LUZON',      hint:'Largest island group of the Philippines',         category:'PH Geography' },
+  { word:'VISAYAS',    hint:'Central island group, heart of the Philippines',  category:'PH Geography' },
+  { word:'MINDANAO',   hint:'Second largest island, southernmost major group', category:'PH Geography' },
+  { word:'MANILA',     hint:'Capital city of the Philippines',                 category:'PH Geography' },
+  { word:'PASIG',      hint:'River running through Metro Manila',              category:'PH Geography' },
+  { word:'LAGUNA',     hint:'Largest lake in the Philippines',                 category:'PH Geography' },
+  { word:'SULU',       hint:'Archipelago in southwestern Philippines',         category:'PH Geography' },
+  { word:'CORDILLERA', hint:'Mountain range in northern Luzon',                category:'PH Geography' },
+  { word:'CAGAYAN',    hint:'Valley region and river in northern Luzon',       category:'PH Geography' },
+  { word:'SIBUYAN',    hint:'Sea between Luzon, Visayas and Mindoro',          category:'PH Geography' },
+  { word:'AETA',       hint:'Indigenous people of Luzon, original inhabitants',category:'PH People' },
+  { word:'IGOROT',     hint:'Indigenous people of the Cordillera mountains',   category:'PH People' },
+  { word:'LUMAD',      hint:'Collective term for indigenous peoples of Mindanao',category:'PH People' },
+  { word:'MORO',       hint:'Filipino Muslim communities of Mindanao and Sulu',category:'PH People' },
+  { word:'ILUSTRADO',  hint:'Educated Filipino elite during Spanish colonial era',category:'PH People' },
+  { word:'INDIO',      hint:'Term used by Spaniards for native Filipinos',     category:'PH People' },
+  { word:'BAYANI',     hint:'Filipino word for hero or volunteer',             category:'PH People' },
+  { word:'BABAYLAN',   hint:'Pre-colonial Filipino shaman or spiritual healer',category:'PH People' },
+  { word:'DATU',       hint:'Pre-colonial Filipino chieftain or leader',       category:'PH People' },
+  { word:'ALIMANGO',   hint:'Mud crab, prized seafood in Philippine markets',  category:'PH Science' },
+  { word:'ABACA',      hint:'Philippine fiber plant, Manila hemp source',      category:'PH Science' },
+  { word:'CAPIZ',      hint:'Shell used for windows and decor, found in Panay',category:'PH Science' },
+  { word:'COGON',      hint:'Tall grass used for thatching roofs in PH',       category:'PH Science' },
+  { word:'CAMOTE',     hint:'Sweet potato, staple crop in rural Philippines',  category:'PH Science' },
+  { word:'AMPALAYA',   hint:'Bitter gourd vegetable, known health food in PH', category:'PH Science' },
+  { word:'MALUNGGAY',  hint:'Moringa tree, Filipino superfood and herbal plant',category:'PH Science' },
+  { word:'LANGKA',     hint:'Jackfruit, largest tree fruit, used in veggie dishes',category:'PH Science' },
 ];
 
 const PLAYABLE = WORD_LIST.filter(w => w.word.length >= 4 && w.word.length <= 9);
 const KEYBOARD_ROWS = ['QWERTYUIOP','ASDFGHJKL','ZXCVBNM'];
-const MAX_GUESSES = 3;
+const MAX_MISTAKES = 3;
 
 function GuessWordGame({ playerName, onScore }) {
   const [wordData, setWordData] = useState(null);
@@ -570,7 +654,7 @@ function GuessWordGame({ playerName, onScore }) {
   const [streak, setStreak] = useState(0);
   const [shake, setShake] = useState(false);
   const [usedWords, setUsedWords] = useState([]);
-  const [showHint, setShowHint] = useState(false);
+  const [mistakes, setMistakes] = useState(0);
   const [baristaMsg, setBaristaMsg] = useState('wave');
 
   const pickWord = useCallback((used = []) => {
@@ -578,7 +662,7 @@ function GuessWordGame({ playerName, onScore }) {
     const list = avail.length > 0 ? avail : PLAYABLE;
     setWordData(list[Math.floor(Math.random() * list.length)]);
     setGuesses([]); setCurrent(''); setGameState('playing');
-    setShowHint(false); setBaristaMsg('wave');
+    setMistakes(0); setBaristaMsg('wave');
   }, []);
 
   useEffect(() => { pickWord([]); }, []);
@@ -593,6 +677,8 @@ function GuessWordGame({ playerName, onScore }) {
     if (word.includes(letter)) return 'present';
     return 'absent';
   };
+
+  const isCorrectGuess = (guess) => guess === word;
 
   const getKeyState = (letter) => {
     let best = 'unused';
@@ -613,14 +699,17 @@ function GuessWordGame({ playerName, onScore }) {
     const newGuesses = [...guesses, current];
     setGuesses(newGuesses); setCurrent('');
     if (current === word) {
-      const pts = (MAX_GUESSES - newGuesses.length + 1) * 50 + streak * 20 + (showHint ? 0 : 30);
+      const pts = Math.max(10, 100 - mistakes * 20) + streak * 15;
       setScore(s => s + pts); setStreak(s => s + 1);
       setGameState('won'); setBaristaMsg('cheer'); onScore(score + pts);
     } else {
-      const remaining = MAX_GUESSES - newGuesses.length;
+      const newMistakes = mistakes + 1;
+      setMistakes(newMistakes);
       setBaristaMsg('fight');
-      setTimeout(() => { setBaristaMsg(remaining <= 1 ? 'sad' : 'wave'); }, 800);
-      if (newGuesses.length >= MAX_GUESSES) { setGameState('lost'); setBaristaMsg('sad'); setStreak(0); onScore(score); }
+      setTimeout(() => { setBaristaMsg(newMistakes >= MAX_MISTAKES - 1 ? 'sad' : 'wave'); }, 800);
+      if (newMistakes >= MAX_MISTAKES) {
+        setGameState('lost'); setBaristaMsg('sad'); setStreak(0); onScore(score);
+      }
     }
   };
 
@@ -640,7 +729,7 @@ function GuessWordGame({ playerName, onScore }) {
     };
     window.addEventListener('keydown', k);
     return () => window.removeEventListener('keydown', k);
-  }, [current, gameState, word, WL]);
+  }, [current, gameState, word, WL, mistakes]);
 
   const nextRound = () => { const nu = [...usedWords, word]; setUsedWords(nu); setRound(r => r + 1); pickWord(nu); };
 
@@ -657,44 +746,53 @@ function GuessWordGame({ playerName, onScore }) {
   if (!wordData) return <div style={{ color: '#d4a853', textAlign: 'center', padding: 40 }}>Loading...</div>;
 
   const msgMap = {
-    wave: { text: `Hi ${playerName}! Guess!`, color: '#ffd700' },
-    fight: { text: 'WRONG!', color: '#ff4444' },
+    wave:  { text: `Guess the word!`, color: '#ffd700' },
+    fight: { text: mistakes >= MAX_MISTAKES - 1 ? 'Last chance!' : 'WRONG!', color: mistakes >= MAX_MISTAKES - 1 ? '#ff8800' : '#ff4444' },
     cheer: { text: 'CORRECT!', color: '#44ff88' },
-    sad: { text: `It was "${word}"`, color: '#888' },
+    sad:   { text: `It was "${word}"`, color: '#888' },
   };
   const msg = msgMap[baristaMsg] || msgMap.wave;
 
   return (
     <div style={{ height: '100%', background: '#121213', color: '#fff', display: 'flex', flexDirection: 'column', fontFamily: "'Arial',sans-serif", overflow: 'hidden' }}>
+
+      {/* Top HUD */}
       <div style={{ background: '#1a1a1b', borderBottom: '1px solid #3a3a3c', padding: '7px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
         <div style={{ fontSize: 11, color: '#818384' }}>Round <b style={{ color: '#d4a853' }}>{round}</b></div>
         <div style={{ fontSize: 13, fontWeight: 'bold', color: '#d4a853', letterSpacing: 2 }}>GUESS THE WORD</div>
-        <div style={{ fontSize: 11, color: '#818384' }}><b style={{ color: '#d4a853' }}>{score}</b> {streak > 0 && <span>🔥{streak}</span>}</div>
+        <div style={{ fontSize: 11, color: '#818384' }}><b style={{ color: '#d4a853' }}>{score}</b>{streak > 0 && <span style={{color:'#ff8800'}}> 🔥{streak}</span>}</div>
       </div>
 
-      <div style={{ background: 'linear-gradient(135deg,#2a1800,#1a0e00)', borderBottom: '1px solid #3d1f00', padding: '10px 16px', flexShrink: 0, textAlign: 'center' }}>
-        <div style={{ fontSize: 11, color: '#818384', marginBottom: 3, textTransform: 'uppercase', letterSpacing: 1 }}>Description</div>
-        <div style={{ fontSize: 15, color: '#f5e6d0', fontStyle: 'italic', lineHeight: 1.4 }}>"{wordData.hint}"</div>
-        <div style={{ fontSize: 10, color: '#555', marginTop: 4 }}>{wordData.category} - {WL} letters</div>
+      {/* Description */}
+      <div style={{ background: '#1e0e00', borderBottom: '1px solid #3d1f00', padding: '10px 16px', flexShrink: 0, textAlign: 'center' }}>
+        <div style={{ fontSize: 10, color: '#6b3a1f', marginBottom: 3, textTransform: 'uppercase', letterSpacing: 1 }}>Description</div>
+        <div style={{ fontSize: 14, color: '#f5e6d0', fontStyle: 'italic', lineHeight: 1.4 }}>"{wordData.hint}"</div>
+        <div style={{ fontSize: 10, color: '#6b3a1f', marginTop: 3 }}>{wordData.category} · {WL} letters</div>
       </div>
 
-      <div style={{ background: 'linear-gradient(180deg,#2c1400,#1a0800)', borderBottom: '2px solid #3d1f00', padding: '10px 16px', textAlign: 'center', flexShrink: 0 }}>
-        <div style={{ fontSize: 16, fontWeight: 'bold', color: msg.color }}>{msg.text}</div>
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 4, marginTop: 6 }}>
-          {Array.from({ length: MAX_GUESSES }).map((_, i) => (
-            <div key={i} style={{ width: 10, height: 10, borderRadius: '50%', background: i < (MAX_GUESSES - guesses.length) ? '#538d4e' : '#3a3a3c', border: '1px solid #555' }}/>
+      {/* Barista message + mistake hearts — NO dots, NO category repeat */}
+      <div style={{ background: '#1a0800', borderBottom: '2px solid #3d1f00', padding: '8px 16px', textAlign: 'center', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', gap: 5 }}>
+          {Array.from({ length: MAX_MISTAKES }).map((_, i) => (
+            <div key={i} style={{ width: 14, height: 14, borderRadius: 3, background: i < mistakes ? '#ff4444' : '#538d4e', border: `1px solid ${i < mistakes ? '#ff2222' : '#3a6a3a'}`, fontSize: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 'bold' }}>
+              {i < mistakes ? 'X' : ''}
+            </div>
           ))}
         </div>
+        <div style={{ fontSize: 14, fontWeight: 'bold', color: msg.color, flex: 1, textAlign: 'center' }}>{msg.text}</div>
+        <div style={{ fontSize: 10, color: '#6b3a1f', minWidth: 40, textAlign: 'right' }}>{mistakes}/{MAX_MISTAKES}</div>
       </div>
 
+      {/* Tile grid */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '8px 0', gap: 5, overflowY: 'auto' }}>
         {Array.from({ length: gameState === 'playing' ? guesses.length + 1 : guesses.length }).map((_, rowIdx) => {
           const guess = guesses[rowIdx];
           const isActive = rowIdx === guesses.length && gameState === 'playing';
           const displayWord = isActive ? current : (guess || '');
           const isShaking = isActive && shake;
+          const isWrong = guess && !isCorrectGuess(guess);
           return (
-            <div key={rowIdx} style={{ display: 'flex', gap: 5, animation: isShaking ? 'shake 0.4s ease' : 'none' }}>
+            <div key={rowIdx} style={{ display: 'flex', gap: 5, animation: isShaking ? 'shake 0.4s ease' : 'none', opacity: isWrong ? 0.7 : 1 }}>
               {Array.from({ length: WL }).map((_, colIdx) => {
                 const letter = displayWord[colIdx] || '';
                 let state = 'empty';
@@ -706,23 +804,25 @@ function GuessWordGame({ playerName, onScore }) {
             </div>
           );
         })}
-        {gameState === 'playing' && (
-          <div style={{ fontSize: 10, color: '#555', marginTop: 4 }}>{MAX_GUESSES - guesses.length - 1} attempts remaining</div>
+        {gameState === 'playing' && mistakes === 0 && guesses.length === 0 && (
+          <div style={{ fontSize: 10, color: '#555', marginTop: 4 }}>3 wrong guesses = game over</div>
         )}
       </div>
 
+      {/* Result panel */}
       {gameState !== 'playing' && (
-        <div style={{ textAlign: 'center', padding: '18px 14px 20px', background: gameState === 'won' ? 'linear-gradient(180deg,#0a2a0a,#0d1f0d)' : 'linear-gradient(180deg,#2a0a0a,#1f0d0d)', borderTop: `2px solid ${gameState === 'won' ? '#44ff88' : '#ff4444'}`, flexShrink: 0 }}>
-          <div style={{ fontSize: gameState==='won' ? 24 : 18, fontWeight: 'bold', color: gameState==='won' ? '#44ff88' : '#ff6b6b', marginBottom: 10 }}>
-            {gameState === 'won' ? (guesses.length === 1 ? 'GENIUS!!' : guesses.length === 2 ? 'AMAZING!' : 'GOT IT!') : `It was "${word}"`}
+        <div style={{ textAlign: 'center', padding: '16px 14px 18px', background: gameState === 'won' ? '#0a1f0a' : '#1f0a0a', borderTop: `2px solid ${gameState === 'won' ? '#44ff88' : '#ff4444'}`, flexShrink: 0 }}>
+          <div style={{ fontSize: gameState==='won' ? 22 : 17, fontWeight: 'bold', color: gameState==='won' ? '#44ff88' : '#ff6b6b', marginBottom: 8 }}>
+            {gameState === 'won' ? (guesses.filter(g => g !== word).length === 0 ? 'PERFECT!!' : mistakes === 1 ? 'GREAT!' : 'GOT IT!') : `It was "${word}"`}
           </div>
-          {gameState === 'won' && <div style={{ fontSize: 14, color: '#ffd700', marginBottom: 12 }}>+{(MAX_GUESSES - guesses.length + 1) * 50} pts {streak > 1 ? `- ${streak}x streak 🔥` : ''}</div>}
-          <button onClick={nextRound} style={{ background: gameState==='won' ? '#44cc66' : '#d4a853', border: 'none', borderRadius: 12, padding: '12px 36px', color: gameState==='won' ? '#fff' : '#1a0a00', fontWeight: 'bold', fontSize: 16, cursor: 'pointer' }}>
+          {gameState === 'won' && <div style={{ fontSize: 13, color: '#ffd700', marginBottom: 10 }}>+{Math.max(10, 100 - mistakes * 20) + streak * 15} pts{streak > 1 ? ` · ${streak}x streak` : ''}</div>}
+          <button onClick={nextRound} style={{ background: gameState==='won' ? '#44cc66' : '#d4a853', border: 'none', borderRadius: 12, padding: '11px 32px', color: gameState==='won' ? '#fff' : '#1a0a00', fontWeight: 'bold', fontSize: 15, cursor: 'pointer' }}>
             Next Word
           </button>
         </div>
       )}
 
+      {/* Keyboard */}
       <div style={{ background: '#1a1a1b', borderTop: '1px solid #3a3a3c', padding: '8px 4px 14px', flexShrink: 0 }}>
         {KEYBOARD_ROWS.map((row, ri) => (
           <div key={ri} style={{ display: 'flex', justifyContent: 'center', gap: 5, marginBottom: 6 }}>
