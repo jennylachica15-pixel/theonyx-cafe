@@ -6,13 +6,24 @@ import {
 } from 'firebase/firestore';
 
 // ── CONFIG ───────────────────────────────────────────────────────────────────
-const SHEET_ID        = '1Gnr_6SBcUBY4GcDqvGpTUZgE8NI3OIZAzlusG5YPfQg';
-const SHEET_NAME      = 'Sheet1';
-const SCOPES          = 'https://www.googleapis.com/auth/spreadsheets';
+const SHEET_ID         = '1Gnr_6SBcUBY4GcDqvGpTUZgE8NI3OIZAzlusG5YPfQg';
+const SHEET_NAME       = 'Sheet1';
+const DRIVE_FOLDER_ID  = '1kzXqUPvyDxZ1fH9quEevh2EwAH3VOIm_';   // receipts folder
 const GOOGLE_CLIENT_ID = '596322682185-n5hm66hvol3nnqqllnuop995kcnefbgu.apps.googleusercontent.com';
+
+// We now need BOTH Sheets + Drive. drive.file = the app can upload files it creates
+// (enough to drop receipts into a known folder by its ID).
+// ⚠️ If receipts don't land in DRIVE_FOLDER_ID, swap the drive.file scope below for
+//    'https://www.googleapis.com/auth/drive' (full access) and re-connect.
+const SCOPES =
+  'https://www.googleapis.com/auth/spreadsheets ' +
+  'https://www.googleapis.com/auth/drive.file';
 
 const CATEGORIES = ['Beans & Coffee','Milk & Cream','Syrups','Food & Pastries','Cups & Packaging','Equipment','Other'];
 const UNITS      = ['kg','g','liters','ml','pcs','bottles','boxes','bags'];
+
+// Sheet columns (A..J). One row per item — updated in place, not appended every time.
+const SHEET_HEADERS = ['Code','Item','Category','Quantity','Unit','Status','Threshold','Last Restocked','Updated','Notes'];
 
 function getStatus(qty, threshold) {
   if (qty <= 0)             return 'out';
@@ -28,6 +39,16 @@ const STATUS_CONFIG = {
   out:  { label: 'Out',      bg: '#f5f5f5', color: '#999'    },
 };
 
+// A category turns red if it holds a Critical ('low') or Out item.
+// Add 'warn' here too if you also want the "Low" status to flag the category.
+const CRITICAL_STATUSES = ['low', 'out'];
+
+const RECEIPT_STATUS = {
+  pending:  { label: 'Pending',  bg: '#fff8ee', color: '#c97c2a' },
+  approved: { label: 'Approved', bg: '#f0faf4', color: '#2d7a4f' },
+  rejected: { label: 'Rejected', bg: '#fff0ee', color: '#c94030' },
+};
+
 const DEFAULT_FORM = { name:'', category:'Beans & Coffee', quantity:'', unit:'kg', threshold:'', notes:'' };
 
 // ── SVG ICONS ────────────────────────────────────────────────────────────────
@@ -38,9 +59,12 @@ const IC = {
   edit:    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4Z"/></svg>,
   trash:   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>,
   upload:  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>,
-  alert:   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2z"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>,
-  box:     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v3"/><path d="M21 8H3l1 12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2Z"/></svg>,
   restockLg: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>,
+  camera:  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>,
+  cameraLg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>,
+  search:  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.7" y2="16.7"/></svg>,
+  receipt: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 2v20l2.5-1.5L10 22l2-1.5L14 22l2.5-1.5L19 22V2l-2.5 1.5L14 2l-2 1.5L10 2 7.5 3.5 5 2Z"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="9" y1="12" x2="15" y2="12"/></svg>,
+  x:       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
 };
 
 // Category SVG icons
@@ -65,12 +89,24 @@ const s = {
   statLabel: { fontSize:11, color:'#aaa', marginTop:2, fontWeight:500, textTransform:'uppercase', letterSpacing:'0.5px' },
   connBtn:   { width:'100%', padding:'12px', borderRadius:13, background:'#1a1a1a', color:'white', fontSize:13, fontWeight:600, marginBottom:10, display:'flex', alignItems:'center', justifyContent:'center', gap:7, border:'none', cursor:'pointer', letterSpacing:'-0.2px' },
   connBadge: { background:'#f0faf4', color:'#2d7a4f', borderRadius:10, padding:'9px 14px', fontSize:12, fontWeight:600, marginBottom:12, display:'flex', alignItems:'center', gap:7, border:'1px solid #c3e8d0' },
-  addBtn:    { width:'100%', padding:'14px', borderRadius:14, background:'#1a1a1a', color:'white', fontSize:14, fontWeight:600, marginBottom:14, display:'flex', alignItems:'center', justifyContent:'center', gap:8, border:'none', cursor:'pointer', letterSpacing:'-0.2px' },
+  btnRow:    { display:'flex', gap:8, marginBottom:10 },
+  addBtn:    { flex:1, padding:'14px', borderRadius:14, background:'#1a1a1a', color:'white', fontSize:14, fontWeight:600, display:'flex', alignItems:'center', justifyContent:'center', gap:8, border:'none', cursor:'pointer', letterSpacing:'-0.2px' },
+  receiptBtn:{ flex:1, padding:'14px', borderRadius:14, background:'white', color:'#1a1a1a', fontSize:14, fontWeight:600, display:'flex', alignItems:'center', justifyContent:'center', gap:8, border:'1.5px solid #1a1a1a', cursor:'pointer', letterSpacing:'-0.2px' },
+  reviewBtn: (pending) => ({ width:'100%', padding:'11px', borderRadius:12, background: pending?'#fff8ee':'white', color: pending?'#c97c2a':'#888', fontSize:13, fontWeight:600, marginBottom:14, display:'flex', alignItems:'center', justifyContent:'center', gap:8, border:'1.5px solid', borderColor: pending?'#f3dcb4':'#efefef', cursor:'pointer', letterSpacing:'-0.1px' }),
+  pendCount: { background:'#c97c2a', color:'white', borderRadius:10, minWidth:18, height:18, padding:'0 5px', fontSize:11, fontWeight:700, display:'inline-flex', alignItems:'center', justifyContent:'center' },
+  searchWrap:{ position:'relative', marginBottom:12 },
+  searchIcon:{ position:'absolute', left:13, top:'50%', transform:'translateY(-50%)', color:'#bbb', display:'flex', pointerEvents:'none' },
+  searchInput:{ width:'100%', padding:'11px 14px 11px 36px', borderRadius:12, border:'1.5px solid #efefef', fontSize:14, background:'white', color:'#1a1a1a', outline:'none', boxSizing:'border-box', fontFamily:'inherit' },
   catFilter: { display:'flex', gap:7, overflowX:'auto', paddingBottom:10, marginBottom:12, scrollbarWidth:'none' },
-  catChip:   (a) => ({ padding:'7px 14px', borderRadius:20, fontSize:12, fontWeight:600, flexShrink:0, background:a?'#1a1a1a':'white', color:a?'white':'#666', border:'1.5px solid', borderColor:a?'#1a1a1a':'#e8e8e8', cursor:'pointer', letterSpacing:'-0.1px' }),
+  catChip:   (a, crit) => ({ padding:'7px 14px', borderRadius:20, fontSize:12, fontWeight:600, flexShrink:0, display:'flex', alignItems:'center', cursor:'pointer', letterSpacing:'-0.1px', border:'1.5px solid',
+    background: a ? '#1a1a1a' : (crit ? '#fff0ee' : 'white'),
+    color:      a ? 'white'   : (crit ? '#c94030' : '#666'),
+    borderColor:a ? '#1a1a1a' : (crit ? '#f1c4be' : '#e8e8e8') }),
+  catDot:    (a) => ({ display:'inline-block', width:7, height:7, borderRadius:'50%', background: a?'#ff7a6e':'#e0402f', marginLeft:6, flexShrink:0 }),
   card:      { background:'white', borderRadius:16, padding:'14px 16px', marginBottom:9, border:'1px solid #efefef' },
   itemName:  { fontSize:15, fontWeight:600, color:'#1a1a1a', margin:0, letterSpacing:'-0.3px' },
   itemSub:   { fontSize:12, color:'#aaa', margin:'2px 0 0', fontWeight:400 },
+  codePill:  { fontSize:10, fontWeight:700, color:'#999', background:'#f3f3f3', borderRadius:6, padding:'2px 6px', fontFamily:'ui-monospace,SFMono-Regular,Menlo,monospace', letterSpacing:'0.5px', flexShrink:0 },
   badge:     (st) => ({ padding:'4px 10px', borderRadius:20, fontSize:11, fontWeight:700, background:STATUS_CONFIG[st].bg, color:STATUS_CONFIG[st].color, flexShrink:0, textTransform:'uppercase', letterSpacing:'0.2px' }),
   actions:   { display:'flex', gap:7, marginTop:4 },
   actionBtn: (v) => ({ flex:1, padding:'8px 6px', borderRadius:10, fontSize:12, fontWeight:600, border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:5, letterSpacing:'-0.1px',
@@ -92,34 +128,142 @@ const s = {
   progressBg: { height:5, background:'#f5f5f5', borderRadius:3, overflow:'hidden', marginBottom:12 },
   syncTag:   { fontSize:10, color:'#ccc', marginTop:8, fontWeight:400 },
   empty:     { textAlign:'center', padding:'40px 0', color:'#bbb', fontSize:14 },
+  // Receipt capture
+  photoBtn:  { width:'100%', padding:'34px 14px', borderRadius:14, background:'white', color:'#888', fontSize:14, fontWeight:600, marginBottom:14, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:8, border:'1.5px dashed #d8d8d8', cursor:'pointer' },
+  photoPrev: { width:'100%', borderRadius:14, marginBottom:10, border:'1px solid #eee', display:'block', maxHeight:280, objectFit:'cover' },
+  retake:    { width:'100%', padding:'10px', borderRadius:11, background:'white', color:'#888', fontSize:13, fontWeight:600, marginBottom:14, border:'1.5px solid #efefef', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6 },
+  notice:    { background:'#fff8ee', border:'1px solid #f3dcb4', color:'#c97c2a', borderRadius:11, padding:'11px 14px', fontSize:12.5, fontWeight:500, marginBottom:14, lineHeight:1.45 },
+  // Receipt review list
+  rcptCard:  { background:'white', borderRadius:14, padding:'12px', marginBottom:10, border:'1px solid #efefef' },
+  rcptThumb: { width:54, height:54, borderRadius:10, objectFit:'cover', background:'#f3f3f3', flexShrink:0, border:'1px solid #eee' },
+  rcptThumbPh:{ width:54, height:54, borderRadius:10, background:'#f3f3f3', flexShrink:0, border:'1px solid #eee', display:'flex', alignItems:'center', justifyContent:'center', color:'#bbb' },
+  rcptLink:  { fontSize:12, fontWeight:600, color:'#3a7acc', textDecoration:'none' },
+  rcptActions:{ display:'flex', gap:7, marginTop:10 },
+  approveBtn:{ flex:1, padding:'9px', borderRadius:10, background:'#f0faf4', color:'#2d7a4f', fontSize:12.5, fontWeight:700, border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:5 },
+  rejectBtn: { flex:1, padding:'9px', borderRadius:10, background:'#fff0ee', color:'#c94030', fontSize:12.5, fontWeight:700, border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:5 },
 };
 
-// ── SHEET HELPERS ─────────────────────────────────────────────────────────────
+// ── HELPERS ───────────────────────────────────────────────────────────────────
 function fmtDate() {
   const n = new Date();
   return n.toLocaleDateString('en-PH',{month:'2-digit',day:'2-digit',year:'2-digit'})
     + ' ' + n.toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'});
 }
 
-async function sheetAppend(accessToken, rows) {
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${SHEET_NAME}!A:G:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
+// Random 4-digit code (1000–9999) not already used by another item.
+function genCode(existingItems) {
+  const used = new Set(existingItems.filter(i=>i.code).map(i=>String(i.code)));
+  let code, tries = 0;
+  do { code = String(Math.floor(1000 + Math.random()*9000)); tries++; }
+  while (used.has(code) && tries < 80);
+  return code;
+}
+
+// One row that represents the item's CURRENT state.
+function buildItemRow(item) {
+  const status = getStatus(item.quantity, item.threshold);
+  const restock = (item.lastRestock != null && item.lastRestock !== '')
+    ? `+${item.lastRestock} ${item.unit||''}${item.lastRestockNote ? ' — ' + item.lastRestockNote : ''}`.trim()
+    : '';
+  return [
+    String(item.code || ''),
+    item.name || '',
+    item.category || '',
+    item.quantity ?? '',
+    item.unit || '',
+    STATUS_CONFIG[status]?.label || status,
+    item.threshold ?? '',
+    restock,
+    fmtDate(),
+    item.notes || '',
+  ];
+}
+
+// ── SHEET API ─────────────────────────────────────────────────────────────────
+async function sheetGetAll(token) {
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${SHEET_NAME}!A:J`;
+  const r = await fetch(url, { headers:{ Authorization:`Bearer ${token}` } });
+  const j = await r.json();
+  return j.values || [];
+}
+
+async function sheetUpdateRow(token, rowNumber /* 1-based */, row) {
+  const range = `${SHEET_NAME}!A${rowNumber}:J${rowNumber}`;
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${range}?valueInputOption=USER_ENTERED`;
   return fetch(url, {
-    method:'POST',
-    headers:{ Authorization:`Bearer ${accessToken}`, 'Content-Type':'application/json' },
-    body: JSON.stringify({ values: rows }),
+    method:'PUT',
+    headers:{ Authorization:`Bearer ${token}`, 'Content-Type':'application/json' },
+    body: JSON.stringify({ values:[row] }),
   });
 }
 
-function buildRow(item, status, action='') {
-  return [
-    fmtDate(),
-    item.name,
-    item.category,
-    item.quantity,
-    STATUS_CONFIG[status]?.label || status,
-    item.threshold,
-    action ? `[${action}] ${item.notes||''}`.trim() : (item.notes||''),
-  ];
+async function sheetAppendRow(token, row) {
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${SHEET_NAME}!A:J:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
+  return fetch(url, {
+    method:'POST',
+    headers:{ Authorization:`Bearer ${token}`, 'Content-Type':'application/json' },
+    body: JSON.stringify({ values:[row] }),
+  });
+}
+
+// Make sure row 1 holds our headers.
+async function ensureHeaders(token) {
+  const vals = await sheetGetAll(token);
+  if (!vals.length || (vals[0]?.[0] || '') !== 'Code') {
+    await sheetUpdateRow(token, 1, SHEET_HEADERS);
+  }
+}
+
+// Find this item's row by code → update it; if none, append. (One row per item.)
+async function upsertItemRow(token, code, row) {
+  const vals = await sheetGetAll(token);
+  let idx = -1; // 0-based into vals; row 1 (idx 0) is headers
+  for (let i = 1; i < vals.length; i++) {
+    if ((vals[i][0] || '') === String(code)) { idx = i; break; }
+  }
+  if (idx === -1) await sheetAppendRow(token, row);
+  else            await sheetUpdateRow(token, idx + 1, row);
+}
+
+// Delete the item's row entirely (keeps the sheet clean).
+async function getSheetGid(token) {
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}?fields=sheets.properties(sheetId,title)`;
+  const r = await fetch(url, { headers:{ Authorization:`Bearer ${token}` } });
+  const j = await r.json();
+  const sheet = (j.sheets || []).find(sh => sh.properties.title === SHEET_NAME);
+  return sheet ? sheet.properties.sheetId : 0;
+}
+
+async function deleteItemRow(token, code, gidRef) {
+  const vals = await sheetGetAll(token);
+  let idx = -1;
+  for (let i = 1; i < vals.length; i++) {
+    if ((vals[i][0] || '') === String(code)) { idx = i; break; }
+  }
+  if (idx === -1) return;
+  if (gidRef.current == null) gidRef.current = await getSheetGid(token);
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}:batchUpdate`;
+  await fetch(url, {
+    method:'POST',
+    headers:{ Authorization:`Bearer ${token}`, 'Content-Type':'application/json' },
+    body: JSON.stringify({ requests:[{ deleteDimension:{
+      range:{ sheetId:gidRef.current, dimension:'ROWS', startIndex:idx, endIndex:idx + 1 }
+    }}]}),
+  });
+}
+
+// ── DRIVE API ─────────────────────────────────────────────────────────────────
+async function uploadReceiptToDrive(token, file, filename) {
+  const metadata = { name: filename, parents:[DRIVE_FOLDER_ID], mimeType: file.type || 'image/jpeg' };
+  const form = new FormData();
+  form.append('metadata', new Blob([JSON.stringify(metadata)], { type:'application/json' }));
+  form.append('file', file);
+  const r = await fetch(
+    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink,thumbnailLink',
+    { method:'POST', headers:{ Authorization:`Bearer ${token}` }, body: form }
+  );
+  if (!r.ok) throw new Error('Drive upload failed: ' + r.status + ' ' + (await r.text()));
+  return r.json(); // { id, name, webViewLink, thumbnailLink }
 }
 
 // ── MAIN COMPONENT ────────────────────────────────────────────────────────────
@@ -134,12 +278,28 @@ export default function Inventory() {
   const [editId,      setEditId]      = useState(null);
   const [expandedId,  setExpandedId]  = useState(null);
   const [filterCat,   setFilterCat]   = useState('All');
+  const [search,      setSearch]      = useState('');
   const [loading,     setLoading]     = useState(true);
   const [accessToken, setAccessToken] = useState(null);
   const [syncing,     setSyncing]     = useState(false);
-  const tokenClientRef = React.useRef(null);
 
-  // Google Auth
+  // Receipts
+  const [receipts,        setReceipts]        = useState([]);
+  const [showReceipt,     setShowReceipt]     = useState(false);   // capture/submit modal
+  const [showReceipts,    setShowReceipts]    = useState(false);   // review modal
+  const [receiptFile,     setReceiptFile]     = useState(null);
+  const [receiptPreview,  setReceiptPreview]  = useState('');
+  const [receiptNote,     setReceiptNote]     = useState('');
+  const [receiptAmount,   setReceiptAmount]   = useState('');
+  const [uploadingReceipt,setUploadingReceipt]= useState(false);
+
+  const tokenClientRef = React.useRef(null);
+  const gidRef         = React.useRef(null);
+  const headersReadyRef= React.useRef(false);
+  const backfilledRef  = React.useRef(false);
+  const fileInputRef   = React.useRef(null);
+
+  // Google Auth (Sheets + Drive)
   useEffect(() => {
     const script = document.createElement('script');
     script.src = 'https://accounts.google.com/gsi/client';
@@ -155,7 +315,7 @@ export default function Inventory() {
     return () => document.body.removeChild(script);
   }, []);
 
-  // Firestore
+  // Firestore — inventory
   useEffect(() => {
     const q = query(collection(db, 'inventory'), orderBy('createdAt','desc'));
     const unsub = onSnapshot(q, (snap) => {
@@ -165,10 +325,39 @@ export default function Inventory() {
     return unsub;
   }, []);
 
-  const syncRow = async (item, status, action='') => {
+  // Firestore — receipts
+  useEffect(() => {
+    const q = query(collection(db, 'receipts'), orderBy('createdAt','desc'));
+    const unsub = onSnapshot(q,
+      (snap) => setReceipts(snap.docs.map(d => ({ id:d.id, ...d.data() }))),
+      (e) => console.error('receipts:', e)
+    );
+    return unsub;
+  }, []);
+
+  // One-time backfill: give existing items a 4-digit code if they don't have one.
+  useEffect(() => {
+    if (loading || backfilledRef.current) return;
+    const missing = items.filter(i => !i.code);
+    backfilledRef.current = true;
+    if (!missing.length) return;
+    const used = new Set(items.filter(i=>i.code).map(i=>String(i.code)));
+    (async () => {
+      for (const it of missing) {
+        let c; do { c = String(Math.floor(1000 + Math.random()*9000)); } while (used.has(c));
+        used.add(c);
+        try { await updateDoc(doc(db,'inventory',it.id), { code:c }); } catch(e){ console.error(e); }
+      }
+    })();
+  }, [items, loading]);
+
+  // Push an item's current state into its single sheet row.
+  const syncUpsert = async (item) => {
     if (!accessToken) return;
-    try { await sheetAppend(accessToken, [buildRow(item, status, action)]); }
-    catch (e) { console.error('Sheet sync:', e); }
+    try {
+      if (!headersReadyRef.current) { await ensureHeaders(accessToken); headersReadyRef.current = true; }
+      await upsertItemRow(accessToken, item.code, buildItemRow(item));
+    } catch (e) { console.error('Sheet upsert:', e); }
   };
 
   // Add / Edit
@@ -183,15 +372,18 @@ export default function Inventory() {
     setSyncing(true);
     const qty    = Number(form.quantity);
     const thresh = Number(form.threshold) || 5;
-    const data   = { name:form.name, category:form.category, quantity:qty, unit:form.unit, threshold:thresh, notes:form.notes, updatedAt:serverTimestamp() };
-    const status = getStatus(qty, thresh);
     try {
       if (editId) {
+        const existing = items.find(i => i.id === editId) || {};
+        const code = existing.code || genCode(items);
+        const data = { name:form.name, category:form.category, quantity:qty, unit:form.unit, threshold:thresh, notes:form.notes, code, updatedAt:serverTimestamp() };
         await updateDoc(doc(db,'inventory',editId), data);
-        await syncRow({ ...data }, status, 'UPDATED');
+        await syncUpsert({ ...existing, ...data });
       } else {
-        await addDoc(collection(db,'inventory'), { ...data, createdAt:serverTimestamp() });
-        await syncRow({ ...data }, status, 'ADDED');
+        const code = genCode(items);
+        const data = { name:form.name, category:form.category, quantity:qty, unit:form.unit, threshold:thresh, notes:form.notes, code, lastRestock:null, lastRestockNote:'', createdAt:serverTimestamp(), updatedAt:serverTimestamp() };
+        const ref = await addDoc(collection(db,'inventory'), data);
+        await syncUpsert({ id:ref.id, ...data });
       }
     } catch(e) { console.error(e); }
     setSyncing(false); setShowModal(false);
@@ -203,12 +395,12 @@ export default function Inventory() {
     setSyncing(true);
     try {
       await deleteDoc(doc(db,'inventory',item.id));
-      await syncRow(item, getStatus(item.quantity, item.threshold), 'DELETED');
+      if (accessToken && item.code) await deleteItemRow(accessToken, item.code, gidRef);
     } catch(e) { console.error(e); }
     setSyncing(false);
   };
 
-  // Restock
+  // Restock — updates the SAME sheet row, records how much was added.
   const openRestock = (item, e) => {
     e.stopPropagation();
     setRestockItem(item); setRestockQty(''); setRestockNote(''); setShowRestock(true);
@@ -217,24 +409,78 @@ export default function Inventory() {
   const handleRestock = async () => {
     if (!restockItem || !restockQty || Number(restockQty)<=0) return;
     setSyncing(true);
-    const added    = Number(restockQty);
-    const newQty   = (restockItem.quantity||0) + added;
-    const newStatus = getStatus(newQty, restockItem.threshold);
+    const added  = Number(restockQty);
+    const newQty = (restockItem.quantity||0) + added;
     try {
-      await updateDoc(doc(db,'inventory',restockItem.id), { quantity:newQty, updatedAt:serverTimestamp() });
-      const row = [
-        fmtDate(), restockItem.name, restockItem.category, newQty,
-        STATUS_CONFIG[newStatus]?.label || newStatus, restockItem.threshold,
-        `[RESTOCKED +${added}${restockItem.unit}] ${restockNote||''}`.trim(),
-      ];
-      if (accessToken) await sheetAppend(accessToken, [row]);
+      const data = { quantity:newQty, lastRestock:added, lastRestockNote:(restockNote||''), lastRestockAt:serverTimestamp(), updatedAt:serverTimestamp() };
+      await updateDoc(doc(db,'inventory',restockItem.id), data);
+      await syncUpsert({ ...restockItem, ...data });
     } catch(e) { console.error(e); }
     setSyncing(false); setShowRestock(false); setExpandedId(null);
   };
 
-  const filtered = filterCat==='All' ? items : items.filter(i=>i.category===filterCat);
+  // ── Receipts ──
+  const openReceipt = () => {
+    setReceiptFile(null); setReceiptPreview(''); setReceiptNote(''); setReceiptAmount('');
+    setShowReceipt(true);
+  };
+
+  const onPickReceipt = (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setReceiptFile(f);
+    const reader = new FileReader();
+    reader.onload = () => setReceiptPreview(reader.result);
+    reader.readAsDataURL(f);
+    e.target.value = ''; // allow re-picking the same file
+  };
+
+  const submitReceipt = async () => {
+    if (!accessToken)  { alert('Connect Google muna (para sa Drive upload).'); return; }
+    if (!receiptFile)  { alert('Kumuha o pumili muna ng larawan ng resibo.'); return; }
+    setUploadingReceipt(true);
+    try {
+      const stamp = new Date().toISOString().replace(/[:.]/g,'-');
+      const tag   = (receiptNote||'item').slice(0,24).replace(/[^\w]+/g,'_');
+      const fname = `receipt_${stamp}_${tag}.jpg`;
+      const up = await uploadReceiptToDrive(accessToken, receiptFile, fname);
+      await addDoc(collection(db,'receipts'), {
+        fileId:   up.id || '',
+        fileName: up.name || fname,
+        link:     up.webViewLink || '',
+        thumb:    up.thumbnailLink || '',
+        note:     receiptNote || '',
+        amount:   receiptAmount ? Number(receiptAmount) : null,
+        status:   'pending',
+        createdAt: serverTimestamp(),
+      });
+      setShowReceipt(false);
+      setReceiptFile(null); setReceiptPreview(''); setReceiptNote(''); setReceiptAmount('');
+    } catch(e) {
+      console.error(e);
+      alert('Hindi na-upload ang resibo. I-check ang Google permission o subukan ulit.');
+    }
+    setUploadingReceipt(false);
+  };
+
+  const reviewReceipt = async (r, status) => {
+    try { await updateDoc(doc(db,'receipts',r.id), { status, reviewedAt: serverTimestamp() }); }
+    catch(e) { console.error(e); }
+  };
+
+  // ── Derived ──
+  const term = search.trim().toLowerCase();
+  const filtered = items.filter(i => {
+    const catOk    = filterCat==='All' || i.category===filterCat;
+    const searchOk = !term || (i.name||'').toLowerCase().includes(term) || String(i.code||'').includes(term);
+    return catOk && searchOk;
+  });
   const lowCount = items.filter(i=>getStatus(i.quantity,i.threshold)!=='ok').length;
   const outCount = items.filter(i=>i.quantity<=0).length;
+  const criticalCats = new Set(
+    items.filter(i => CRITICAL_STATUSES.includes(getStatus(i.quantity,i.threshold))).map(i=>i.category)
+  );
+  const pendingCount = receipts.filter(r=>r.status==='pending').length;
 
   return (
     <div style={s.page}>
@@ -251,23 +497,53 @@ export default function Inventory() {
       {/* Google connect */}
       {!accessToken ? (
         <button style={s.connBtn} onClick={()=>tokenClientRef.current?.requestAccessToken()}>
-          {IC.link} Connect Google Sheets
+          {IC.link} Connect Google (Sheets + Drive)
         </button>
       ) : (
-        <div style={s.connBadge}>{IC.check} Connected to Google Sheets</div>
+        <div style={s.connBadge}>{IC.check} Connected to Google Sheets &amp; Drive</div>
       )}
 
-      <button style={s.addBtn} onClick={openAdd}>{IC.plus} Add Item</button>
+      {/* Add + Receipt */}
+      <div style={s.btnRow}>
+        <button style={s.addBtn} onClick={openAdd}>{IC.plus} Add Item</button>
+        <button style={s.receiptBtn} onClick={openReceipt}>{IC.camera} Receipt</button>
+      </div>
 
-      {/* Category filter */}
+      {/* Review receipts (Manager) */}
+      <button style={s.reviewBtn(pendingCount>0)} onClick={()=>setShowReceipts(true)}>
+        {IC.receipt} Review Receipts
+        {pendingCount>0 && <span style={s.pendCount}>{pendingCount}</span>}
+      </button>
+
+      {/* Search by name or code */}
+      <div style={s.searchWrap}>
+        <span style={s.searchIcon}>{IC.search}</span>
+        <input
+          style={s.searchInput}
+          placeholder="Search item name or code (e.g. 1234)"
+          value={search}
+          onChange={e=>setSearch(e.target.value)}
+          inputMode="text"
+        />
+      </div>
+
+      {/* Category filter — red when a category has a Critical/Out item */}
       <div style={s.catFilter}>
-        {['All',...CATEGORIES].map(c=>(
-          <div key={c} style={s.catChip(filterCat===c)} onClick={()=>setFilterCat(c)}>{c}</div>
-        ))}
+        {['All',...CATEGORIES].map(c=>{
+          const active = filterCat===c;
+          const crit   = c!=='All' && criticalCats.has(c);
+          return (
+            <div key={c} style={s.catChip(active, crit)} onClick={()=>setFilterCat(c)}>
+              {c}{crit && <span style={s.catDot(active)} />}
+            </div>
+          );
+        })}
       </div>
 
       {loading && <div style={s.empty}>Loading inventory…</div>}
-      {!loading && filtered.length===0 && <div style={s.empty}>No items yet. Tap "Add Item" to start.</div>}
+      {!loading && filtered.length===0 && (
+        <div style={s.empty}>{term || filterCat!=='All' ? 'Walang tugmang item.' : 'No items yet. Tap "Add Item" to start.'}</div>
+      )}
 
       {/* Item cards */}
       {filtered.map(item => {
@@ -282,8 +558,11 @@ export default function Inventory() {
               <div style={{width:44,height:44,borderRadius:12,background:catCfg.bg,display:'flex',alignItems:'center',justifyContent:'center',color:catCfg.color,flexShrink:0}}>
                 {catCfg.icon}
               </div>
-              <div style={{flex:1}}>
-                <p style={s.itemName}>{item.name}</p>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{display:'flex',alignItems:'center',gap:6}}>
+                  <p style={s.itemName}>{item.name}</p>
+                  {item.code && <span style={s.codePill}>#{item.code}</span>}
+                </div>
                 <p style={s.itemSub}>{item.quantity} {item.unit} · {item.category}</p>
               </div>
               <span style={s.badge(status)}>{STATUS_CONFIG[status].label}</span>
@@ -323,6 +602,9 @@ export default function Inventory() {
           </div>
         );
       })}
+
+      {/* hidden camera input (opens rear camera on mobile) */}
+      <input ref={fileInputRef} type="file" accept="image/*" capture="environment" style={{display:'none'}} onChange={onPickReceipt} />
 
       {/* ── ADD / EDIT MODAL ── */}
       {showModal && (
@@ -375,7 +657,10 @@ export default function Inventory() {
             <div style={s.modalTitle}>{IC.restockLg} Restock Item</div>
 
             <div style={s.infoBox}>
-              <div style={{fontSize:14,fontWeight:600,color:'#1a1a1a',marginBottom:6,letterSpacing:'-0.2px'}}>{restockItem.name}</div>
+              <div style={{fontSize:14,fontWeight:600,color:'#1a1a1a',marginBottom:6,letterSpacing:'-0.2px',display:'flex',alignItems:'center',gap:6}}>
+                {restockItem.name}
+                {restockItem.code && <span style={s.codePill}>#{restockItem.code}</span>}
+              </div>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
                 <span style={{fontSize:12,color:'#aaa'}}>Current: <b style={{color:'#1a1a1a'}}>{restockItem.quantity} {restockItem.unit}</b></span>
                 <span style={s.badge(getStatus(restockItem.quantity,restockItem.threshold))}>
@@ -412,6 +697,88 @@ export default function Inventory() {
               {syncing?'Saving…':'Confirm Restock'}
             </button>
             <button style={s.cancelBtn} onClick={()=>setShowRestock(false)}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {/* ── RECEIPT CAPTURE MODAL ── */}
+      {showReceipt && (
+        <div style={s.modal} onClick={()=>setShowReceipt(false)}>
+          <div style={s.modalCard} onClick={e=>e.stopPropagation()}>
+            <div style={s.modalTitle}>{IC.cameraLg} New Receipt</div>
+
+            {!accessToken && (
+              <div style={s.notice}>Connect Google muna (Sheets + Drive) bago mag-upload ng resibo.</div>
+            )}
+
+            {!receiptPreview ? (
+              <div style={s.photoBtn} onClick={()=>fileInputRef.current?.click()}>
+                {IC.cameraLg}
+                Take photo / choose image
+              </div>
+            ) : (
+              <>
+                <img src={receiptPreview} alt="receipt" style={s.photoPrev} />
+                <button style={s.retake} onClick={()=>fileInputRef.current?.click()}>{IC.camera} Retake / change photo</button>
+              </>
+            )}
+
+            <label style={s.label}>What was purchased</label>
+            <input style={s.input} placeholder="e.g. Milk + cups from supplier" value={receiptNote} onChange={e=>setReceiptNote(e.target.value)}/>
+
+            <label style={s.label}>Amount (₱, optional)</label>
+            <input style={s.input} type="number" placeholder="e.g. 1250" value={receiptAmount} onChange={e=>setReceiptAmount(e.target.value)}/>
+
+            <button style={s.saveBtn} onClick={submitReceipt} disabled={uploadingReceipt||!receiptFile||!accessToken}>
+              {uploadingReceipt?'Uploading…':'Submit for Approval'}
+            </button>
+            <button style={s.cancelBtn} onClick={()=>setShowReceipt(false)}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {/* ── RECEIPT REVIEW MODAL (Manager) ── */}
+      {showReceipts && (
+        <div style={s.modal} onClick={()=>setShowReceipts(false)}>
+          <div style={s.modalCard} onClick={e=>e.stopPropagation()}>
+            <div style={s.modalTitle}>{IC.receipt} Receipts &nbsp;<span style={{fontSize:13,color:'#aaa',fontWeight:500}}>{pendingCount} pending</span></div>
+
+            {receipts.length===0 && <div style={s.empty}>Wala pang resibo.</div>}
+
+            {receipts.map(r => {
+              const st = RECEIPT_STATUS[r.status] || RECEIPT_STATUS.pending;
+              return (
+                <div key={r.id} style={s.rcptCard}>
+                  <div style={{display:'flex',gap:12,alignItems:'flex-start'}}>
+                    {r.thumb
+                      ? <img src={r.thumb} alt="" style={s.rcptThumb} referrerPolicy="no-referrer" onError={(e)=>{e.currentTarget.style.display='none';}} />
+                      : <div style={s.rcptThumbPh}>{IC.receipt}</div>}
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
+                        <span style={{fontSize:14,fontWeight:600,color:'#1a1a1a',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                          {r.note || 'Receipt'}
+                        </span>
+                        <span style={{...s.badge('ok'),background:st.bg,color:st.color}}>{st.label}</span>
+                      </div>
+                      <div style={{fontSize:12,color:'#aaa',margin:'3px 0 6px'}}>
+                        {r.amount!=null ? `₱${Number(r.amount).toLocaleString('en-PH')} · ` : ''}
+                        {r.createdAt?.toDate ? r.createdAt.toDate().toLocaleString('en-PH',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : 'just now'}
+                      </div>
+                      {r.link && <a href={r.link} target="_blank" rel="noreferrer" style={s.rcptLink}>View receipt in Drive ↗</a>}
+                    </div>
+                  </div>
+
+                  {r.status==='pending' && (
+                    <div style={s.rcptActions}>
+                      <button style={s.approveBtn} onClick={()=>reviewReceipt(r,'approved')}>{IC.check} Approve</button>
+                      <button style={s.rejectBtn}  onClick={()=>reviewReceipt(r,'rejected')}>{IC.x} Reject</button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            <button style={s.cancelBtn} onClick={()=>setShowReceipts(false)}>Close</button>
           </div>
         </div>
       )}
