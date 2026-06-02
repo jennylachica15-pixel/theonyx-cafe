@@ -68,7 +68,7 @@ const MENU_CATEGORIES = [
     items: [
       { name: 'Tapsilog', regular: 90 },
       { name: 'Cornsilog', regular: 90 },
-      { name: 'Spamsilog', regular: 90 },
+      { name: 'Spamsilog', regular: 110 },
       { name: 'Pork Sisig Rice', regular: 180 },
       { name: 'Pork Embotido Rice', regular: 129 },
       { name: 'Lumpia Rice', regular: 80 },
