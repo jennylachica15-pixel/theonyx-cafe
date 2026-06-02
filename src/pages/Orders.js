@@ -11,7 +11,6 @@ const PAYMENT_METHODS = ['Cash', 'GCash', 'Maya', 'Card'];
 const SIZES = ['mini', 'classic', 'upgrade', 'regular'];
 const SIZE_LABELS = { mini: 'Mini', classic: 'Classic', upgrade: 'Upgrade', regular: 'Regular' };
 
-// ── UPDATED MENU ──
 const MENU_GROUPS = [
   { id: 'espresso', label: 'Espresso based', items: [
     { name: 'COFFEE LATTE',          mini: 75,  classic: 85,  upgrade: 95  },
@@ -121,7 +120,6 @@ const s = {
   groupCard: { background: C.card, borderRadius: 12, marginBottom: 8, border: `0.5px solid ${C.cardBorder}`, overflow: 'hidden' },
   groupHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 14px', cursor: 'pointer' },
   groupLabel: { fontSize: 14, fontWeight: 600, color: C.ink },
-  // ── NEW: item row with selection state ──
   itemRow: (selected) => ({
     display: 'flex', alignItems: 'center', padding: '10px 14px',
     borderTop: `0.5px solid ${C.rowBorder}`,
@@ -129,7 +127,6 @@ const s = {
     transition: 'background 0.15s',
   }),
   itemName: { fontSize: 12, fontWeight: 600, color: C.ink, flex: 1 },
-  // ── NEW: size pill with selected state ──
   sizeBtn: (selected) => ({
     padding: '6px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700,
     cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
@@ -137,7 +134,15 @@ const s = {
     background: selected ? C.selectedBg : C.cream,
     color: selected ? C.green : C.goldDeep,
     position: 'relative',
+    display: 'inline-flex', alignItems: 'center', gap: 4,
   }),
+  minusInPill: {
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    background: C.green, color: '#fff',
+    borderRadius: 4, width: 16, height: 16,
+    fontSize: 14, fontWeight: 700, lineHeight: 1,
+    flexShrink: 0,
+  },
   input: { width: '100%', padding: '11px 13px', borderRadius: 10, border: `0.5px solid ${C.inputBorder}`, fontSize: 14, background: C.input, color: C.ink, outline: 'none', boxSizing: 'border-box', marginBottom: 10, fontFamily: 'inherit' },
   label: { display: 'block', fontSize: 11.5, fontWeight: 600, color: C.muted, marginBottom: 5 },
   orderPanel: { background: C.card, borderRadius: 14, padding: '14px', marginTop: 12, border: `0.5px solid ${C.cardBorder}` },
@@ -169,6 +174,9 @@ const s = {
   metricCard: { flex: 1, background: C.card, border: `0.5px solid ${C.cardBorder}`, borderRadius: 12, padding: '13px', textAlign: 'center' },
   metricDark: { flex: 1, background: C.darker, borderRadius: 12, padding: '13px', textAlign: 'center' },
   disabledOverlay: { background: 'rgba(251,246,239,0.85)', borderRadius: 12, border: `1px dashed ${C.pillBorder}`, padding: '28px 20px', textAlign: 'center', marginTop: 8 },
+  // ── Order complete popup ──
+  completeOverlay: { position: 'fixed', inset: 0, background: 'rgba(26,10,0,0.65)', zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  completeCard: { background: C.cream, borderRadius: 24, padding: '36px 28px 28px', textAlign: 'center', width: 280, animation: 'popIn 0.4s cubic-bezier(.34,1.56,.64,1)' },
 };
 
 const Chev = ({ open }) => (
@@ -206,7 +214,8 @@ export default function Orders({ userName }) {
   const [notes, setNotes] = useState('');
   const [showPreview, setShowPreview] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  // ── replaced old `saved` boolean with a richer object ──
+  const [completedOrder, setCompletedOrder] = useState(null);
   const [accessToken, setAccessToken] = useState(null);
   const tokenClientRef = React.useRef(null);
 
@@ -220,6 +229,23 @@ export default function Orders({ userName }) {
   const [removingId, setRemovingId] = useState(null);
   const [removeReason, setRemoveReason] = useState('');
   const [removeSaving, setRemoveSaving] = useState(false);
+
+  // inject keyframe animation once
+  useEffect(() => {
+    const id = 'order-complete-keyframes';
+    if (!document.getElementById(id)) {
+      const style = document.createElement('style');
+      style.id = id;
+      style.textContent = `
+        @keyframes popIn {
+          0%   { transform: scale(0.7); opacity: 0; }
+          70%  { transform: scale(1.06); opacity: 1; }
+          100% { transform: scale(1);   opacity: 1; }
+        }
+      `;
+      document.head.appendChild(style);
+    }
+  }, []);
 
   useEffect(() => {
     const script = document.createElement('script');
@@ -243,7 +269,6 @@ export default function Orders({ userName }) {
     return () => unsub();
   }, []);
 
-  // ── check if an item+size is in the order ──
   const isSelected = (itemName, size) => order.some(o => o.key === `${itemName}_${size}`);
   const getQty = (itemName, size) => {
     const found = order.find(o => o.key === `${itemName}_${size}`);
@@ -261,15 +286,18 @@ export default function Orders({ userName }) {
     });
   };
 
-  // ── tap selected item: increase qty ──
-  const toggleOrAdd = (item, size) => {
+  const handlePillTap = (item, size) => {
+    addToOrder(item, size);
+  };
+
+  // (-) inside pill: decrement, removes from order panel too when hits 0
+  const handlePillMinus = (e, item, size) => {
+    e.stopPropagation();
     const key = `${item.name}_${size}`;
-    const existing = order.find(o => o.key === key);
-    if (existing) {
-      setOrder(prev => prev.map(o => o.key === key ? { ...o, qty: o.qty + 1 } : o));
-    } else {
-      addToOrder(item, size);
-    }
+    setOrder(prev => {
+      const updated = prev.map(o => o.key === key ? { ...o, qty: o.qty - 1 } : o);
+      return updated.filter(o => o.qty > 0);
+    });
   };
 
   const updateQty = (key, delta) => {
@@ -326,6 +354,11 @@ export default function Orders({ userName }) {
 
   const saveOrder = async () => {
     setSaving(true);
+    // snapshot before clearing
+    const savedTotal = total;
+    const savedPayment = paymentMethod;
+    const savedItemCount = order.reduce((sum, o) => sum + o.qty, 0);
+    const savedCashier = cashier;
     try {
       await addDoc(collection(db, 'orders'), {
         items: order, total, buyerName, paymentMethod, notes,
@@ -340,11 +373,14 @@ export default function Orders({ userName }) {
         form.append('file', blob);
         await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', { method: 'POST', headers: { Authorization: `Bearer ${accessToken}` }, body: form });
       }
-      setSaved(true); setOrder([]); setBuyerName(''); setNotes(''); setShowPreview(false);
-      setTimeout(() => setSaved(false), 4000);
+      // clear order first, then show the big popup
+      setOrder([]); setBuyerName(''); setNotes(''); setShowPreview(false);
+      setCompletedOrder({ total: savedTotal, payment: savedPayment, itemCount: savedItemCount, cashier: savedCashier });
     } catch (e) { console.error(e); }
     setSaving(false);
   };
+
+  const dismissComplete = () => setCompletedOrder(null);
 
   const startToday = new Date(); startToday.setHours(0, 0, 0, 0);
   const startYesterday = new Date(startToday); startYesterday.setDate(startToday.getDate() - 1);
@@ -455,11 +491,7 @@ export default function Orders({ userName }) {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.green} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                 Connected — orders sync to Sheets & Drive
               </div>
-              {saved && (
-                <div style={{ background: C.greenBg, color: C.green, border: `0.5px solid ${C.greenBorder}`, borderRadius: 10, padding: '10px 14px', fontSize: 13, marginBottom: 12 }}>
-                  Order saved successfully.
-                </div>
-              )}
+
               <label style={s.label}>Buyer name (optional)</label>
               <input style={s.input} placeholder="Customer name..." value={buyerName} onChange={e => setBuyerName(e.target.value)} />
               <label style={s.label}>Payment method</label>
@@ -472,7 +504,6 @@ export default function Orders({ userName }) {
                   <div style={s.groupHeader} onClick={() => setOpenGroup(openGroup === group.id ? null : group.id)}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span style={s.groupLabel}>{group.label}</span>
-                      {/* badge showing how many items from this group are selected */}
                       {group.items.some(item => SIZES.some(sz => isSelected(item.name, sz))) && (
                         <span style={{ background: C.green, color: '#fff', borderRadius: 20, fontSize: 10, fontWeight: 700, padding: '2px 7px' }}>
                           {group.items.reduce((count, item) => count + SIZES.filter(sz => isSelected(item.name, sz)).length, 0)}
@@ -493,15 +524,26 @@ export default function Orders({ userName }) {
                             const selected = isSelected(item.name, size);
                             const qty = getQty(item.name, size);
                             return (
-                              <button key={size} style={s.sizeBtn(selected)} onClick={() => toggleOrAdd(item, size)}>
+                              <button
+                                key={size}
+                                style={s.sizeBtn(selected)}
+                                onClick={() => handlePillTap(item, size)}
+                              >
                                 {selected && (
-                                  <span style={{ position: 'absolute', top: -5, right: -5, background: C.green, borderRadius: '50%', width: 14, height: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    <CheckIcon />
+                                  <span style={s.minusInPill} onClick={(e) => handlePillMinus(e, item, size)}>
+                                    −
                                   </span>
                                 )}
                                 {SIZE_LABELS[size]} P{item[size]}
                                 {selected && qty > 1 && (
-                                  <span style={{ marginLeft: 4, background: C.green, color: '#fff', borderRadius: 10, fontSize: 9, fontWeight: 700, padding: '1px 5px' }}>x{qty}</span>
+                                  <span style={{ background: C.green, color: '#fff', borderRadius: 10, fontSize: 9, fontWeight: 700, padding: '1px 5px' }}>
+                                    x{qty}
+                                  </span>
+                                )}
+                                {selected && (
+                                  <span style={{ position: 'absolute', top: -5, right: -5, background: C.green, borderRadius: '50%', width: 14, height: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <CheckIcon />
+                                  </span>
                                 )}
                               </button>
                             );
@@ -690,6 +732,30 @@ export default function Orders({ userName }) {
           </div>
         </div>
       )}
+
+      {/* ── ORDER COMPLETE POPUP ── */}
+      {completedOrder && (
+        <div style={s.completeOverlay} onClick={dismissComplete}>
+          <div style={s.completeCard} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: 26, fontWeight: 800, color: C.ink, marginBottom: 6, lineHeight: 1.2 }}>
+              Order Complete!
+            </div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: C.green, marginBottom: 8 }}>
+              Good job, {completedOrder.cashier}!
+            </div>
+            <div style={{ fontSize: 13, color: C.muted, marginBottom: 24 }}>
+              P{completedOrder.total.toLocaleString()} · {completedOrder.payment} · {completedOrder.itemCount} item{completedOrder.itemCount !== 1 ? 's' : ''}
+            </div>
+            <button
+              style={{ ...s.primaryBtn, marginTop: 0 }}
+              onClick={dismissComplete}
+            >
+              New order
+            </button>
+          </div>
+        </div>
+      )}
+
       <div style={{ height: 100 }} />
     </div>
   );
