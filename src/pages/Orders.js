@@ -64,7 +64,7 @@ const MENU_GROUPS = [
   { id: 'rice', label: 'Rice meals', items: [
     { name: 'TAPSILOG',               regular: 90  },
     { name: 'CORNSILOG',              regular: 90  },
-    { name: 'SPAMSILOG',              regular: 80  },
+    { name: 'SPAMSILOG',              regular: 110  },
     { name: 'PORK SISIG RICE',        regular: 180 },
     { name: 'PORK EMBOTIDO RICE',     regular: 129 },
     { name: 'LUMPIA RICE',            regular: 80  },
