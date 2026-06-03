@@ -6,9 +6,8 @@ import {
 } from 'firebase/firestore';
 
 const SHEET_ID = '15o1OUhOO17s1ifKSlYonPrmtJEAP1qQRLoMCI7_N0DM';
-const ATTENDANCE_FOLDER_ID = '1xuC8werkmhShXi1qSjUPTuj_EtZzk9V3';
 const GOOGLE_CLIENT_ID = '596322682185-n5hm66hvol3nnqqllnuop995kcnefbgu.apps.googleusercontent.com';
-const SCOPES = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file';
+const SCOPES = 'https://www.googleapis.com/auth/spreadsheets';
 const STAFF_LIST = ['Kelly', 'Maryz'];
 const DAILY_RATE = 400;
 
@@ -156,7 +155,7 @@ export default function Attendance({ role, userName }) {
   // notifications (manager only)
   const [notifications, setNotifications] = useState([]);
   const [notifOpen, setNotifOpen] = useState(false);
-  const [photoViewer, setPhotoViewer] = useState(null); // { url, docId, field, driveId }
+  const [photoViewer, setPhotoViewer] = useState(null); // { url, docId, field, staff, label }
   const [deletingPhoto, setDeletingPhoto] = useState(false);
   const prevRecordsRef = useRef({});
 
@@ -204,6 +203,8 @@ export default function Attendance({ role, userName }) {
           timeOut: data.timeOut || null,
           docId: d.id,
           rowIndex: data.rowIndex || null,
+          photoInData: data.photoInData || null,
+          photoOutData: data.photoOutData || null,
         };
       });
       setFirestoreRecords(recs);
@@ -219,12 +220,12 @@ export default function Attendance({ role, userName }) {
       const p = prev[staff] || {};
       // New clock-in
       if (rec.timeIn && !p.timeIn) {
-        setNotifications(n => [{ id: Date.now() + staff + 'IN', staff, type: 'IN', time: rec.timeIn, photoId: rec.photoInId, read: false }, ...n]);
+        setNotifications(n => [{ id: Date.now() + staff + 'IN', staff, type: 'IN', time: rec.timeIn, photoData: rec.photoInData, read: false }, ...n]);
         setNotifOpen(true);
       }
       // New clock-out
       if (rec.timeOut && !p.timeOut) {
-        setNotifications(n => [{ id: Date.now() + staff + 'OUT', staff, type: 'OUT', time: rec.timeOut, photoId: rec.photoOutId, read: false }, ...n]);
+        setNotifications(n => [{ id: Date.now() + staff + 'OUT', staff, type: 'OUT', time: rec.timeOut, photoData: rec.photoOutData, read: false }, ...n]);
         setNotifOpen(true);
       }
     });
@@ -263,22 +264,25 @@ export default function Attendance({ role, userName }) {
     setPhoto(null); setPhotoFile(null);
   };
 
-  const uploadSelfie = async (staffName, type) => {
-    if (!photoFile || !accessToken) return '';
-    const now = new Date();
-    const fileName = `${staffName}_${type}_${formatDate(now).replace(/\//g, '-')}.jpg`;
-    const form = new FormData();
-    form.append('metadata', new Blob([JSON.stringify({ name: fileName, parents: [ATTENDANCE_FOLDER_ID], mimeType: 'image/jpeg' })], { type: 'application/json' }));
-    form.append('file', photoFile);
-    const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
-      method: 'POST', headers: { Authorization: `Bearer ${accessToken}` }, body: form
-    });
-    if (!res.ok) return '';
-    const data = await res.json();
-    return data.id || '';
-  };
+  // Compress selfie to small base64 (~200px) — stored in Firestore, no Drive needed
+  const compressSelfie = (file) => new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const MAX = 200;
+      const scale = Math.min(MAX / img.width, MAX / img.height, 1);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL('image/jpeg', 0.7));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+    img.src = url;
+  });
 
-  // ── CLOCK IN/OUT: writes to BOTH Google Sheets AND Firestore ──
+  // ── CLOCK IN/OUT: photo stored as base64 in Firestore, no Drive ──
   const confirmAction = async () => {
     if (!photoFile) { setError('Please take a selfie first.'); return; }
     const { staffName, type } = pendingAction;
@@ -288,12 +292,13 @@ export default function Attendance({ role, userName }) {
     const sheetDate = formatDate(now);
 
     try {
-      const photoId = await uploadSelfie(staffName, type);
+      // Compress selfie to small base64 (~200px) — no Drive upload
+      const photoData = await compressSelfie(photoFile);
       const existingDoc = firestoreRecords[staffName];
 
       if (type === 'IN') {
-        // 1. Write to Google Sheets
-        const values = [[sheetDate, staffName, timeNow, photoId, '', '']];
+        // 1. Write to Google Sheets (no photo column needed)
+        const values = [[sheetDate, staffName, timeNow, '', '', '']];
         const res = await fetch(
           `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${staffName}!A:F:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
           { method: 'POST', headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ values }) }
@@ -303,34 +308,33 @@ export default function Attendance({ role, userName }) {
         const rowMatch = range.match(/(\d+)$/);
         const rowIndex = rowMatch ? parseInt(rowMatch[1]) : null;
 
-        // 2. Write to Firestore — this triggers real-time sync on all devices
+        // 2. Write to Firestore with base64 photo — syncs to all devices instantly
         await addDoc(collection(db, 'attendance'), {
           staff: staffName,
           date: today,
           timeIn: timeNow,
           timeOut: null,
           rowIndex,
-          photoInId: photoId,
+          photoInData: photoData || null,
           createdAt: serverTimestamp(),
         });
 
       } else {
-        // Clock OUT
         const rowIndex = existingDoc?.rowIndex;
 
         // 1. Update Google Sheets
         if (rowIndex) {
           await fetch(
             `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${staffName}!E${rowIndex}:F${rowIndex}?valueInputOption=RAW`,
-            { method: 'PUT', headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ values: [[timeNow, photoId]] }) }
+            { method: 'PUT', headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ values: [[timeNow, '']] }) }
           );
         }
 
-        // 2. Update Firestore — triggers real-time sync on all devices
+        // 2. Update Firestore with base64 photo — syncs instantly
         if (existingDoc?.docId) {
           await updateDoc(doc(db, 'attendance', existingDoc.docId), {
             timeOut: timeNow,
-            photoOutId: photoId,
+            photoOutData: photoData || null,
           });
         }
       }
@@ -345,24 +349,16 @@ export default function Attendance({ role, userName }) {
     setLoading(false);
   };
 
-  // ── Delete selfie from Drive + clear from Firestore ──
-  const deletePhoto = async (driveId, docId, field) => {
-    if (!accessToken || !driveId) return;
+  // ── Delete selfie — just clear the base64 field in Firestore ──
+  const deletePhoto = async (docId, field) => {
+    if (!docId) return;
     setDeletingPhoto(true);
     try {
-      await fetch(`https://www.googleapis.com/drive/v3/files/${driveId}`, {
-        method: 'DELETE', headers: { Authorization: `Bearer ${accessToken}` }
-      });
       await updateDoc(doc(db, 'attendance', docId), { [field]: null });
       setPhotoViewer(null);
     } catch (e) { console.error(e); }
     setDeletingPhoto(false);
   };
-
-  // Drive thumbnail URL (requires connected token)
-  const driveThumb = (fileId) => fileId
-    ? `https://drive.google.com/thumbnail?id=${fileId}&sz=w400`
-    : null;
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
@@ -503,26 +499,26 @@ export default function Attendance({ role, userName }) {
       )}
 
       {/* Manager: today's selfie cards */}
-      {role === 'manager' && accessToken && STAFF_LIST.some(n => firestoreRecords[n]?.photoInId || firestoreRecords[n]?.photoOutId) && (
+      {role === 'manager' && STAFF_LIST.some(n => firestoreRecords[n]?.photoInData || firestoreRecords[n]?.photoOutData) && (
         <div style={{ marginBottom: 14 }}>
           <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 700, marginBottom: 8 }}>Today's Selfies</div>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             {STAFF_LIST.map(name => {
               const r = firestoreRecords[name] || {};
-              if (!r.photoInId && !r.photoOutId) return null;
+              if (!r.photoInData && !r.photoOutData) return null;
               return (
                 <div key={name} style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 14, padding: '12px', flex: 1, minWidth: 140 }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: C.ink, marginBottom: 8 }}>{name}</div>
                   <div style={{ display: 'flex', gap: 8 }}>
-                    {r.photoInId && (
-                      <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => setPhotoViewer({ url: driveThumb(r.photoInId), driveId: r.photoInId, docId: r.docId, field: 'photoInId', staff: name, label: 'Clock In' })}>
-                        <img src={driveThumb(r.photoInId)} alt="clock-in" style={{ width: '100%', borderRadius: 8, objectFit: 'cover', aspectRatio: '1/1' }} onError={e => { e.target.style.display='none'; }} />
+                    {r.photoInData && (
+                      <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => setPhotoViewer({ url: r.photoInData, docId: r.docId, field: 'photoInData', staff: name, label: 'Clock In' })}>
+                        <img src={r.photoInData} alt="clock-in" style={{ width: '100%', borderRadius: 8, objectFit: 'cover', aspectRatio: '1/1' }} />
                         <div style={{ fontSize: 9.5, color: C.green, fontWeight: 700, textAlign: 'center', marginTop: 3 }}>IN {r.timeIn ? r.timeIn.slice(0,8) : ''}</div>
                       </div>
                     )}
-                    {r.photoOutId && (
-                      <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => setPhotoViewer({ url: driveThumb(r.photoOutId), driveId: r.photoOutId, docId: r.docId, field: 'photoOutId', staff: name, label: 'Clock Out' })}>
-                        <img src={driveThumb(r.photoOutId)} alt="clock-out" style={{ width: '100%', borderRadius: 8, objectFit: 'cover', aspectRatio: '1/1' }} onError={e => { e.target.style.display='none'; }} />
+                    {r.photoOutData && (
+                      <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => setPhotoViewer({ url: r.photoOutData, docId: r.docId, field: 'photoOutData', staff: name, label: 'Clock Out' })}>
+                        <img src={r.photoOutData} alt="clock-out" style={{ width: '100%', borderRadius: 8, objectFit: 'cover', aspectRatio: '1/1' }} />
                         <div style={{ fontSize: 9.5, color: C.terra, fontWeight: 700, textAlign: 'center', marginTop: 3 }}>OUT {r.timeOut ? r.timeOut.slice(0,8) : ''}</div>
                       </div>
                     )}
@@ -671,11 +667,10 @@ export default function Attendance({ role, userName }) {
             ) : (
               notifications.map(n => (
                 <div key={n.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px', borderRadius: 12, marginBottom: 8, background: n.read ? C.cream : '#fff8e8', border: `1px solid ${n.read ? C.border : '#f0d090'}` }}>
-                  {n.photoId && accessToken ? (
-                    <img src={driveThumb(n.photoId)} alt="selfie"
+                  {n.photoData ? (
+                    <img src={n.photoData} alt="selfie"
                       style={{ width: 52, height: 52, borderRadius: 10, objectFit: 'cover', flexShrink: 0, cursor: 'pointer', border: `2px solid ${C.gold}` }}
-                      onClick={() => { setPhotoViewer({ url: driveThumb(n.photoId), driveId: n.photoId, docId: firestoreRecords[n.staff]?.docId, field: n.type === 'IN' ? 'photoInId' : 'photoOutId', staff: n.staff, label: `Clock ${n.type}` }); setNotifOpen(false); }}
-                      onError={e => { e.target.style.display='none'; }}
+                      onClick={() => { setPhotoViewer({ url: n.photoData, docId: firestoreRecords[n.staff]?.docId, field: n.type === 'IN' ? 'photoInData' : 'photoOutData', staff: n.staff, label: `Clock ${n.type}` }); setNotifOpen(false); }}
                     />
                   ) : (
                     <div style={{ width: 52, height: 52, borderRadius: 10, background: C.soft, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>👤</div>
@@ -715,8 +710,8 @@ export default function Attendance({ role, userName }) {
               onError={e => { e.target.src = ''; e.target.alt = 'Image unavailable'; }}
             />
             <button
-              onClick={() => deletePhoto(photoViewer.driveId, photoViewer.docId, photoViewer.field)}
-              disabled={deletingPhoto || !photoViewer.driveId}
+              onClick={() => deletePhoto(photoViewer.docId, photoViewer.field)}
+              disabled={deletingPhoto || !photoViewer.docId}
               style={{ width: '100%', padding: '13px', borderRadius: 11, background: deletingPhoto ? C.soft : C.errBg, color: C.err, border: `1.5px solid ${C.errBorder}`, fontSize: 14, fontWeight: 700, cursor: deletingPhoto ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
               {Ic.warn} {deletingPhoto ? 'Deleting…' : 'Delete this photo'}
             </button>
