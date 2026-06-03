@@ -519,9 +519,23 @@ export default function Inventory({ role='staff', userName='' }) {
                 <div style={s.progressLbl}><span>Stock level</span><span>{item.quantity} / {item.threshold*2} {item.unit}</span></div>
                 <div style={s.progressBg}><div style={{height:'100%',width:`${pct}%`,background:barColor,borderRadius:3,transition:'width 0.4s'}}/></div>
                 <div style={s.actions}>
-                  <button style={s.actionBtn('restock')} onClick={(e)=>openRestock(item,e)}>{IC.upload} Restock</button>
-                  <button style={s.actionBtn('edit')} onClick={(e)=>{e.stopPropagation();openEdit(item);}}>{IC.edit} Edit</button>
-                  {isManager&&<button style={s.actionBtn('danger')} onClick={(e)=>{e.stopPropagation();handleDelete(item);}}>{IC.trash} Delete</button>}
+                  <button
+                    style={{...s.actionBtn('restock'), ...(accessToken?{}:{opacity:0.45,cursor:'not-allowed'})}}
+                    onClick={(e)=>{ e.stopPropagation(); if(accessToken) openRestock(item,e); }}
+                    title={!accessToken?'Connect Google first':''}
+                  >{accessToken?IC.upload:IC.lock} Restock</button>
+                  <button
+                    style={{...s.actionBtn('edit'), ...(accessToken?{}:{opacity:0.45,cursor:'not-allowed'})}}
+                    onClick={(e)=>{ e.stopPropagation(); if(accessToken) openEdit(item); }}
+                    title={!accessToken?'Connect Google first':''}
+                  >{accessToken?IC.edit:IC.lock} Edit</button>
+                  {String(role||'').trim().toLowerCase()==='manager'&&(
+                    <button
+                      style={{...s.actionBtn('danger'), ...(accessToken?{}:{opacity:0.45,cursor:'not-allowed'})}}
+                      onClick={(e)=>{ e.stopPropagation(); if(accessToken) handleDelete(item); }}
+                      title={!accessToken?'Connect Google first':''}
+                    >{IC.trash} Delete</button>
+                  )}
                 </div>
                 {item.updatedAt?.toDate&&<div style={s.syncTag}>Updated: {item.updatedAt.toDate().toLocaleString('en-PH')}</div>}
               </div>
