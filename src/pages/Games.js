@@ -50,3 +50,4 @@
 // NO CODE CHANGE NEEDED — scores auto-reset after 5 days as designed.
 // If you want IMMEDIATE manual reset, call this once from browser console:
 //   getDocs(collection(db,'leaderboard')).then(s=>s.docs.forEach(d=>deleteDoc(d.ref)))
+
