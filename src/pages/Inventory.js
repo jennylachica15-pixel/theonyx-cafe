@@ -101,8 +101,8 @@ const s = {
   connBadge:  { background:C.greenBg, color:C.green, borderRadius:10, padding:'9px 14px', fontSize:12, fontWeight:600, marginBottom:12, display:'flex', alignItems:'center', gap:7, border:`1px solid ${C.greenBd}` },
   btnRow:     { display:'flex', gap:8, marginBottom:10 },
   // active buttons (connected)
-  addBtn:     { flex:1, padding:'14px', borderRadius:14, background:'#f5ede2', color:C.terra, fontSize:14, fontWeight:600, display:'flex', alignItems:'center', justifyContent:'center', gap:8, border:`1.5px solid ${C.border}`, cursor:'pointer' },
-  receiptBtn: { flex:1, padding:'14px', borderRadius:14, background:'#f5ede2', color:C.terra, fontSize:14, fontWeight:600, display:'flex', alignItems:'center', justifyContent:'center', gap:8, border:`1.5px solid ${C.border}`, cursor:'pointer' },
+  addBtn:     { flex:1, padding:'14px', borderRadius:14, background:'#e8d5bc', color:'#5a3010', fontSize:14, fontWeight:600, display:'flex', alignItems:'center', justifyContent:'center', gap:8, border:`1.5px solid #c8a878`, cursor:'pointer' },
+  receiptBtn: { flex:1, padding:'14px', borderRadius:14, background:'#e8d5bc', color:'#5a3010', fontSize:14, fontWeight:600, display:'flex', alignItems:'center', justifyContent:'center', gap:8, border:`1.5px solid #c8a878`, cursor:'pointer' },
   // disabled buttons (not connected)
   addBtnOff:  { flex:1, padding:'14px', borderRadius:14, background:C.soft, color:C.disabled, fontSize:14, fontWeight:600, display:'flex', alignItems:'center', justifyContent:'center', gap:8, border:`1px solid ${C.border}`, cursor:'not-allowed' },
   receiptOff: { flex:1, padding:'14px', borderRadius:14, background:C.soft, color:C.disabled, fontSize:14, fontWeight:600, display:'flex', alignItems:'center', justifyContent:'center', gap:8, border:`1px solid ${C.border}`, cursor:'not-allowed' },
@@ -436,7 +436,7 @@ export default function Inventory({ role='staff', userName='' }) {
 
       {/* Google connect */}
       {!accessToken
-        ? <button style={s.connBtn} onClick={()=>tokenClientRef.current?.requestAccessToken()}>{IC.link} Connect Google (Sheets + Drive)</button>
+        ? <button style={s.connBtn} onClick={()=>tokenClientRef.current?.requestAccessToken()}>{IC.link} Connect before proceeding…</button>
         : <div style={s.connBadge}>{IC.check} Connected to Google Sheets &amp; Drive</div>
       }
 
