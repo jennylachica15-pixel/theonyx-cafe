@@ -379,6 +379,7 @@ export default function Inventory({ role='staff', userName='' }) {
 
   const handleSave=async()=>{
     if(!form.name||form.quantity==='') return;
+    if(!editId && items.some(i=>i.name.trim().toLowerCase()===form.name.trim().toLowerCase())) return;
     setSyncing(true);
     const qty=Number(form.quantity), thresh=Number(form.threshold)||5;
     const who=userName||'Unknown';
@@ -477,6 +478,10 @@ export default function Inventory({ role='staff', userName='' }) {
 
   // Derived
   const term=search.trim().toLowerCase();
+  // Duplicate check — item name already exists (case-insensitive), excluding the item being edited
+  const dupeName = !editId && form.name.trim()
+    ? items.some(i => i.name.trim().toLowerCase() === form.name.trim().toLowerCase())
+    : false;
   const filtered=items.filter(i=>{
     const catOk=filterCat==='All'||i.category===filterCat;
     const searchOk=!term||(i.name||'').toLowerCase().includes(term)||String(i.code||'').includes(term);
@@ -666,7 +671,12 @@ export default function Inventory({ role='staff', userName='' }) {
           <div style={s.modalCard} onClick={e=>e.stopPropagation()}>
             <div style={s.modalTitle}>{editId?IC.edit:IC.plus}{editId?'Edit Item':'Add New Item'}</div>
             <label style={s.label}>Item Name</label>
-            <input style={s.input} placeholder="e.g. Arabica Beans" value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/>
+            <input style={{...s.input, borderColor: dupeName ? C.err : C.border}} placeholder="e.g. Arabica Beans" value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/>
+            {dupeName && (
+              <div style={{background:C.errBg,border:`1px solid ${C.errBd}`,borderRadius:9,padding:'9px 12px',fontSize:12.5,color:C.err,display:'flex',alignItems:'center',gap:7,marginTop:-8,marginBottom:14}}>
+                ⚠ "{form.name.trim()}" already exists in inventory. Choose a different name.
+              </div>
+            )}
             <label style={s.label}>Category</label>
             <select style={s.input} value={form.category} onChange={e=>setForm({...form,category:e.target.value})}>{CATEGORIES.map(c=><option key={c}>{c}</option>)}</select>
             <div style={s.row2}>
@@ -677,7 +687,7 @@ export default function Inventory({ role='staff', userName='' }) {
             <input style={s.input} type="number" placeholder="e.g. 5" value={form.threshold} onChange={e=>setForm({...form,threshold:e.target.value})}/>
             <label style={s.label}>Notes (optional)</label>
             <input style={s.input} placeholder="e.g. Supplier: ABC Trading" value={form.notes} onChange={e=>setForm({...form,notes:e.target.value})}/>
-            <button style={s.saveBtn} onClick={handleSave} disabled={syncing}>{syncing?'Saving…':editId?'Save Changes':'Add Item'}</button>
+            <button style={{...s.saveBtn,...(dupeName?{opacity:0.5,cursor:'not-allowed'}:{})}} onClick={handleSave} disabled={syncing||dupeName}>{syncing?'Saving…':editId?'Save Changes':'Add Item'}</button>
             <button style={s.cancelBtn} onClick={()=>setShowModal(false)}>Cancel</button>
           </div>
         </div>
