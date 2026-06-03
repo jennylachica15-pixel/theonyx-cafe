@@ -294,6 +294,20 @@ async function deleteDriveFile(token,fileId) {
 // ── Main Component ──
 export default function Inventory({ role='staff', userName='' }) {
   const isManager = String(role||'').trim().toLowerCase()==='manager';
+  // Resolve display name — try exact match, then email prefix match against STAFF_NAMES
+  const resolvedName = (() => {
+    const raw = String(userName||'').trim();
+    if (!raw) return isManager ? 'Manager' : 'Staff';
+    // Direct match (e.g. "Kelly")
+    const direct = STAFF_NAMES.find(n => n.toLowerCase() === raw.toLowerCase());
+    if (direct) return direct;
+    // Email prefix match (e.g. "kelly@..." → "Kelly")
+    const prefix = raw.split('@')[0].toLowerCase();
+    const emailMatch = STAFF_NAMES.find(n => n.toLowerCase() === prefix);
+    if (emailMatch) return emailMatch;
+    // Return raw as-is (e.g. "Jenny")
+    return raw;
+  })();
 
   const [items,         setItems]         = useState([]);
   const [showModal,     setShowModal]     = useState(false);
@@ -382,7 +396,7 @@ export default function Inventory({ role='staff', userName='' }) {
     if(!editId && items.some(i=>i.name.trim().toLowerCase()===form.name.trim().toLowerCase())) return;
     setSyncing(true);
     const qty=Number(form.quantity), thresh=Number(form.threshold)||5;
-    const who=userName||'Unknown';
+    const who=resolvedName;
     try{
       if(editId){
         // Edit existing item
@@ -420,7 +434,7 @@ export default function Inventory({ role='staff', userName='' }) {
     if(!restockItem||!restockQty||Number(restockQty)<=0) return;
     setSyncing(true);
     const added=Number(restockQty), newQty=(restockItem.quantity||0)+added;
-    const who=userName||'Unknown';
+    const who=resolvedName;
     try{
       const data={quantity:newQty,lastRestock:added,lastRestockNote:(restockNote||''),lastRestockAt:serverTimestamp(),editedBy:who,updatedAt:serverTimestamp()};
       await updateDoc(doc(db,'inventory',restockItem.id),data);
@@ -434,8 +448,7 @@ export default function Inventory({ role='staff', userName='' }) {
   const openReceipt=()=>{
     if(!accessToken) return;
     setReceiptFile(null);setReceiptPreview('');setReceiptNote('');setReceiptAmount('');
-    const match=STAFF_NAMES.find(n=>n.toLowerCase()===String(userName).toLowerCase());
-    setUploader(match||''); setShowReceipt(true);
+    setUploader(resolvedName||''); setShowReceipt(true);
   };
 
   const onPickReceipt=(e)=>{
