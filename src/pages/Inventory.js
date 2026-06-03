@@ -242,7 +242,8 @@ export default function Inventory({ role='staff', userName='' }) {
   const [restockNote,   setRestockNote]   = useState('');
   const [form,          setForm]          = useState(DEFAULT_FORM);
   const [editId,        setEditId]        = useState(null);
-  const [expandedId,    setExpandedId]    = useState(null);
+  const [expandedCat,   setExpandedCat]   = useState(null);   // which category is open
+  const [expandedId,    setExpandedId]    = useState(null);   // which item is open
   const [filterCat,     setFilterCat]     = useState('All');
   const [search,        setSearch]        = useState('');
   const [loading,       setLoading]       = useState(true);
@@ -493,7 +494,6 @@ export default function Inventory({ role='staff', userName='' }) {
 
       {/* Category summary + item cards */}
       {!loading && (() => {
-        // Group filtered items by category
         const groups = {};
         const catOrder = filterCat === 'All' ? CATEGORIES : [filterCat];
         catOrder.forEach(c => { groups[c] = []; });
@@ -506,41 +506,42 @@ export default function Inventory({ role='staff', userName='' }) {
           const catCfg = CAT_SVG[cat] || CAT_SVG['Other'];
           const critCount = catItems.filter(i => ['low','out'].includes(getStatus(i.quantity,i.threshold))).length;
           const warnCount = catItems.filter(i => getStatus(i.quantity,i.threshold)==='warn').length;
-          const isCatOpen = expandedId === '__cat__' + cat;
+          const isCatOpen = expandedCat === cat;
           return (
-            <div key={cat} style={{marginBottom: 10}}>
-              {/* Category header — tap to expand/collapse */}
+            <div key={cat} style={{marginBottom:10}}>
+              {/* Category header */}
               <div
-                style={{background:C.white, borderRadius: isCatOpen?'14px 14px 0 0':14, padding:'13px 16px', border:`1px solid ${C.border}`, borderBottom: isCatOpen?`1px solid ${C.border}`:`1px solid ${C.border}`, cursor:'pointer', display:'flex', alignItems:'center', gap:12}}
-                onClick={()=>setExpandedId(isCatOpen ? null : '__cat__'+cat)}
+                style={{background:C.white, borderRadius:isCatOpen?'14px 14px 0 0':14, padding:'13px 16px', border:`1px solid ${C.border}`, cursor:'pointer', display:'flex', alignItems:'center', gap:12}}
+                onClick={()=>{ setExpandedCat(isCatOpen?null:cat); setExpandedId(null); }}
               >
                 <div style={{width:40,height:40,borderRadius:10,background:catCfg.bg,display:'flex',alignItems:'center',justifyContent:'center',color:catCfg.color,flexShrink:0}}>{catCfg.icon}</div>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontSize:14,fontWeight:700,color:C.ink,marginBottom:2}}>{cat}</div>
-                  <div style={{fontSize:12,color:C.muted}}>{catItems.length} item{catItems.length!==1?'s':''}{critCount>0?` · ${critCount} critical`:''}{warnCount>0?` · ${warnCount} low`:''}</div>
+                  <div style={{fontSize:12,color:C.muted}}>{catItems.length} item{catItems.length!==1?'s':''}{critCount>0?` · ${critCount} critical`:''}{warnCount>0&&critCount===0?` · ${warnCount} low`:''}</div>
                 </div>
                 <div style={{display:'flex',gap:5,alignItems:'center',flexShrink:0}}>
                   {critCount>0&&<span style={{background:C.errBg,color:C.err,borderRadius:20,padding:'3px 9px',fontSize:11,fontWeight:700}}>{critCount} ⚠</span>}
                   {warnCount>0&&critCount===0&&<span style={{background:C.warnBg,color:C.warn,borderRadius:20,padding:'3px 9px',fontSize:11,fontWeight:700}}>{warnCount} low</span>}
                   {critCount===0&&warnCount===0&&<span style={{background:C.greenBg,color:C.green,borderRadius:20,padding:'3px 9px',fontSize:11,fontWeight:700}}>OK</span>}
-                  <span style={{fontSize:16,color:C.muted,marginLeft:4}}>{isCatOpen?'▲':'▼'}</span>
+                  <span style={{fontSize:14,color:C.muted,marginLeft:4}}>{isCatOpen?'▲':'▼'}</span>
                 </div>
               </div>
 
-              {/* Items inside category */}
+              {/* Items inside — each taps to expand/collapse independently */}
               {isCatOpen && catItems.map((item, idx) => {
-                const status=getStatus(item.quantity,item.threshold);
-                const isItemOpen=expandedId==='__item__'+item.id;
-                const catCfgI=CAT_SVG[item.category]||CAT_SVG['Other'];
-                const pct=Math.min(100,(item.quantity/(item.threshold*2))*100);
-                const barColor=status==='ok'?C.green:status==='warn'?C.warn:C.err;
+                const status = getStatus(item.quantity, item.threshold);
+                const isItemOpen = expandedId === item.id;
+                const pct = Math.min(100,(item.quantity/(item.threshold*2))*100);
+                const barColor = status==='ok'?C.green:status==='warn'?C.warn:C.err;
                 const isLast = idx === catItems.length - 1;
                 return (
-                  <div key={item.id} style={{background:C.white, borderRadius: isLast?'0 0 14px 14px':0, padding:'12px 16px', borderLeft:`1px solid ${C.border}`, borderRight:`1px solid ${C.border}`, borderBottom:`1px solid ${C.border}`, cursor:'pointer'}}
-                    onClick={()=>setExpandedId(isItemOpen?'__cat__'+cat:'__item__'+item.id)}>
+                  <div key={item.id}
+                    style={{background:C.white, borderRadius:isLast?'0 0 14px 14px':0, padding:'12px 16px', borderLeft:`1px solid ${C.border}`, borderRight:`1px solid ${C.border}`, borderBottom:`1px solid ${C.border}`, borderTop:`1px solid ${C.border}`, cursor:'pointer', marginTop:-1}}
+                    onClick={(e)=>{ e.stopPropagation(); setExpandedId(isItemOpen?null:item.id); }}
+                  >
                     <div style={{display:'flex',alignItems:'center',gap:12}}>
                       <div style={{flex:1,minWidth:0}}>
-                        <div style={{display:'flex',alignItems:'center',gap:6}}>
+                        <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                           <p style={s.itemName}>{item.name}</p>
                           {item.code&&<span style={s.codePill}>#{item.code}</span>}
                         </div>
@@ -549,32 +550,28 @@ export default function Inventory({ role='staff', userName='' }) {
                       <span style={s.badge(status)}>{STATUS_CONFIG[status].label}</span>
                     </div>
 
-                    {isItemOpen&&(
-                      <div style={{marginTop:12,paddingTop:12,borderTop:`1px solid ${C.border}`}}>
+                    {isItemOpen && (
+                      <div style={{marginTop:12,paddingTop:12,borderTop:`1px solid ${C.border}`}} onClick={e=>e.stopPropagation()}>
                         {item.notes&&<p style={{fontSize:12,color:C.muted,marginBottom:8}}>{item.notes}</p>}
                         <p style={{fontSize:11,color:C.muted,marginBottom:6}}>Alert threshold: {item.threshold} {item.unit}</p>
                         <div style={s.progressLbl}><span>Stock level</span><span>{item.quantity} / {item.threshold*2} {item.unit}</span></div>
                         <div style={s.progressBg}><div style={{height:'100%',width:`${pct}%`,background:barColor,borderRadius:3,transition:'width 0.4s'}}/></div>
-                        {/* Who added/edited */}
-                        {(item.addedBy||item.editedBy) && (
+                        {(item.addedBy||item.editedBy)&&(
                           <div style={{fontSize:10.5,color:C.muted,marginBottom:8,display:'flex',gap:10,flexWrap:'wrap'}}>
                             {item.addedBy&&<span>Added by: <b style={{color:C.terra}}>{item.addedBy}</b></span>}
-                            {item.editedBy&&<span>Last edited by: <b style={{color:C.terra}}>{item.editedBy}</b></span>}
+                            {item.editedBy&&<span>Last edited: <b style={{color:C.terra}}>{item.editedBy}</b></span>}
                           </div>
                         )}
                         <div style={s.actions}>
-                          <button
-                            style={{...s.actionBtn('restock'), ...(accessToken?{}:{opacity:0.45,cursor:'not-allowed'})}}
-                            onClick={(e)=>{ e.stopPropagation(); if(accessToken) openRestock(item,e); }}
+                          <button style={{...s.actionBtn('restock'),...(accessToken?{}:{opacity:0.45,cursor:'not-allowed'})}}
+                            onClick={(e)=>{e.stopPropagation();if(accessToken)openRestock(item,e);}}
                           >{accessToken?IC.upload:IC.lock} Restock</button>
-                          <button
-                            style={{...s.actionBtn('edit'), ...(accessToken?{}:{opacity:0.45,cursor:'not-allowed'})}}
-                            onClick={(e)=>{ e.stopPropagation(); if(accessToken) openEdit(item); }}
+                          <button style={{...s.actionBtn('edit'),...(accessToken?{}:{opacity:0.45,cursor:'not-allowed'})}}
+                            onClick={(e)=>{e.stopPropagation();if(accessToken)openEdit(item);}}
                           >{accessToken?IC.edit:IC.lock} Edit</button>
-                          <button
-                            style={{...s.actionBtn('danger'), ...(accessToken?{}:{opacity:0.45,cursor:'not-allowed'})}}
-                            onClick={(e)=>{ e.stopPropagation(); if(accessToken) handleDelete(item); }}
-                          >{IC.trash} {String(role||'').trim().toLowerCase()==='manager'?'Delete':'Report'}</button>
+                          <button style={{...s.actionBtn('danger'),...(accessToken?{}:{opacity:0.45,cursor:'not-allowed'})}}
+                            onClick={(e)=>{e.stopPropagation();if(accessToken)handleDelete(item);}}
+                          >{IC.trash} Delete</button>
                         </div>
                         {item.updatedAt?.toDate&&<div style={s.syncTag}>Updated: {item.updatedAt.toDate().toLocaleString('en-PH')}</div>}
                       </div>
