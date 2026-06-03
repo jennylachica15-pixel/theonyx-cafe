@@ -153,6 +153,13 @@ export default function Attendance({ role, userName }) {
   const [summaryRows, setSummaryRows] = useState([]);
   const [summaryStats, setSummaryStats] = useState({ worked: 0, rest: 0, salary: 0 });
 
+  // notifications (manager only)
+  const [notifications, setNotifications] = useState([]);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [photoViewer, setPhotoViewer] = useState(null); // { url, docId, field, driveId }
+  const [deletingPhoto, setDeletingPhoto] = useState(false);
+  const prevRecordsRef = useRef({});
+
   // rest days
   const [restDays, setRestDays] = useState([]);
   const [restDate, setRestDate] = useState('');
@@ -203,6 +210,26 @@ export default function Attendance({ role, userName }) {
     });
     return () => unsub();
   }, [today]);
+
+  // ── Notification: fire when new clock-in/out detected (manager only) ──
+  useEffect(() => {
+    if (role !== 'manager') return;
+    const prev = prevRecordsRef.current;
+    Object.entries(firestoreRecords).forEach(([staff, rec]) => {
+      const p = prev[staff] || {};
+      // New clock-in
+      if (rec.timeIn && !p.timeIn) {
+        setNotifications(n => [{ id: Date.now() + staff + 'IN', staff, type: 'IN', time: rec.timeIn, photoId: rec.photoInId, read: false }, ...n]);
+        setNotifOpen(true);
+      }
+      // New clock-out
+      if (rec.timeOut && !p.timeOut) {
+        setNotifications(n => [{ id: Date.now() + staff + 'OUT', staff, type: 'OUT', time: rec.timeOut, photoId: rec.photoOutId, read: false }, ...n]);
+        setNotifOpen(true);
+      }
+    });
+    prevRecordsRef.current = firestoreRecords;
+  }, [firestoreRecords, role]);
 
   // ── Rest days listener ──
   useEffect(() => {
@@ -318,6 +345,27 @@ export default function Attendance({ role, userName }) {
     setLoading(false);
   };
 
+  // ── Delete selfie from Drive + clear from Firestore ──
+  const deletePhoto = async (driveId, docId, field) => {
+    if (!accessToken || !driveId) return;
+    setDeletingPhoto(true);
+    try {
+      await fetch(`https://www.googleapis.com/drive/v3/files/${driveId}`, {
+        method: 'DELETE', headers: { Authorization: `Bearer ${accessToken}` }
+      });
+      await updateDoc(doc(db, 'attendance', docId), { [field]: null });
+      setPhotoViewer(null);
+    } catch (e) { console.error(e); }
+    setDeletingPhoto(false);
+  };
+
+  // Drive thumbnail URL (requires connected token)
+  const driveThumb = (fileId) => fileId
+    ? `https://drive.google.com/thumbnail?id=${fileId}&sz=w400`
+    : null;
+
+  const unreadCount = notifications.filter(n => !n.read).length;
+
   // ── Summary: reads from Firestore for speed, falls back to Sheets ──
   const openSummary = async () => {
     if (!accessToken) { setError('Connect to record log first to view the summary.'); return; }
@@ -395,6 +443,15 @@ export default function Attendance({ role, userName }) {
           : <div style={s.connectedBadge}>{Ic.check} Log connected</div>
         }
         <button style={{ ...s.smallBtn, ...s.summaryBtn }} onClick={openSummary}>{Ic.list} Summary</button>
+        {role === 'manager' && (
+          <button onClick={() => { setNotifOpen(true); setNotifications(n => n.map(x => ({ ...x, read: true }))); }}
+            style={{ position: 'relative', padding: '9px 13px', borderRadius: 10, fontSize: 18, background: unreadCount > 0 ? C.gold : C.white, color: unreadCount > 0 ? C.white : C.muted, border: `1px solid ${C.border}`, cursor: 'pointer', lineHeight: 1 }}>
+            🔔
+            {unreadCount > 0 && (
+              <span style={{ position: 'absolute', top: -4, right: -4, background: C.err, color: '#fff', borderRadius: '50%', width: 16, height: 16, fontSize: 9, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{unreadCount}</span>
+            )}
+          </button>
+        )}
       </div>
 
       {/* Real-time sync indicator */}
@@ -442,6 +499,38 @@ export default function Attendance({ role, userName }) {
               }
             </>
           )}
+        </div>
+      )}
+
+      {/* Manager: today's selfie cards */}
+      {role === 'manager' && accessToken && STAFF_LIST.some(n => firestoreRecords[n]?.photoInId || firestoreRecords[n]?.photoOutId) && (
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 700, marginBottom: 8 }}>Today's Selfies</div>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            {STAFF_LIST.map(name => {
+              const r = firestoreRecords[name] || {};
+              if (!r.photoInId && !r.photoOutId) return null;
+              return (
+                <div key={name} style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 14, padding: '12px', flex: 1, minWidth: 140 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: C.ink, marginBottom: 8 }}>{name}</div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    {r.photoInId && (
+                      <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => setPhotoViewer({ url: driveThumb(r.photoInId), driveId: r.photoInId, docId: r.docId, field: 'photoInId', staff: name, label: 'Clock In' })}>
+                        <img src={driveThumb(r.photoInId)} alt="clock-in" style={{ width: '100%', borderRadius: 8, objectFit: 'cover', aspectRatio: '1/1' }} onError={e => { e.target.style.display='none'; }} />
+                        <div style={{ fontSize: 9.5, color: C.green, fontWeight: 700, textAlign: 'center', marginTop: 3 }}>IN {r.timeIn ? r.timeIn.slice(0,8) : ''}</div>
+                      </div>
+                    )}
+                    {r.photoOutId && (
+                      <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => setPhotoViewer({ url: driveThumb(r.photoOutId), driveId: r.photoOutId, docId: r.docId, field: 'photoOutId', staff: name, label: 'Clock Out' })}>
+                        <img src={driveThumb(r.photoOutId)} alt="clock-out" style={{ width: '100%', borderRadius: 8, objectFit: 'cover', aspectRatio: '1/1' }} onError={e => { e.target.style.display='none'; }} />
+                        <div style={{ fontSize: 9.5, color: C.terra, fontWeight: 700, textAlign: 'center', marginTop: 3 }}>OUT {r.timeOut ? r.timeOut.slice(0,8) : ''}</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -565,6 +654,73 @@ export default function Attendance({ role, userName }) {
                   </table>
                 )
             }
+          </div>
+        </div>
+      )}
+
+      {/* Notification modal (manager) */}
+      {notifOpen && role === 'manager' && (
+        <div style={s.modal} onClick={() => setNotifOpen(false)}>
+          <div style={s.modalCard} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700, color: C.ink }}>🔔 Notifications</div>
+              <button onClick={() => setNotifOpen(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4, lineHeight: 0 }}>{Ic.close}</button>
+            </div>
+            {notifications.length === 0 ? (
+              <div style={{ fontSize: 13, color: C.muted, textAlign: 'center', padding: '20px 0' }}>No notifications yet.</div>
+            ) : (
+              notifications.map(n => (
+                <div key={n.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px', borderRadius: 12, marginBottom: 8, background: n.read ? C.cream : '#fff8e8', border: `1px solid ${n.read ? C.border : '#f0d090'}` }}>
+                  {n.photoId && accessToken ? (
+                    <img src={driveThumb(n.photoId)} alt="selfie"
+                      style={{ width: 52, height: 52, borderRadius: 10, objectFit: 'cover', flexShrink: 0, cursor: 'pointer', border: `2px solid ${C.gold}` }}
+                      onClick={() => { setPhotoViewer({ url: driveThumb(n.photoId), driveId: n.photoId, docId: firestoreRecords[n.staff]?.docId, field: n.type === 'IN' ? 'photoInId' : 'photoOutId', staff: n.staff, label: `Clock ${n.type}` }); setNotifOpen(false); }}
+                      onError={e => { e.target.style.display='none'; }}
+                    />
+                  ) : (
+                    <div style={{ width: 52, height: 52, borderRadius: 10, background: C.soft, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>👤</div>
+                  )}
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: C.ink }}>{n.staff}</div>
+                    <div style={{ fontSize: 12, color: n.type === 'IN' ? C.green : C.terra, fontWeight: 600 }}>
+                      Clocked {n.type === 'IN' ? 'In' : 'Out'} at {n.time}
+                    </div>
+                  </div>
+                  {!n.read && <span style={{ width: 8, height: 8, borderRadius: '50%', background: C.gold, flexShrink: 0 }} />}
+                </div>
+              ))
+            )}
+            {notifications.length > 0 && (
+              <button onClick={() => setNotifications([])} style={{ width: '100%', marginTop: 8, padding: '10px', borderRadius: 10, background: 'transparent', border: `1px solid ${C.border}`, color: C.muted, fontSize: 12, cursor: 'pointer' }}>
+                Clear all
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Photo viewer modal (manager) */}
+      {photoViewer && role === 'manager' && (
+        <div style={s.modal} onClick={() => setPhotoViewer(null)}>
+          <div style={s.modalCard} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: 15, fontWeight: 700, color: C.ink }}>{photoViewer.staff} — {photoViewer.label}</div>
+                <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>Tap image to zoom · Manager only</div>
+              </div>
+              <button onClick={() => setPhotoViewer(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4, lineHeight: 0 }}>{Ic.close}</button>
+            </div>
+            <img src={photoViewer.url} alt="selfie"
+              style={{ width: '100%', borderRadius: 14, objectFit: 'cover', maxHeight: 340, marginBottom: 14 }}
+              onError={e => { e.target.src = ''; e.target.alt = 'Image unavailable'; }}
+            />
+            <button
+              onClick={() => deletePhoto(photoViewer.driveId, photoViewer.docId, photoViewer.field)}
+              disabled={deletingPhoto || !photoViewer.driveId}
+              style={{ width: '100%', padding: '13px', borderRadius: 11, background: deletingPhoto ? C.soft : C.errBg, color: C.err, border: `1.5px solid ${C.errBorder}`, fontSize: 14, fontWeight: 700, cursor: deletingPhoto ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              {Ic.warn} {deletingPhoto ? 'Deleting…' : 'Delete this photo'}
+            </button>
+            <button onClick={() => setPhotoViewer(null)} style={s.cancelBtn}>Close</button>
           </div>
         </div>
       )}
