@@ -243,12 +243,10 @@ function CleanlinessReviews({ role, userName }) {
               </div>
               <span style={{ fontSize: 11, color: '#2a6000', background: '#f0fce8', border: '1px solid #cfe0b0', borderRadius: 20, padding: '3px 9px', whiteSpace: 'nowrap' }}>{(c.checkedItems?.length || 0)} of {total || (c.checkedItems?.length || 0)}</span>
             </div>
-
             {c.checkedItems?.length > 0 && (
               <div style={{ fontSize: 11, color: '#a07850', marginTop: 8, lineHeight: 1.5 }}>{c.checkedItems.join(', ')}</div>
             )}
             {c.notes && <div style={{ fontSize: 11.5, color: '#5a3a1a', marginTop: 6, fontStyle: 'italic' }}>Staff note: {c.notes}</div>}
-
             {photoIds.length > 0 && (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
                 {photoIds.map(id => {
@@ -263,14 +261,12 @@ function CleanlinessReviews({ role, userName }) {
                   ) : (
                     <a key={id} href={v} target="_blank" rel="noreferrer"
                       style={{ fontSize: 11, color: '#c8943a', background: '#fff8f0', border: '1px solid #f0e8d8', borderRadius: 7, padding: '4px 9px', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#c8943a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
                       {labelFor(id)}
                     </a>
                   );
                 })}
               </div>
             )}
-
             {role === 'manager' ? (
               <div style={{ marginTop: 12, borderTop: '1px solid #f0e8d8', paddingTop: 12 }}>
                 <div style={{ fontSize: 11, color: '#a07850', marginBottom: 6 }}>Is the area really clean?</div>
@@ -345,7 +341,6 @@ function CleanlinessPanel({ role, userName }) {
   );
 }
 
-// ─── BIBLE VERSES NIV ────────────────────────────────────────────────────────
 const VERSES = [
   { text: "I can do all this through him who gives me strength.", ref: "Philippians 4:13" },
   { text: "The Lord is my shepherd, I lack nothing.", ref: "Psalm 23:1" },
@@ -385,7 +380,6 @@ function getDailyVerse() {
   return VERSES[day % VERSES.length];
 }
 
-// ─── MAIN ADMIN APP ──────────────────────────────────────────────────────────
 export default function AdminApp({ user, onSignOut }) {
   const [activeTab, setActiveTab] = useState(null);
   const [role, setRole] = useState('staff');
@@ -401,7 +395,18 @@ export default function AdminApp({ user, onSignOut }) {
     const fetchUser = async () => {
       try {
         const snap = await getDoc(doc(db, 'users', user.uid));
-        if (snap.exists()) { setRole(snap.data().role || 'staff'); setUserName(snap.data().name || ''); }
+        if (snap.exists()) {
+          setRole(snap.data().role || 'staff');
+          // ── FIX: use name field, fallback to email prefix if name not set ──
+          const name = snap.data().name || '';
+          if (name) {
+            setUserName(name);
+          } else if (user.email) {
+            // e.g. "kelly@theonyxcafe.com" → "kelly" → capitalise → "Kelly"
+            const prefix = user.email.split('@')[0];
+            setUserName(prefix.charAt(0).toUpperCase() + prefix.slice(1));
+          }
+        }
       } catch { setRole('staff'); }
     };
     fetchUser();
@@ -491,7 +496,6 @@ export default function AdminApp({ user, onSignOut }) {
       <div style={S.content}>
         {!activeTab ? (
           <div style={{ paddingBottom: 32 }}>
-            {/* Greeting + time + daily verse — one card */}
             <div style={{ padding: '14px 18px 16px', background: '#fff8f0', borderBottom: '1px solid #f0e8d8' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div style={{ fontSize: 13, color: '#a07850' }}>
@@ -513,13 +517,12 @@ export default function AdminApp({ user, onSignOut }) {
               </div>
             </div>
 
-            {/* Main panels */}
             <div style={{ padding: '16px 16px 8px' }}>
               <div style={{ fontSize: 10, color: '#a07850', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>Panels</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 {mainPanels.map(p => (
                   <div key={p.id} onClick={() => setActiveTab(p.id)}
-                    style={{ background: '#fff', border: '1px solid #f0e8d8', borderRadius: 14, padding: '16px 14px', cursor: 'pointer', transition: 'border-color 0.15s' }}
+                    style={{ background: '#fff', border: '1px solid #f0e8d8', borderRadius: 14, padding: '16px 14px', cursor: 'pointer' }}
                     onMouseOver={e => e.currentTarget.style.borderColor = '#c8943a'}
                     onMouseOut={e => e.currentTarget.style.borderColor = '#f0e8d8'}>
                     <div style={{ width: 36, height: 36, background: '#fff8f0', border: '1px solid #f0e8d8', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
@@ -532,7 +535,6 @@ export default function AdminApp({ user, onSignOut }) {
               </div>
             </div>
 
-            {/* More panels */}
             <div style={{ padding: '4px 16px 8px' }}>
               <div style={{ fontSize: 10, color: '#a07850', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>More</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
@@ -542,7 +544,7 @@ export default function AdminApp({ user, onSignOut }) {
                     : p.id === 'cleanliness' && cleanlinessAlert ? '!' : null;
                   return (
                     <div key={p.id} onClick={() => setActiveTab(p.id)}
-                      style={{ background: '#fff8f0', border: `1px solid ${badge ? '#ffb74d' : '#f0e8d8'}`, borderRadius: 10, padding: '11px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, transition: 'border-color 0.15s', position: 'relative' }}
+                      style={{ background: '#fff8f0', border: `1px solid ${badge ? '#ffb74d' : '#f0e8d8'}`, borderRadius: 10, padding: '11px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, position: 'relative' }}
                       onMouseOver={e => e.currentTarget.style.borderColor = '#c8943a'}
                       onMouseOut={e => e.currentTarget.style.borderColor = badge ? '#ffb74d' : '#f0e8d8'}>
                       <div style={{ width: 30, height: 30, background: '#fff', border: '1px solid #f0e8d8', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -583,7 +585,7 @@ export default function AdminApp({ user, onSignOut }) {
             <div style={{ flex: 1, overflowY: 'auto' }}>
               {activeTab === 'attendance'  && <Attendance role={role} userName={userName} />}
               {activeTab === 'orders'      && <Orders userName={userName} />}
-              {activeTab === 'inventory'   && <Inventory />}
+              {activeTab === 'inventory'   && <Inventory role={role} userName={userName} />}
               {activeTab === 'approvals'   && <Approvals role={role} />}
               {activeTab === 'reports'     && <Reports />}
               {activeTab === 'menu'        && role === 'manager' && <MenuManager />}
