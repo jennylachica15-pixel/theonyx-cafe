@@ -90,8 +90,8 @@ const CAT_SVG = {
 
 // ── Styles ──
 const s = {
-  page:       { padding:'16px 16px 0', fontFamily:"var(--font-display,'-apple-system')" },
-  title:      { fontFamily:'var(--font-display)', fontSize:22, fontWeight:700, color:C.ink, letterSpacing:'-0.3px', marginBottom:2 },
+  page:       { padding:'16px 16px 0', fontFamily:"-apple-system,'SF Pro Display','Helvetica Neue',sans-serif" },
+  title:      { fontSize:24, fontWeight:700, color:C.ink, letterSpacing:'-0.5px', marginBottom:2, fontFamily:"-apple-system,'SF Pro Display','Helvetica Neue',sans-serif" },
   sub:        { fontSize:13, color:C.muted, marginBottom:16 },
   statsRow:   { display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:14 },
   statCard:   { background:C.white, borderRadius:14, padding:'14px 10px', textAlign:'center', border:`1px solid ${C.border}` },
@@ -101,13 +101,13 @@ const s = {
   connBadge:  { background:C.greenBg, color:C.green, borderRadius:10, padding:'9px 14px', fontSize:12, fontWeight:600, marginBottom:12, display:'flex', alignItems:'center', gap:7, border:`1px solid ${C.greenBd}` },
   btnRow:     { display:'flex', gap:8, marginBottom:10 },
   // active buttons (connected)
-  addBtn:     { flex:1, padding:'14px', borderRadius:14, background:C.ink, color:C.white, fontSize:14, fontWeight:600, display:'flex', alignItems:'center', justifyContent:'center', gap:8, border:'none', cursor:'pointer' },
-  receiptBtn: { flex:1, padding:'14px', borderRadius:14, background:C.white, color:C.ink, fontSize:14, fontWeight:600, display:'flex', alignItems:'center', justifyContent:'center', gap:8, border:`1.5px solid ${C.ink}`, cursor:'pointer' },
+  addBtn:     { flex:1, padding:'14px', borderRadius:14, background:'#f5ede2', color:C.terra, fontSize:14, fontWeight:600, display:'flex', alignItems:'center', justifyContent:'center', gap:8, border:`1.5px solid ${C.border}`, cursor:'pointer' },
+  receiptBtn: { flex:1, padding:'14px', borderRadius:14, background:'#f5ede2', color:C.terra, fontSize:14, fontWeight:600, display:'flex', alignItems:'center', justifyContent:'center', gap:8, border:`1.5px solid ${C.border}`, cursor:'pointer' },
   // disabled buttons (not connected)
   addBtnOff:  { flex:1, padding:'14px', borderRadius:14, background:C.soft, color:C.disabled, fontSize:14, fontWeight:600, display:'flex', alignItems:'center', justifyContent:'center', gap:8, border:`1px solid ${C.border}`, cursor:'not-allowed' },
   receiptOff: { flex:1, padding:'14px', borderRadius:14, background:C.soft, color:C.disabled, fontSize:14, fontWeight:600, display:'flex', alignItems:'center', justifyContent:'center', gap:8, border:`1px solid ${C.border}`, cursor:'not-allowed' },
   lockNote:   { background:C.errBg, border:`1px solid ${C.errBd}`, borderRadius:10, padding:'10px 13px', fontSize:12.5, color:C.err, display:'flex', alignItems:'center', gap:7, marginBottom:10, fontWeight:500 },
-  reviewBtn:  (p)=>({ width:'100%', padding:'11px', borderRadius:12, background:p?C.warnBg:C.white, color:p?C.warn:C.muted, fontSize:13, fontWeight:600, marginBottom:14, display:'flex', alignItems:'center', justifyContent:'center', gap:8, border:'1.5px solid', borderColor:p?C.warnBd:C.border, cursor:'pointer' }),
+  reviewBtn:  (p)=>({ width:'100%', padding:'11px', borderRadius:12, background:p?'#fbeede':'#f5ede2', color:p?C.warn:C.terra, fontSize:13, fontWeight:600, marginBottom:14, display:'flex', alignItems:'center', justifyContent:'center', gap:8, border:'1.5px solid', borderColor:p?C.warnBd:C.border, cursor:'pointer' }),
   pendCount:  { background:C.gold, color:C.white, borderRadius:10, minWidth:18, height:18, padding:'0 5px', fontSize:11, fontWeight:700, display:'inline-flex', alignItems:'center', justifyContent:'center' },
   searchWrap: { position:'relative', marginBottom:12 },
   searchIcon: { position:'absolute', left:13, top:'50%', transform:'translateY(-50%)', color:C.muted, display:'flex', pointerEvents:'none' },
@@ -125,15 +125,15 @@ const s = {
   badge:      (st)=>({ padding:'4px 10px', borderRadius:20, fontSize:11, fontWeight:700, background:STATUS_CONFIG[st].bg, color:STATUS_CONFIG[st].color, flexShrink:0, textTransform:'uppercase', letterSpacing:'0.2px' }),
   actions:    { display:'flex', gap:7, marginTop:4 },
   actionBtn:  (v)=>({ flex:1, padding:'8px 6px', borderRadius:10, fontSize:12, fontWeight:600, border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:5,
-    background: v==='danger'?C.errBg:v==='restock'?C.greenBg:C.soft,
-    color:      v==='danger'?C.err:v==='restock'?C.green:C.terra }),
+    background: v==='danger'?C.errBg:'#f5ede2',
+    color:      v==='danger'?C.err:'#8a5a2b' }),
   modal:      { position:'fixed', inset:0, background:'rgba(26,10,0,0.6)', zIndex:200, display:'flex', alignItems:'flex-end', justifyContent:'center' },
   modalCard:  { background:C.cream, borderRadius:'20px 20px 0 0', padding:'28px 22px 42px', width:'100%', maxWidth:480, animation:'slideUp 0.3s ease', maxHeight:'90vh', overflowY:'auto' },
   modalTitle: { fontSize:20, fontWeight:700, marginBottom:20, color:C.ink, display:'flex', alignItems:'center', gap:8 },
   label:      { display:'block', fontSize:11, fontWeight:700, color:C.muted, marginBottom:5, textTransform:'uppercase', letterSpacing:'0.6px' },
   input:      { width:'100%', padding:'12px 14px', borderRadius:11, border:`1.5px solid ${C.border}`, fontSize:14, background:C.white, color:C.ink, marginBottom:14, outline:'none', boxSizing:'border-box', fontFamily:'inherit' },
   row2:       { display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 },
-  saveBtn:    { width:'100%', padding:'14px', borderRadius:13, background:C.ink, color:C.white, fontSize:15, fontWeight:700, marginTop:4, border:'none', cursor:'pointer' },
+  saveBtn:    { width:'100%', padding:'14px', borderRadius:13, background:C.gold, color:C.white, fontSize:15, fontWeight:700, marginTop:4, border:'none', cursor:'pointer' },
   cancelBtn:  { width:'100%', padding:'13px', borderRadius:13, background:C.white, color:C.muted, fontSize:14, fontWeight:500, marginTop:8, border:`1.5px solid ${C.border}`, cursor:'pointer' },
   infoBox:    { background:C.soft, borderRadius:12, padding:'12px 14px', marginBottom:14, border:`1px solid ${C.border}` },
   prevBox:    { background:C.greenBg, borderRadius:11, padding:'11px 14px', marginBottom:14, fontSize:13, display:'flex', alignItems:'center', gap:6 },
@@ -232,7 +232,7 @@ async function deleteDriveFile(token,fileId) {
 
 // ── Main Component ──
 export default function Inventory({ role='staff', userName='' }) {
-  const isManager = String(role).toLowerCase()==='manager';
+  const isManager = String(role||'').trim().toLowerCase()==='manager';
 
   const [items,         setItems]         = useState([]);
   const [showModal,     setShowModal]     = useState(false);
