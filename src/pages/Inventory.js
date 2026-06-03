@@ -6,7 +6,9 @@ import {
 } from 'firebase/firestore';
 
 const SHEET_ID        = '1Gnr_6SBcUBY4GcDqvGpTUZgE8NI3OIZAzlusG5YPfQg';
-const SHEET_NAME      = 'Sheet1';
+const TAB_ITEMS       = 'Available Items';
+const TAB_RESTOCK     = 'Restocking Data';
+const TAB_EDITS       = 'Editing Data';
 const DRIVE_FOLDER_ID = '1kzXqUPvyDxZ1fH9quEevh2EwAH3VOIm_';
 const GOOGLE_CLIENT_ID= '596322682185-n5hm66hvol3nnqqllnuop995kcnefbgu.apps.googleusercontent.com';
 const SCOPES =
@@ -166,52 +168,111 @@ function genCode(existingItems) {
   do { code=String(Math.floor(1000+Math.random()*9000)); tries++; } while(used.has(code)&&tries<80);
   return code;
 }
-function buildItemRow(item) {
-  const status = getStatus(item.quantity, item.threshold);
-  const restock = (item.lastRestock!=null&&item.lastRestock!=='') ? `+${item.lastRestock} ${item.unit||''}${item.lastRestockNote?' — '+item.lastRestockNote:''}`.trim() : '';
-  return [String(item.code||''), item.name||'', item.category||'', item.quantity??'', item.unit||'', STATUS_CONFIG[status]?.label||status, item.threshold??'', restock, fmtDate(), item.notes||''];
-}
 
-// ── Sheet API ──
-async function sheetGetAll(token) {
-  const r = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${SHEET_NAME}!A:J`, { headers:{Authorization:`Bearer ${token}`} });
+// ── Sheet API — 3 separate tabs ──
+const API = (token, tab) => ({
+  base: `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}`,
+  headers: { Authorization:`Bearer ${token}`, 'Content-Type':'application/json' },
+  tab: encodeURIComponent(tab),
+});
+
+async function sheetGetTab(token, tab) {
+  const a = API(token, tab);
+  const r = await fetch(`${a.base}/values/${a.tab}!A:Z`, { headers:{ Authorization:`Bearer ${token}` } });
   return (await r.json()).values || [];
 }
-async function sheetUpdateRow(token, rowNumber, row) {
-  return fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${SHEET_NAME}!A${rowNumber}:J${rowNumber}?valueInputOption=USER_ENTERED`, {
-    method:'PUT', headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'}, body:JSON.stringify({values:[row]})
+
+async function sheetAppend(token, tab, row) {
+  const a = API(token, tab);
+  return fetch(`${a.base}/values/${a.tab}!A:Z:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, {
+    method:'POST', headers:a.headers, body:JSON.stringify({ values:[row] })
   });
 }
-async function sheetAppendRow(token, row) {
-  return fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${SHEET_NAME}!A:J:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, {
-    method:'POST', headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'}, body:JSON.stringify({values:[row]})
+
+async function sheetUpdateRow(token, tab, rowNum, row) {
+  const a = API(token, tab);
+  const cols = String.fromCharCode(64 + row.length);
+  return fetch(`${a.base}/values/${a.tab}!A${rowNum}:${cols}${rowNum}?valueInputOption=USER_ENTERED`, {
+    method:'PUT', headers:a.headers, body:JSON.stringify({ values:[row] })
   });
 }
-async function ensureHeaders(token) {
-  const vals = await sheetGetAll(token);
-  if (!vals.length||(vals[0]?.[0]||'')!=='Code') await sheetUpdateRow(token,1,SHEET_HEADERS);
+
+// Tab 1 — Available Items: upsert by Code ID (update in place or append new)
+// Columns: Code ID | Item | Category | Available Stock | Unit | Status | Threshold | Supplier | Encoded By | Date Encoded
+async function syncAvailableItem(token, item, encodedBy) {
+  const status = getStatus(item.quantity, item.threshold);
+  const row = [
+    String(item.code||''),
+    item.name||'',
+    item.category||'',
+    item.quantity??'',
+    item.unit||'',
+    STATUS_CONFIG[status]?.label||status,
+    item.threshold??'',
+    item.notes||'',
+    encodedBy||'',
+    fmtDate(),
+  ];
+  const vals = await sheetGetTab(token, TAB_ITEMS);
+  let idx = -1;
+  for(let i=1;i<vals.length;i++) { if(String(vals[i][0]||'')=== String(item.code)){idx=i;break;} }
+  if(idx===-1) await sheetAppend(token, TAB_ITEMS, row);
+  else          await sheetUpdateRow(token, TAB_ITEMS, idx+1, row);
 }
-async function upsertItemRow(token, code, row) {
-  const vals = await sheetGetAll(token);
-  let idx=-1;
-  for(let i=1;i<vals.length;i++) { if((vals[i][0]||'')===String(code)){idx=i;break;} }
-  if(idx===-1) await sheetAppendRow(token,row); else await sheetUpdateRow(token,idx+1,row);
+
+// Tab 2 — Restocking Data: always APPEND a new row (full restock log)
+// Columns: Code ID | Item | Category | Available Stock (before) | Unit | Restock Stock | Unit | Status After Restock | Threshold | Supplier | Restock Encoded By | Restock Date Encoded
+async function logRestock(token, item, added, newQty, encodedBy) {
+  const statusAfter = getStatus(newQty, item.threshold);
+  const row = [
+    String(item.code||''),
+    item.name||'',
+    item.category||'',
+    item.quantity??'',
+    item.unit||'',
+    added,
+    item.unit||'',
+    STATUS_CONFIG[statusAfter]?.label||statusAfter,
+    item.threshold??'',
+    item.notes||'',
+    encodedBy||'',
+    fmtDate(),
+  ];
+  await sheetAppend(token, TAB_RESTOCK, row);
 }
-async function getSheetGid(token) {
-  const r = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}?fields=sheets.properties(sheetId,title)`, {headers:{Authorization:`Bearer ${token}`}});
+
+// Tab 3 — Editing Data: always APPEND a new row (full edit log)
+// Columns: Code ID | Item | Category | Available Stock | Unit | Status | Threshold | Supplier | Edited By | Date Edited
+async function logEdit(token, item, editedBy) {
+  const status = getStatus(item.quantity, item.threshold);
+  const row = [
+    String(item.code||''),
+    item.name||'',
+    item.category||'',
+    item.quantity??'',
+    item.unit||'',
+    STATUS_CONFIG[status]?.label||status,
+    item.threshold??'',
+    item.notes||'',
+    editedBy||'',
+    fmtDate(),
+  ];
+  await sheetAppend(token, TAB_EDITS, row);
+}
+
+// Delete item row from Tab 1 by Code ID
+async function deleteAvailableItem(token, code) {
+  const r = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}?fields=sheets.properties(sheetId,title)`,{headers:{Authorization:`Bearer ${token}`}});
   const j = await r.json();
-  const sheet = (j.sheets||[]).find(sh=>sh.properties.title===SHEET_NAME);
-  return sheet?sheet.properties.sheetId:0;
-}
-async function deleteItemRow(token, code, gidRef) {
-  const vals = await sheetGetAll(token);
+  const sheet = (j.sheets||[]).find(sh=>sh.properties.title===TAB_ITEMS);
+  const gid = sheet?sheet.properties.sheetId:0;
+  const vals = await sheetGetTab(token, TAB_ITEMS);
   let idx=-1;
-  for(let i=1;i<vals.length;i++){if((vals[i][0]||'')===String(code)){idx=i;break;}}
+  for(let i=1;i<vals.length;i++){if(String(vals[i][0]||'')===String(code)){idx=i;break;}}
   if(idx===-1) return;
-  if(gidRef.current==null) gidRef.current=await getSheetGid(token);
   await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}:batchUpdate`,{
     method:'POST', headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},
-    body:JSON.stringify({requests:[{deleteDimension:{range:{sheetId:gidRef.current,dimension:'ROWS',startIndex:idx,endIndex:idx+1}}}]})
+    body:JSON.stringify({requests:[{deleteDimension:{range:{sheetId:gid,dimension:'ROWS',startIndex:idx,endIndex:idx+1}}}]})
   });
 }
 
@@ -260,8 +321,6 @@ export default function Inventory({ role='staff', userName='' }) {
   const [uploadingReceipt,setUploadingReceipt]=useState(false);
 
   const tokenClientRef  = React.useRef(null);
-  const gidRef          = React.useRef(null);
-  const headersReadyRef = React.useRef(false);
   const backfilledRef   = React.useRef(false);
   const fileInputRef    = React.useRef(null);
 
@@ -303,12 +362,10 @@ export default function Inventory({ role='staff', userName='' }) {
     })();
   },[items,loading]);
 
-  const syncUpsert=async(item)=>{
+  // Sync to Tab 1 (Available Items) — upsert by code
+  const syncAvailable=async(item, encodedBy)=>{
     if(!accessToken) return;
-    try{
-      if(!headersReadyRef.current){await ensureHeaders(accessToken);headersReadyRef.current=true;}
-      await upsertItemRow(accessToken,item.code,buildItemRow(item));
-    }catch(e){console.error('Sheet upsert:',e);}
+    try{ await syncAvailableItem(accessToken, item, encodedBy); }catch(e){ console.error('Tab1 sync:',e); }
   };
 
   const openAdd=()=>{
@@ -324,18 +381,23 @@ export default function Inventory({ role='staff', userName='' }) {
     if(!form.name||form.quantity==='') return;
     setSyncing(true);
     const qty=Number(form.quantity), thresh=Number(form.threshold)||5;
+    const who=userName||'Unknown';
     try{
       if(editId){
+        // Edit existing item
         const existing=items.find(i=>i.id===editId)||{};
         const code=existing.code||genCode(items);
-        const data={name:form.name,category:form.category,quantity:qty,unit:form.unit,threshold:thresh,notes:form.notes,code,editedBy:userName||'Unknown',updatedAt:serverTimestamp()};
+        const data={name:form.name,category:form.category,quantity:qty,unit:form.unit,threshold:thresh,notes:form.notes,code,editedBy:who,updatedAt:serverTimestamp()};
         await updateDoc(doc(db,'inventory',editId),data);
-        await syncUpsert({...existing,...data});
+        const merged={...existing,...data};
+        await syncAvailable(merged, existing.addedBy||who);  // Tab 1: update row
+        try{ await logEdit(accessToken, merged, who); }catch(e){ console.error('Tab3:',e); } // Tab 3: append log
       }else{
+        // New item
         const code=genCode(items);
-        const data={name:form.name,category:form.category,quantity:qty,unit:form.unit,threshold:thresh,notes:form.notes,code,lastRestock:null,lastRestockNote:'',addedBy:userName||'Unknown',editedBy:null,createdAt:serverTimestamp(),updatedAt:serverTimestamp()};
+        const data={name:form.name,category:form.category,quantity:qty,unit:form.unit,threshold:thresh,notes:form.notes,code,lastRestock:null,lastRestockNote:'',addedBy:who,editedBy:null,createdAt:serverTimestamp(),updatedAt:serverTimestamp()};
         const ref=await addDoc(collection(db,'inventory'),data);
-        await syncUpsert({id:ref.id,...data});
+        await syncAvailable({id:ref.id,...data}, who);  // Tab 1: new row
       }
     }catch(e){console.error(e);}
     setSyncing(false); setShowModal(false);
@@ -346,7 +408,7 @@ export default function Inventory({ role='staff', userName='' }) {
     setSyncing(true);
     try{
       await deleteDoc(doc(db,'inventory',item.id));
-      if(accessToken&&item.code) await deleteItemRow(accessToken,item.code,gidRef);
+      if(accessToken&&item.code) await deleteAvailableItem(accessToken, item.code); // Tab 1: remove row
     }catch(e){console.error(e);}
     setSyncing(false);
   };
@@ -357,10 +419,13 @@ export default function Inventory({ role='staff', userName='' }) {
     if(!restockItem||!restockQty||Number(restockQty)<=0) return;
     setSyncing(true);
     const added=Number(restockQty), newQty=(restockItem.quantity||0)+added;
+    const who=userName||'Unknown';
     try{
-      const data={quantity:newQty,lastRestock:added,lastRestockNote:(restockNote||''),lastRestockAt:serverTimestamp(),editedBy:userName||'Unknown',updatedAt:serverTimestamp()};
+      const data={quantity:newQty,lastRestock:added,lastRestockNote:(restockNote||''),lastRestockAt:serverTimestamp(),editedBy:who,updatedAt:serverTimestamp()};
       await updateDoc(doc(db,'inventory',restockItem.id),data);
-      await syncUpsert({...restockItem,...data});
+      const merged={...restockItem,...data};
+      await syncAvailable(merged, restockItem.addedBy||who);          // Tab 1: update qty + status
+      try{ await logRestock(accessToken, restockItem, added, newQty, who); }catch(e){ console.error('Tab2:',e); } // Tab 2: append restock log
     }catch(e){console.error(e);}
     setSyncing(false); setShowRestock(false); setExpandedId(null);
   };
