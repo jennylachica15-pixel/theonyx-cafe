@@ -498,28 +498,39 @@ export default function Attendance({ role, userName }) {
         </div>
       )}
 
-      {/* Manager: today's selfie cards */}
-      {role === 'manager' && STAFF_LIST.some(n => firestoreRecords[n]?.photoInData || firestoreRecords[n]?.photoOutData) && (
+      {/* Manager: today's staff status + selfie cards */}
+      {role === 'manager' && STAFF_LIST.some(n => firestoreRecords[n]?.timeIn) && (
         <div style={{ marginBottom: 14 }}>
           <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 700, marginBottom: 8 }}>Today's Selfies</div>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             {STAFF_LIST.map(name => {
               const r = firestoreRecords[name] || {};
-              if (!r.photoInData && !r.photoOutData) return null;
+              if (!r.timeIn) return null;
+              const noPhoto = { width: '100%', aspectRatio: '1/1', borderRadius: 8, background: C.soft, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28 };
               return (
                 <div key={name} style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 14, padding: '12px', flex: 1, minWidth: 140 }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: C.ink, marginBottom: 8 }}>{name}</div>
                   <div style={{ display: 'flex', gap: 8 }}>
-                    {r.photoInData && (
-                      <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => setPhotoViewer({ url: r.photoInData, docId: r.docId, field: 'photoInData', staff: name, label: 'Clock In' })}>
-                        <img src={r.photoInData} alt="clock-in" style={{ width: '100%', borderRadius: 8, objectFit: 'cover', aspectRatio: '1/1' }} />
-                        <div style={{ fontSize: 9.5, color: C.green, fontWeight: 700, textAlign: 'center', marginTop: 3 }}>IN {r.timeIn ? r.timeIn.slice(0,8) : ''}</div>
-                      </div>
-                    )}
-                    {r.photoOutData && (
-                      <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => setPhotoViewer({ url: r.photoOutData, docId: r.docId, field: 'photoOutData', staff: name, label: 'Clock Out' })}>
-                        <img src={r.photoOutData} alt="clock-out" style={{ width: '100%', borderRadius: 8, objectFit: 'cover', aspectRatio: '1/1' }} />
-                        <div style={{ fontSize: 9.5, color: C.terra, fontWeight: 700, textAlign: 'center', marginTop: 3 }}>OUT {r.timeOut ? r.timeOut.slice(0,8) : ''}</div>
+                    {/* Clock In photo */}
+                    <div style={{ flex: 1 }}>
+                      {r.photoInData
+                        ? <div style={{ cursor: 'pointer' }} onClick={() => setPhotoViewer({ url: r.photoInData, docId: r.docId, field: 'photoInData', staff: name, label: 'Clock In' })}>
+                            <img src={r.photoInData} alt="clock-in" style={{ width: '100%', borderRadius: 8, objectFit: 'cover', aspectRatio: '1/1' }} />
+                          </div>
+                        : <div style={noPhoto}>👤</div>
+                      }
+                      <div style={{ fontSize: 9.5, color: C.green, fontWeight: 700, textAlign: 'center', marginTop: 3 }}>IN {r.timeIn ? r.timeIn.slice(0,8) : ''}</div>
+                    </div>
+                    {/* Clock Out photo — only if clocked out */}
+                    {r.timeOut && (
+                      <div style={{ flex: 1 }}>
+                        {r.photoOutData
+                          ? <div style={{ cursor: 'pointer' }} onClick={() => setPhotoViewer({ url: r.photoOutData, docId: r.docId, field: 'photoOutData', staff: name, label: 'Clock Out' })}>
+                              <img src={r.photoOutData} alt="clock-out" style={{ width: '100%', borderRadius: 8, objectFit: 'cover', aspectRatio: '1/1' }} />
+                            </div>
+                          : <div style={noPhoto}>👤</div>
+                        }
+                        <div style={{ fontSize: 9.5, color: C.terra, fontWeight: 700, textAlign: 'center', marginTop: 3 }}>OUT {r.timeOut.slice(0,8)}</div>
                       </div>
                     )}
                   </div>
