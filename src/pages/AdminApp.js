@@ -39,7 +39,10 @@ function CleanlinessCheck({ userName }) {
     setPhotos(prev => ({ ...prev, [itemId]: { file, url: URL.createObjectURL(file) } }));
   };
 
-  const compressImage = (file, maxDim = 640, quality = 0.5) => new Promise((resolve) => {
+  // Photos are stored as base64 directly in the Firestore doc, and one check can hold
+  // up to 8 of them. Firestore caps a document at ~1 MB, so each image is kept under
+  // ~115 KB (quality steps down only when needed) so all 8 fit safely.
+  const compressImage = (file, maxDim = 1100, startQuality = 0.72) => new Promise((resolve) => {
     const reader = new FileReader();
     reader.onload = (e) => {
       const img = new Image();
@@ -50,8 +53,18 @@ function CleanlinessCheck({ userName }) {
           else if (h >= w && h > maxDim) { w = Math.round(w * maxDim / h); h = maxDim; }
           const canvas = document.createElement('canvas');
           canvas.width = w; canvas.height = h;
-          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-          resolve(canvas.toDataURL('image/jpeg', quality));
+          const ctx = canvas.getContext('2d');
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+          ctx.drawImage(img, 0, 0, w, h);
+          const MAX_LEN = 115000; // ~115 KB per image → 8 fit under Firestore's 1 MB limit
+          let q = startQuality;
+          let dataUrl = canvas.toDataURL('image/jpeg', q);
+          while (dataUrl.length > MAX_LEN && q > 0.45) {
+            q -= 0.08;
+            dataUrl = canvas.toDataURL('image/jpeg', q);
+          }
+          resolve(dataUrl);
         } catch { resolve(null); }
       };
       img.onerror = () => resolve(null);
