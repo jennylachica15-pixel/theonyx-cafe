@@ -31,15 +31,33 @@ const addWatermark = (file) => new Promise((resolve) => {
   img.src = url;
 });
 
-const makeThumb = (file) => new Promise((resolve) => {
-  const img = new Image();
+// Center-crop to a sharp square for the grid
+const makeSquareThumb = (file, size, quality) => new Promise((resolve) => {
+  const img = new Image(); const url = URL.createObjectURL(file);
   img.onload = () => {
-    const c = document.createElement('canvas'); c.width = 200; c.height = 200;
-    const ctx = c.getContext('2d'); const size = Math.min(img.width, img.height);
-    ctx.drawImage(img, (img.width-size)/2, (img.height-size)/2, size, size, 0, 0, 200, 200);
-    resolve(c.toDataURL('image/jpeg', 0.6));
+    const c = document.createElement('canvas'); c.width = size; c.height = size;
+    const ctx = c.getContext('2d'); ctx.imageSmoothingQuality = 'high';
+    const crop = Math.min(img.width, img.height);
+    ctx.drawImage(img, (img.width - crop) / 2, (img.height - crop) / 2, crop, crop, 0, 0, size, size);
+    URL.revokeObjectURL(url);
+    resolve(c.toDataURL('image/jpeg', quality));
   };
-  img.src = URL.createObjectURL(file);
+  img.src = url;
+});
+
+// Resize to fit a max longest-edge, preserving aspect ratio (for the viewer)
+const resizeImage = (file, maxDim, quality) => new Promise((resolve) => {
+  const img = new Image(); const url = URL.createObjectURL(file);
+  img.onload = () => {
+    const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+    const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    const ctx = c.getContext('2d'); ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, 0, 0, w, h);
+    URL.revokeObjectURL(url);
+    resolve(c.toDataURL('image/jpeg', quality));
+  };
+  img.src = url;
 });
 
 const getGuestId = () => {
@@ -118,8 +136,9 @@ export default function Gallery() {
       const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', { method: 'POST', headers: { Authorization: `Bearer ${accessToken}` }, body: form });
       if (!res.ok) throw new Error('Upload failed');
       const data = await res.json(); setProgress(90);
-      const thumb = await makeThumb(wm);
-      await addDoc(collection(db, 'guestPhotos'), { fileName, driveFileId: data.id, thumb, feedback, public: isPublic, hearts: [], createdAt: serverTimestamp() });
+      const thumb = await makeSquareThumb(wm, 512, 0.82);
+      const full = await resizeImage(wm, 1280, 0.85);
+      await addDoc(collection(db, 'guestPhotos'), { fileName, driveFileId: data.id, thumb, full, feedback, public: isPublic, hearts: [], createdAt: serverTimestamp() });
       setSuccess(isPublic ? '✅ Photo submitted for approval!' : '✅ Photo saved privately.');
       setPhoto(null); setPhotoFile(null); setFeedback('');
       setProgress(100); setTimeout(() => { setSuccess(''); setProgress(0); }, 4000);
@@ -217,7 +236,7 @@ export default function Gallery() {
               {/* Photo with overlay */}
               <div style={{ position: 'relative', cursor: 'pointer', aspectRatio: '1', overflow: 'hidden' }} onClick={() => cols > 1 ? setSelected(p) : null}>
                 {p.thumb
-                  ? <img src={p.thumb} alt="guest" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                  ? <img src={cols === 1 ? (p.full || p.thumb) : p.thumb} alt="guest" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                   : <div style={{ width: '100%', height: '100%', background: 'rgba(107,58,31,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>📷</div>
                 }
                 {/* Overlay — hearts & comments inside photo */}
@@ -297,7 +316,7 @@ export default function Gallery() {
       {selected && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.95)', zIndex: 400, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px 16px' }} onClick={() => setSelected(null)}>
           <div style={{ maxWidth: 400, width: '100%' }} onClick={e => e.stopPropagation()}>
-            {selected.thumb && <img src={selected.thumb} alt="full" style={{ width: '100%', borderRadius: 12, marginBottom: 10 }} />}
+            {(selected.full || selected.thumb) && <img src={selected.full || selected.thumb} alt="full" style={{ width: '100%', borderRadius: 12, marginBottom: 10 }} />}
             {selected.feedback && <div style={{ color: 'rgba(255,255,255,0.65)', fontSize: 12, fontStyle: 'italic', marginBottom: 10, textAlign: 'center' }}>"{selected.feedback}"</div>}
             {/* Hearts + comments in viewer */}
             <div style={{ display: 'flex', gap: 14, justifyContent: 'center', marginBottom: 12 }}>
