@@ -424,6 +424,10 @@ export default function Attendance({ role, userName }) {
 
           {onRestToday ? (
             <div style={s.restTodayBox}>{Ic.cal} It's {activeStaff}'s rest day today — Clock In / Out is off.</div>
+          ) : !accessToken ? (
+            <div style={{ ...s.restTodayBox, background: C.errBg, border: `1px solid ${C.errBorder}`, color: C.err }}>
+              {Ic.lock} Connect to record log above to enable Clock In / Out.
+            </div>
           ) : (
             <>
               {!rec(activeStaff).timeIn
