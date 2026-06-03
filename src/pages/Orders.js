@@ -23,9 +23,10 @@ const MENU_GROUPS = [
     { name: 'COFFEE MINT',           mini: 99,  classic: 120, upgrade: 150 },
     { name: 'RHUMPUCCINO',           mini: 99,  classic: 135, upgrade: 150 },
     { name: 'BREWED',                mini: 25,  classic: 50,  upgrade: 85  },
+    { name: 'DIRTY MATCHA',            classic: 120, upgrade: 150 },
+    { name: 'FRAPPE CARAMEL MACCHIATO',regular: 150 },
   ]},
   { id: 'noncoffee', label: 'Non-coffee', items: [
-    { name: 'DIRTY MATCHA',            classic: 120, upgrade: 150 },
     { name: 'STRAWBERRY LATTE',        classic: 120, upgrade: 150 },
     { name: 'STRAWBERRY MATCHA',       classic: 120, upgrade: 150 },
     { name: 'MATCHA LATTE',            classic: 120, upgrade: 150 },
@@ -34,7 +35,6 @@ const MENU_GROUPS = [
     { name: 'FRAPPE STRAWBERRY',       regular: 165 },
     { name: 'FRAPPE UBE HALAYA',       regular: 150 },
     { name: 'FRAPPE CHOCOLATE',        regular: 150 },
-    { name: 'FRAPPE CARAMEL MACCHIATO',regular: 150 },
   ]},
   { id: 'milktea', label: 'Milk tea', items: [
     { name: 'M.T. - HOKKAIDO',       regular: 55 },
