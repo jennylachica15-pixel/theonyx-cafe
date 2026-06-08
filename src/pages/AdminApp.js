@@ -21,6 +21,53 @@ const CHECKLIST_ITEMS = [
   { id: 'entrance', label: 'Entrance / Exit' },
 ];
 
+// ── Daily cleanliness reminder hook ──────────────────────────────────────────
+// Fires a browser notification once per day per staff member.
+// Automatically stops notifying after they submit their check for the day.
+function useDailyCleanlinessReminder(userName) {
+  useEffect(() => {
+    if (!userName) return;
+
+    // Ask for permission the first time
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+
+    const checkAndNotify = async () => {
+      if (!('Notification' in window) || Notification.permission !== 'granted') return;
+
+      const today = new Date().toDateString();
+      try {
+        const snap = await getDocs(
+          query(
+            collection(db, 'cleanlinessChecks'),
+            where('staff', '==', userName),
+            where('date', '==', today)
+          )
+        );
+        // Only notify when no submission exists for today
+        if (snap.empty) {
+          new Notification('🧹 Cleanliness Check Reminder', {
+            body: `Hi ${userName}! Please don't forget to complete today's cleanliness check.`,
+            icon: '/logo.jpg',
+            tag: 'cleanliness-daily', // replaces any prior notification instead of stacking
+          });
+        }
+      } catch (e) {
+        // silently ignore — notification is non-critical
+      }
+    };
+
+    // Fire once on mount / login
+    checkAndNotify();
+
+    // Re-check every hour so notification won't re-appear after they've submitted
+    const interval = setInterval(checkAndNotify, 60 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [userName]);
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 function CleanlinessCheck({ userName }) {
   const [checks, setChecks] = React.useState({});
   const [photos, setPhotos] = React.useState({});
@@ -403,6 +450,12 @@ export default function AdminApp({ user, onSignOut }) {
   const [cleanFeedback, setCleanFeedback] = useState(0);
 
   const verse = getDailyVerse();
+
+  // ── Daily cleanliness notification ────────────────────────────────────────
+  // Called once userName is known. Fires a browser push notification every day
+  // until the staff member submits their cleanliness check. Re-checks every hour.
+  useDailyCleanlinessReminder(userName);
+  // ──────────────────────────────────────────────────────────────────────────
 
   useEffect(() => {
     const fetchUser = async () => {
