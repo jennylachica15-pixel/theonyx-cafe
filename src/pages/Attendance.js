@@ -146,13 +146,13 @@ const displayTime = (val) => {
   return str;
 };
 
-// ── FIX: appendRestRow — writes date in col A, staff in col B, REST DAY in col C ──
+// ── appendRestRow — A=Date, B=Name, C=REST DAY, D=empty, E=empty ──
 async function appendRestRow(staffName, sheetDate, token) {
-  // Row: [Date, Name, REST DAY, , , ]  — matches clock-in row structure
-  const values = [[sheetDate, staffName, 'REST DAY', '', '', '']];
+  // Exactly 5 columns: A B C D E
+  const values = [[sheetDate, staffName, 'REST DAY', '', '']];
   try {
     const res = await fetch(
-      `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${staffName}!A:F:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
+      `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${staffName}!A:E:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
       {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -323,10 +323,11 @@ export default function Attendance({ role, userName }) {
       const existingDoc = firestoreRecords[staffName] || {};
 
       if (type === 'IN') {
-        // ── CLOCK IN: append a new row [Date, Name, TimeIn, , , ] ──
-        const values = [[sheetDate, staffName, timeNow, '', '', '']];
+        // ── CLOCK IN ──
+        // A=Date  B=Name  C=TimeIn  D=empty  E=empty (TimeOut filled later)
+        const values = [[sheetDate, staffName, timeNow, '', '']];
         const res = await fetch(
-          `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${staffName}!A:F:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
+          `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${staffName}!A:E:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
           {
             method: 'POST',
             headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
@@ -334,34 +335,33 @@ export default function Attendance({ role, userName }) {
           }
         );
         const data = await res.json();
-        // Extract the row number that was written
+        // Grab the exact row number that was written so clock-out can target it
         const range = data.updates?.updatedRange || '';
         const rowMatch = range.match(/(\d+)$/);
         const rowIndex = rowMatch ? parseInt(rowMatch[1]) : null;
 
-        // Write to Firestore — store sheetDate so clock-out can use it
         await addDoc(collection(db, 'attendance'), {
           staff: staffName,
           date: today,
           timeIn: timeNow,
           timeOut: null,
           rowIndex,
-          sheetDate,          // FIX: persist sheetDate for clock-out
+          sheetDate,       // stored so clock-out rewrites the correct date string
           photoInData: photoData || null,
           createdAt: serverTimestamp(),
         });
 
       } else {
-        // ── CLOCK OUT: overwrite the FULL row so date/name columns stay intact ──
+        // ── CLOCK OUT ──
+        // Rewrite the FULL row A–E so date & name are never left blank
+        // A=Date  B=Name  C=TimeIn  D=empty  E=TimeOut
         const rowIndex = existingDoc.rowIndex;
-        // FIX: use the stored sheetDate and timeIn from when they clocked in
         const storedSheetDate = existingDoc.sheetDate || sheetDate;
-        const storedTimeIn = existingDoc.timeIn || '';
+        const storedTimeIn   = existingDoc.timeIn    || '';
 
         if (rowIndex) {
-          // FIX: write columns A–E (A=date, B=name, C=timeIn, D=empty, E=timeOut)
           await fetch(
-            `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${staffName}!A${rowIndex}:E${rowIndex}?valueInputOption=RAW`,
+            `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${staffName}!A${rowIndex}:E${rowIndex}?valueInputOption=USER_ENTERED`,
             {
               method: 'PUT',
               headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
@@ -429,25 +429,21 @@ export default function Attendance({ role, userName }) {
       const data = await res.json();
       const allRows = data.values || [];
 
-      // FIX: filter out header row and rows with no date
-      // Column layout: A=Date, B=Name, C=Clock In (or REST DAY), D=empty, E=Clock Out, F=empty
+      // Sheet layout: A=Date(0)  B=Name(1)  C=TimeIn or REST DAY(2)  D=empty(3)  E=TimeOut(4)
       const rows = allRows
         .filter(r => {
-          if (!r || !r[0]) return false;                          // must have a date
-          const dateStr = String(r[0]).trim();
-          if (!dateStr) return false;
-          if (String(r[1] || '').toLowerCase() === 'name') return false; // skip header
+          if (!r || !r[0]) return false;                               // must have a date in col A
+          if (String(r[1] || '').toLowerCase() === 'name') return false; // skip header row
           return true;
         })
         .map(r => {
-          const colC = String(r[2] || '').trim();
-          const isRest = colC.toUpperCase() === 'REST DAY';
+          const colC = String(r[2] || '').trim().toUpperCase();
+          const isRest = colC === 'REST DAY';
           return {
             isRest,
-            date: displayDate(r[0]),
-            // FIX: timeIn is col C (index 2), timeOut is col E (index 4)
-            timeIn: isRest ? '' : displayTime(r[2] || ''),
-            timeOut: isRest ? '' : displayTime(r[4] || ''),
+            date:    displayDate(r[0]),
+            timeIn:  isRest ? '' : displayTime(r[2] || ''), // col C → index 2
+            timeOut: isRest ? '' : displayTime(r[4] || ''), // col E → index 4
           };
         });
 
