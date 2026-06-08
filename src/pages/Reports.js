@@ -4,6 +4,7 @@ import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 
 const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const REPORT_START = new Date('2025-06-04T00:00:00');
+const DAY_COLORS = ['#e07b39','#c8956c','#d4a853','#6b3a1f','#1a0a00','#888','#c8956c'];
 
 const s = {
   page: { padding: '16px 16px 0', animation: 'fadeIn 0.3s ease' },
@@ -19,12 +20,120 @@ const s = {
   statLabel: { fontSize: 11, color: 'var(--brown-light)', marginTop: 2 },
   productRow: { display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', borderBottom: '1px solid #f5ede4' },
   rank: { width: 22, height: 22, borderRadius: '50%', background: 'var(--brown-dark)', color: 'var(--gold-light)', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  tooltip: { position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', background: 'var(--brown-dark)', color: 'var(--gold-light)', borderRadius: 10, padding: '6px 14px', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap', zIndex: 10, boxShadow: '0 2px 8px rgba(0,0,0,0.18)', pointerEvents: 'none' },
 };
 
-const DAY_COLORS = ['#e07b39','#c8956c','#d4a853','#6b3a1f','#1a0a00','#888','#c8956c'];
+function formatAmount(val) {
+  return val >= 1000 ? `P${(val / 1000).toFixed(1)}k` : `P${val.toLocaleString()}`;
+}
 
 function isAfterReportStart(date) {
   return date >= REPORT_START;
+}
+
+function DailyChart({ dailyData, maxDaily }) {
+  const [tooltip, setTooltip] = useState(null);
+
+  return (
+    <div style={{ position: 'relative' }}>
+      {tooltip && (
+        <div style={s.tooltip}>
+          {tooltip.label} · {formatAmount(tooltip.total)}
+        </div>
+      )}
+      <div
+        style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 100, marginBottom: 4, marginTop: 32 }}
+        onClick={() => setTooltip(null)}
+      >
+        {dailyData.map((d, i) => {
+          const barHeight = d.disabled || d.total === 0 ? 0 : Math.max((d.total / maxDaily) * 100, 4);
+          const isActive = tooltip?.label === d.label;
+          return (
+            <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' }}>
+              <div style={{ fontSize: 9, color: 'var(--brown-mid)', marginBottom: 2, textAlign: 'center' }}>
+                {!d.disabled && d.total > 0 ? (d.total >= 1000 ? `${(d.total / 1000).toFixed(1)}k` : d.total) : ''}
+              </div>
+              <div
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (!d.disabled && d.total > 0) setTooltip(isActive ? null : { label: d.label, total: d.total });
+                }}
+                style={{
+                  width: '70%',
+                  height: `${barHeight}px`,
+                  background: isActive ? 'var(--gold)' : (d.disabled ? '#e8e8e8' : 'var(--brown-dark)'),
+                  borderRadius: '4px 4px 0 0',
+                  transition: 'height 0.4s ease, background 0.2s ease',
+                  cursor: d.total > 0 ? 'pointer' : 'default',
+                }}
+              />
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ display: 'flex', gap: 6 }}>
+        {dailyData.map((d, i) => (
+          <div key={i} style={{ flex: 1, fontSize: 9, color: d.disabled ? '#ccc' : 'var(--brown-light)', textAlign: 'center' }}>{d.label}</div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function WeeklyChart({ weeklyData, maxWeekly }) {
+  const [tooltip, setTooltip] = useState(null);
+
+  return (
+    <div style={{ position: 'relative' }}>
+      {tooltip && (
+        <div style={s.tooltip}>
+          {tooltip.label} · {formatAmount(tooltip.total)}
+        </div>
+      )}
+      <div
+        style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 100, marginBottom: 4, marginTop: 32 }}
+        onClick={() => setTooltip(null)}
+      >
+        {weeklyData.map((w, i) => {
+          const barHeight = w.total === 0 ? 0 : Math.max((w.total / maxWeekly) * 100, 4);
+          const isActive = tooltip?.label === w.label;
+          return (
+            <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' }}>
+              <div style={{ fontSize: 9, color: 'var(--brown-mid)', marginBottom: 2, textAlign: 'center' }}>
+                {w.total > 0 ? (w.total >= 1000 ? `${(w.total / 1000).toFixed(1)}k` : w.total) : ''}
+              </div>
+              <div
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (w.total > 0) setTooltip(isActive ? null : { label: w.label, total: w.total });
+                }}
+                style={{
+                  width: '70%',
+                  height: `${barHeight}px`,
+                  borderRadius: '4px 4px 0 0',
+                  overflow: 'hidden',
+                  display: 'flex',
+                  flexDirection: 'column-reverse',
+                  cursor: w.total > 0 ? 'pointer' : 'default',
+                  outline: isActive ? '2px solid var(--gold)' : 'none',
+                  transition: 'outline 0.2s ease',
+                }}
+              >
+                {w.days.map((dayVal, di) => dayVal > 0 ? (
+                  <div key={di} style={{ background: DAY_COLORS[di], flex: dayVal, minHeight: 2 }} />
+                ) : null)}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ display: 'flex', gap: 6 }}>
+        {weeklyData.map((w, i) => (
+          <div key={i} style={{ flex: 1, fontSize: 9, color: 'var(--brown-light)', textAlign: 'center' }}>{w.label}</div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export default function Reports() {
@@ -125,27 +234,7 @@ export default function Reports() {
       {activeTab === 'daily' && (
         <div style={s.card}>
           <div style={s.cardTitle}>Daily Sales - Last 7 Days</div>
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 100, marginBottom: 4 }}>
-            {dailyData.map((d, i) => (
-              <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end' }}>
-                <div style={{ fontSize: 9, color: 'var(--brown-mid)', marginBottom: 2, textAlign: 'center' }}>
-                  {!d.disabled && d.total > 0 ? (d.total >= 1000 ? `${(d.total / 1000).toFixed(1)}k` : d.total) : ''}
-                </div>
-                <div style={{
-                  width: '80%',
-                  height: `${d.disabled ? 0 : Math.max((d.total / maxDaily) * 100, d.total > 0 ? 4 : 0)}%`,
-                  background: d.disabled ? '#e8e8e8' : 'var(--brown-dark)',
-                  borderRadius: '4px 4px 0 0',
-                  transition: 'height 0.4s ease',
-                }} />
-              </div>
-            ))}
-          </div>
-          <div style={{ display: 'flex', gap: 4 }}>
-            {dailyData.map((d, i) => (
-              <div key={i} style={{ flex: 1, fontSize: 9, color: d.disabled ? '#ccc' : 'var(--brown-light)', textAlign: 'center' }}>{d.label}</div>
-            ))}
-          </div>
+          <DailyChart dailyData={dailyData} maxDaily={maxDaily} />
         </div>
       )}
 
@@ -153,32 +242,7 @@ export default function Reports() {
       {activeTab === 'weekly' && (
         <div style={s.card}>
           <div style={s.cardTitle}>Weekly Sales - Last 4 Weeks</div>
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 100, marginBottom: 4 }}>
-            {weeklyData.map((w, i) => (
-              <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end' }}>
-                <div style={{ fontSize: 9, color: 'var(--brown-mid)', marginBottom: 2, textAlign: 'center' }}>
-                  {w.total > 0 ? (w.total >= 1000 ? `${(w.total / 1000).toFixed(1)}k` : w.total) : ''}
-                </div>
-                <div style={{
-                  width: '80%',
-                  height: `${Math.max((w.total / maxWeekly) * 100, w.total > 0 ? 4 : 0)}%`,
-                  borderRadius: '4px 4px 0 0',
-                  overflow: 'hidden',
-                  display: 'flex',
-                  flexDirection: 'column-reverse',
-                }}>
-                  {w.days.map((dayVal, di) => dayVal > 0 ? (
-                    <div key={di} style={{ background: DAY_COLORS[di], flex: dayVal, minHeight: 2 }} />
-                  ) : null)}
-                </div>
-              </div>
-            ))}
-          </div>
-          <div style={{ display: 'flex', gap: 4 }}>
-            {weeklyData.map((w, i) => (
-              <div key={i} style={{ flex: 1, fontSize: 9, color: 'var(--brown-light)', textAlign: 'center' }}>{w.label}</div>
-            ))}
-          </div>
+          <WeeklyChart weeklyData={weeklyData} maxWeekly={maxWeekly} />
         </div>
       )}
 
