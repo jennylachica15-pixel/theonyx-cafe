@@ -3,6 +3,7 @@ import { db } from '../firebase/config';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 
 const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const REPORT_START = new Date('2025-06-03T00:00:00');
 
 function getStatus(qty, threshold) {
   if (qty <= 0) return 'out';
@@ -42,13 +43,25 @@ const s = {
 
 const DAY_COLORS = ['#e07b39','#c8956c','#d4a853','#6b3a1f','#1a0a00','#888','#c8956c'];
 
+function isAfterReportStart(date) {
+  return date >= REPORT_START;
+}
+
 export default function Reports() {
   const [orders, setOrders] = useState([]);
   const [items, setItems] = useState([]);
   const [activeTab, setActiveTab] = useState('daily');
 
   useEffect(() => {
-    const unsub1 = onSnapshot(query(collection(db, 'orders'), orderBy('createdAt', 'desc')), snap => setOrders(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsub1 = onSnapshot(query(collection(db, 'orders'), orderBy('createdAt', 'desc')), snap => {
+      const allOrders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      // Filter to only include orders from June 3 onwards
+      const filtered = allOrders.filter(o => {
+        if (!o.createdAt?.toDate) return false;
+        return isAfterReportStart(o.createdAt.toDate());
+      });
+      setOrders(filtered);
+    });
     const unsub2 = onSnapshot(query(collection(db, 'inventory'), orderBy('createdAt', 'desc')), snap => setItems(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     return () => { unsub1(); unsub2(); };
   }, []);
@@ -57,25 +70,33 @@ export default function Reports() {
 
   const dailyData = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(now); d.setDate(d.getDate() - (6 - i));
+    // Skip days before REPORT_START
+    if (d < REPORT_START) return { label: DAYS[d.getDay()], total: 0, disabled: true };
     const dayKey = d.toDateString();
     const total = orders.filter(o => o.createdAt?.toDate && o.createdAt.toDate().toDateString() === dayKey).reduce((s, o) => s + (o.total || 0), 0);
-    return { label: DAYS[d.getDay()], total };
+    return { label: DAYS[d.getDay()], total, disabled: false };
   });
   const maxDaily = Math.max(...dailyData.map(d => d.total), 1);
 
   const weeklyData = Array.from({ length: 4 }, (_, i) => {
     const weekStart = new Date(now); weekStart.setDate(weekStart.getDate() - weekStart.getDay() - (3 - i) * 7);
-    const weekDays = Array.from({ length: 7 }, (_, d) => { const day = new Date(weekStart); day.setDate(day.getDate() + d); return day.toDateString(); });
-    const totals = weekDays.map(ds => orders.filter(o => o.createdAt?.toDate && o.createdAt.toDate().toDateString() === ds).reduce((s, o) => s + (o.total || 0), 0));
+    const weekDays = Array.from({ length: 7 }, (_, d) => { const day = new Date(weekStart); day.setDate(day.getDate() + d); return day; });
+    // Only count days from REPORT_START onwards
+    const totals = weekDays.map(day => {
+      if (day < REPORT_START) return 0;
+      const ds = day.toDateString();
+      return orders.filter(o => o.createdAt?.toDate && o.createdAt.toDate().toDateString() === ds).reduce((s, o) => s + (o.total || 0), 0);
+    });
     return { label: `W${i + 1}`, days: totals, total: totals.reduce((a, b) => a + b, 0) };
   });
   const maxWeekly = Math.max(...weeklyData.map(w => w.total), 1);
 
   const monthlyData = Array.from({ length: 30 }, (_, i) => {
     const d = new Date(now); d.setDate(d.getDate() - (29 - i));
+    if (d < REPORT_START) return { label: d.getDate(), total: 0, disabled: true };
     const dayKey = d.toDateString();
     const total = orders.filter(o => o.createdAt?.toDate && o.createdAt.toDate().toDateString() === dayKey).reduce((s, o) => s + (o.total || 0), 0);
-    return { label: d.getDate(), total };
+    return { label: d.getDate(), total, disabled: false };
   });
   const maxMonthly = Math.max(...monthlyData.map(d => d.total), 1);
 
@@ -92,16 +113,18 @@ export default function Reports() {
 
   const todayTotal = orders.filter(o => o.createdAt?.toDate && o.createdAt.toDate().toDateString() === now.toDateString()).reduce((s, o) => s + (o.total || 0), 0);
   const weekStart = new Date(now); weekStart.setDate(weekStart.getDate() - weekStart.getDay());
-  const weekTotal = orders.filter(o => { if (!o.createdAt?.toDate) return false; const d = o.createdAt.toDate(); return d >= weekStart; }).reduce((s, o) => s + (o.total || 0), 0);
+  const effectiveWeekStart = weekStart < REPORT_START ? REPORT_START : weekStart;
+  const weekTotal = orders.filter(o => { if (!o.createdAt?.toDate) return false; const d = o.createdAt.toDate(); return d >= effectiveWeekStart; }).reduce((s, o) => s + (o.total || 0), 0);
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const monthTotal = orders.filter(o => { if (!o.createdAt?.toDate) return false; const d = o.createdAt.toDate(); return d >= monthStart; }).reduce((s, o) => s + (o.total || 0), 0);
+  const effectiveMonthStart = monthStart < REPORT_START ? REPORT_START : monthStart;
+  const monthTotal = orders.filter(o => { if (!o.createdAt?.toDate) return false; const d = o.createdAt.toDate(); return d >= effectiveMonthStart; }).reduce((s, o) => s + (o.total || 0), 0);
 
   const alerts = items.filter(i => getStatus(i.quantity, i.threshold) !== 'ok');
 
   return (
     <div style={s.page}>
       <div style={s.title}>Reports</div>
-      <div style={s.sub}>Sales & inventory overview</div>
+      <div style={s.sub}>Sales & inventory overview · From Jun 3</div>
 
       <div style={s.statGrid}>
         <div style={s.statBox}><div style={s.statNum('var(--brown-dark)')}>P{todayTotal.toLocaleString()}</div><div style={s.statLabel}>Today</div></div>
@@ -120,9 +143,9 @@ export default function Reports() {
           <div style={s.barWrap}>
             {dailyData.map((d, i) => (
               <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <div style={s.barValue}>{d.total > 0 ? (d.total >= 1000 ? `${(d.total/1000).toFixed(1)}k` : d.total) : ''}</div>
-                <div style={s.bar((d.total / maxDaily) * 100)} />
-                <div style={s.barLabel}>{d.label}</div>
+                <div style={s.barValue}>{!d.disabled && d.total > 0 ? (d.total >= 1000 ? `${(d.total/1000).toFixed(1)}k` : d.total) : ''}</div>
+                <div style={{ ...s.bar((d.total / maxDaily) * 100), background: d.disabled ? '#e8e8e8' : 'var(--brown-dark)' }} />
+                <div style={{ ...s.barLabel, color: d.disabled ? '#ccc' : 'var(--brown-light)' }}>{d.label}</div>
               </div>
             ))}
           </div>
@@ -152,7 +175,7 @@ export default function Reports() {
           <svg width="100%" height="130" viewBox={`0 0 ${monthlyData.length * 10} 100`} preserveAspectRatio="none">
             <polyline fill="none" stroke="var(--brown-dark)" strokeWidth="1.5"
               points={monthlyData.map((d, i) => `${i * 10 + 5},${100 - (d.total / maxMonthly) * 90}`).join(' ')} />
-            {monthlyData.map((d, i) => d.total > 0 ? <circle key={i} cx={i * 10 + 5} cy={100 - (d.total / maxMonthly) * 90} r="2" fill="var(--gold)" /> : null)}
+            {monthlyData.map((d, i) => (!d.disabled && d.total > 0) ? <circle key={i} cx={i * 10 + 5} cy={100 - (d.total / maxMonthly) * 90} r="2" fill="var(--gold)" /> : null)}
           </svg>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--brown-light)', marginTop: 4 }}>
             <span>{monthlyData[0]?.label}</span><span>{monthlyData[14]?.label}</span><span>{monthlyData[29]?.label}</span>
