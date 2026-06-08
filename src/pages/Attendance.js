@@ -29,8 +29,13 @@ const s = {
   connectBtn: { background: C.gold, color: C.white, border: 'none' },
   connectedBadge: { flex: 1, padding: '9px 10px', borderRadius: 10, fontSize: 12.5, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: C.greenBg, border: `1px solid ${C.greenBorder}`, color: C.green },
   summaryBtn: { background: C.white, color: C.ink, border: `1px solid ${C.border}` },
-  banner: (kind) => ({ borderRadius: 10, padding: '10px 12px', fontSize: 13, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8,
-    background: kind === 'err' ? C.errBg : C.greenBg, border: `1px solid ${kind === 'err' ? C.errBorder : C.greenBorder}`, color: kind === 'err' ? C.err : C.green }),
+  banner: (kind) => ({
+    borderRadius: 10, padding: '10px 12px', fontSize: 13, marginBottom: 12,
+    display: 'flex', alignItems: 'center', gap: 8,
+    background: kind === 'err' ? C.errBg : C.greenBg,
+    border: `1px solid ${kind === 'err' ? C.errBorder : C.greenBorder}`,
+    color: kind === 'err' ? C.err : C.green
+  }),
   tabRow: { display: 'flex', background: C.white, borderRadius: 12, padding: 4, marginBottom: 16, border: `1px solid ${C.border}` },
   tab: (active) => ({ flex: 1, padding: '9px', borderRadius: 9, fontSize: 13, fontWeight: active ? 700 : 500, background: active ? C.ink : 'transparent', color: active ? C.gold : C.muted, border: 'none', cursor: 'pointer' }),
   card: { background: C.white, borderRadius: 14, padding: '18px', marginBottom: 14, border: `1px solid ${C.border}` },
@@ -49,8 +54,10 @@ const s = {
   restInputRow: { display: 'flex', gap: 8, marginBottom: 12 },
   dateInput: { flex: 1, border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 11px', fontSize: 13, color: C.ink, outline: 'none', background: C.cream, fontFamily: 'inherit' },
   setBtn: { padding: '10px 16px', borderRadius: 10, background: C.gold, color: C.white, border: 'none', fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' },
-  restItem: (clash) => ({ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, marginBottom: 7,
-    background: clash ? C.warnBg : C.cream, border: `1px solid ${clash ? C.warnBorder : C.border}` }),
+  restItem: (clash) => ({
+    display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, marginBottom: 7,
+    background: clash ? C.warnBg : C.cream, border: `1px solid ${clash ? C.warnBorder : C.border}`
+  }),
   statStrip: { display: 'flex', gap: 8, marginBottom: 16 },
   statBox: { flex: 1, background: C.cream, border: `1px solid ${C.border}`, borderRadius: 10, padding: '11px 8px', textAlign: 'center' },
   statNum: { fontSize: 18, fontWeight: 700, color: C.ink },
@@ -85,18 +92,34 @@ const Ic = {
   sync: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>,
 };
 
+// ── Date/time helpers ──
 const localIso = (d = new Date()) => {
   const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'), day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 };
+
 const prettyDate = (iso) => {
   if (!iso) return '';
   const [y, m, d] = iso.split('-').map(Number);
   return new Date(y, m - 1, d).toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric' });
 };
-const peso = (n) => '\u20B1' + Number(n).toLocaleString('en-PH');
-const fmtMDY = (d) => `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`;
 
+const peso = (n) => '\u20B1' + Number(n).toLocaleString('en-PH');
+
+// ── FIX: formatDate always returns MM/DD/YYYY ──
+const formatDate = (d) =>
+  `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`;
+
+// ── FIX: sheetDateFromIso converts YYYY-MM-DD → MM/DD/YYYY ──
+const sheetDateFromIso = (iso) => {
+  const [y, m, d] = iso.split('-').map(Number);
+  return formatDate(new Date(y, m - 1, d));
+};
+
+const formatTime = (d) =>
+  d.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+// ── FIX: displayDate handles both serial numbers and string dates ──
 const displayDate = (val) => {
   if (val === '' || val === null || val === undefined) return '';
   const str = String(val).trim();
@@ -106,25 +129,35 @@ const displayDate = (val) => {
   }
   return str;
 };
+
+// ── FIX: displayTime handles fractional serial, HH:MM:SS, and 12-hr formats ──
 const displayTime = (val) => {
   if (val === '' || val === null || val === undefined) return '—';
   const str = String(val).trim();
-  if (str === '') return '—';
+  if (!str) return '—';
+  // Google Sheets fractional time (e.g. 0.649...)
   if (/^\d*\.\d+$/.test(str)) {
-    const frac = parseFloat(str) - Math.floor(parseFloat(str));
+    const frac = parseFloat(str) % 1;
     const total = Math.round(frac * 86400);
     const h = Math.floor(total / 3600), m = Math.floor((total % 3600) / 60), sec = total % 60;
     return `${(h % 12) || 12}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
   }
+  // Already formatted (e.g. "03:46:17 PM" or "19:49:50")
   return str;
 };
 
+// ── FIX: appendRestRow — writes date in col A, staff in col B, REST DAY in col C ──
 async function appendRestRow(staffName, sheetDate, token) {
+  // Row: [Date, Name, REST DAY, , , ]  — matches clock-in row structure
   const values = [[sheetDate, staffName, 'REST DAY', '', '', '']];
   try {
     const res = await fetch(
       `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${staffName}!A:F:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
-      { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ values }) }
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ values }),
+      }
     );
     return res.ok;
   } catch { return false; }
@@ -133,10 +166,7 @@ async function appendRestRow(staffName, sheetDate, token) {
 export default function Attendance({ role, userName }) {
   const [accessToken, setAccessToken] = useState(null);
   const [activeStaff, setActiveStaff] = useState(null);
-
-  // ── KEY CHANGE: records now come from Firestore (real-time), not localStorage ──
   const [firestoreRecords, setFirestoreRecords] = useState({});
-
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
@@ -155,7 +185,7 @@ export default function Attendance({ role, userName }) {
   // notifications (manager only)
   const [notifications, setNotifications] = useState([]);
   const [notifOpen, setNotifOpen] = useState(false);
-  const [photoViewer, setPhotoViewer] = useState(null); // { url, docId, field, staff, label }
+  const [photoViewer, setPhotoViewer] = useState(null);
   const [deletingPhoto, setDeletingPhoto] = useState(false);
   const prevRecordsRef = useRef({});
 
@@ -171,11 +201,13 @@ export default function Attendance({ role, userName }) {
   // ── Google Sign-in ──
   useEffect(() => {
     const script = document.createElement('script');
-    script.src = 'https://accounts.google.com/gsi/client'; script.async = true;
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
     script.onload = () => {
       if (!window.google) return;
       tokenClientRef.current = window.google.accounts.oauth2.initTokenClient({
-        client_id: GOOGLE_CLIENT_ID, scope: SCOPES,
+        client_id: GOOGLE_CLIENT_ID,
+        scope: SCOPES,
         callback: res => { if (res.access_token) setAccessToken(res.access_token); },
       });
     };
@@ -187,13 +219,9 @@ export default function Attendance({ role, userName }) {
     if (visibleStaff.length > 0) setActiveStaff(visibleStaff[0]);
   }, [userName, role]);
 
-  // ── REAL-TIME: listen to today's attendance from Firestore ──
-  // This fires on ALL devices the moment any device writes a clock-in/out
+  // ── Real-time Firestore listener for today's attendance ──
   useEffect(() => {
-    const q = query(
-      collection(db, 'attendance'),
-      where('date', '==', today)
-    );
+    const q = query(collection(db, 'attendance'), where('date', '==', today));
     const unsub = onSnapshot(q, (snap) => {
       const recs = {};
       snap.docs.forEach(d => {
@@ -203,6 +231,7 @@ export default function Attendance({ role, userName }) {
           timeOut: data.timeOut || null,
           docId: d.id,
           rowIndex: data.rowIndex || null,
+          sheetDate: data.sheetDate || null,   // FIX: store sheetDate for clock-out
           photoInData: data.photoInData || null,
           photoOutData: data.photoOutData || null,
         };
@@ -218,12 +247,10 @@ export default function Attendance({ role, userName }) {
     const prev = prevRecordsRef.current;
     Object.entries(firestoreRecords).forEach(([staff, rec]) => {
       const p = prev[staff] || {};
-      // New clock-in
       if (rec.timeIn && !p.timeIn) {
         setNotifications(n => [{ id: Date.now() + staff + 'IN', staff, type: 'IN', time: rec.timeIn, photoData: rec.photoInData, read: false }, ...n]);
         setNotifOpen(true);
       }
-      // New clock-out
       if (rec.timeOut && !p.timeOut) {
         setNotifications(n => [{ id: Date.now() + staff + 'OUT', staff, type: 'OUT', time: rec.timeOut, photoData: rec.photoOutData, read: false }, ...n]);
         setNotifOpen(true);
@@ -234,15 +261,12 @@ export default function Attendance({ role, userName }) {
 
   // ── Rest days listener ──
   useEffect(() => {
-    const unsub = onSnapshot(query(collection(db, 'restDays'), orderBy('date', 'asc')), snap => {
-      setRestDays(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
+    const unsub = onSnapshot(
+      query(collection(db, 'restDays'), orderBy('date', 'asc')),
+      snap => setRestDays(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    );
     return () => unsub();
   }, []);
-
-  const formatTime = d => d.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  const formatDate = d => fmtMDY(d);
-  const sheetDateFromIso = iso => { const [y, m, d] = iso.split('-').map(Number); return formatDate(new Date(y, m - 1, d)); };
 
   const handleFile = e => {
     const file = e.target.files[0]; if (!file) return;
@@ -260,11 +284,12 @@ export default function Attendance({ role, userName }) {
       setError(r.timeOut ? 'Already clocked out today.' : 'Clock in first.');
       return;
     }
+    setError('');
     setPendingAction({ staffName, type });
     setPhoto(null); setPhotoFile(null);
   };
 
-  // Compress selfie to small base64 (~200px) — stored in Firestore, no Drive needed
+  // Compress selfie to ~200px base64
   const compressSelfie = (file) => new Promise((resolve) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
@@ -282,56 +307,71 @@ export default function Attendance({ role, userName }) {
     img.src = url;
   });
 
-  // ── CLOCK IN/OUT: photo stored as base64 in Firestore, no Drive ──
+  // ── CLOCK IN/OUT ──
   const confirmAction = async () => {
     if (!photoFile) { setError('Please take a selfie first.'); return; }
     const { staffName, type } = pendingAction;
     setLoading(true); setError('');
+
     const now = new Date();
     const timeNow = formatTime(now);
+    // FIX: sheetDate is always MM/DD/YYYY
     const sheetDate = formatDate(now);
 
     try {
-      // Compress selfie to small base64 (~200px) — no Drive upload
       const photoData = await compressSelfie(photoFile);
-      const existingDoc = firestoreRecords[staffName];
+      const existingDoc = firestoreRecords[staffName] || {};
 
       if (type === 'IN') {
-        // 1. Write to Google Sheets (no photo column needed)
+        // ── CLOCK IN: append a new row [Date, Name, TimeIn, , , ] ──
         const values = [[sheetDate, staffName, timeNow, '', '', '']];
         const res = await fetch(
           `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${staffName}!A:F:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
-          { method: 'POST', headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ values }) }
+          {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ values }),
+          }
         );
         const data = await res.json();
+        // Extract the row number that was written
         const range = data.updates?.updatedRange || '';
         const rowMatch = range.match(/(\d+)$/);
         const rowIndex = rowMatch ? parseInt(rowMatch[1]) : null;
 
-        // 2. Write to Firestore with base64 photo — syncs to all devices instantly
+        // Write to Firestore — store sheetDate so clock-out can use it
         await addDoc(collection(db, 'attendance'), {
           staff: staffName,
           date: today,
           timeIn: timeNow,
           timeOut: null,
           rowIndex,
+          sheetDate,          // FIX: persist sheetDate for clock-out
           photoInData: photoData || null,
           createdAt: serverTimestamp(),
         });
 
       } else {
-        const rowIndex = existingDoc?.rowIndex;
+        // ── CLOCK OUT: overwrite the FULL row so date/name columns stay intact ──
+        const rowIndex = existingDoc.rowIndex;
+        // FIX: use the stored sheetDate and timeIn from when they clocked in
+        const storedSheetDate = existingDoc.sheetDate || sheetDate;
+        const storedTimeIn = existingDoc.timeIn || '';
 
-        // 1. Update Google Sheets
         if (rowIndex) {
+          // FIX: write columns A–E (A=date, B=name, C=timeIn, D=empty, E=timeOut)
           await fetch(
-            `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${staffName}!E${rowIndex}:F${rowIndex}?valueInputOption=RAW`,
-            { method: 'PUT', headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ values: [[timeNow, '']] }) }
+            `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${staffName}!A${rowIndex}:E${rowIndex}?valueInputOption=RAW`,
+            {
+              method: 'PUT',
+              headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ values: [[storedSheetDate, staffName, storedTimeIn, '', timeNow]] }),
+            }
           );
         }
 
-        // 2. Update Firestore with base64 photo — syncs instantly
-        if (existingDoc?.docId) {
+        // Update Firestore with timeOut and clock-out photo
+        if (existingDoc.docId) {
           await updateDoc(doc(db, 'attendance', existingDoc.docId), {
             timeOut: timeNow,
             photoOutData: photoData || null,
@@ -349,7 +389,7 @@ export default function Attendance({ role, userName }) {
     setLoading(false);
   };
 
-  // ── Delete selfie — just clear the base64 field in Firestore ──
+  // ── Delete selfie ──
   const deletePhoto = async (docId, field) => {
     if (!docId) return;
     setDeletingPhoto(true);
@@ -362,7 +402,7 @@ export default function Attendance({ role, userName }) {
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
-  // ── Summary: reads from Firestore for speed, falls back to Sheets ──
+  // ── Summary modal: reads from Google Sheets ──
   const openSummary = async () => {
     if (!accessToken) { setError('Connect to record log first to view the summary.'); return; }
     if (!activeStaff) return;
@@ -370,32 +410,66 @@ export default function Attendance({ role, userName }) {
     setSummaryRows([]); setSummaryStats({ worked: 0, rest: 0, salary: 0 }); setError('');
 
     try {
-      // Sync any un-synced rest days to sheet
+      // Sync any un-synced rest days to sheet first
       const toSync = restDays.filter(r => r.staff === activeStaff && r.inSheet !== true);
       for (const r of toSync) {
         const ok = await appendRestRow(activeStaff, sheetDateFromIso(r.date), accessToken);
-        if (ok) { try { await updateDoc(doc(db, 'restDays', r.id), { inSheet: true }); } catch {} }
+        if (ok) {
+          try { await updateDoc(doc(db, 'restDays', r.id), { inSheet: true }); } catch {}
+        }
       }
 
-      // Read from Google Sheets (the master record)
+      // Fetch all rows from Google Sheets
       const res = await fetch(
         `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${activeStaff}!A:F`,
         { headers: { Authorization: `Bearer ${accessToken}` } }
       );
-      if (!res.ok) { setSummaryLoading(false); return; }
+      if (!res.ok) { setError('Could not load sheet. Try reconnecting.'); setSummaryLoading(false); return; }
+
       const data = await res.json();
-      const rows = (data.values || [])
-        .filter(r => r && r[1] && String(r[1]).toLowerCase() !== 'name')
-        .map(r => ({ isRest: String(r[2]).toUpperCase() === 'REST DAY', date: displayDate(r[0]), timeIn: displayTime(r[2]), timeOut: displayTime(r[4]) }));
+      const allRows = data.values || [];
+
+      // FIX: filter out header row and rows with no date
+      // Column layout: A=Date, B=Name, C=Clock In (or REST DAY), D=empty, E=Clock Out, F=empty
+      const rows = allRows
+        .filter(r => {
+          if (!r || !r[0]) return false;                          // must have a date
+          const dateStr = String(r[0]).trim();
+          if (!dateStr) return false;
+          if (String(r[1] || '').toLowerCase() === 'name') return false; // skip header
+          return true;
+        })
+        .map(r => {
+          const colC = String(r[2] || '').trim();
+          const isRest = colC.toUpperCase() === 'REST DAY';
+          return {
+            isRest,
+            date: displayDate(r[0]),
+            // FIX: timeIn is col C (index 2), timeOut is col E (index 4)
+            timeIn: isRest ? '' : displayTime(r[2] || ''),
+            timeOut: isRest ? '' : displayTime(r[4] || ''),
+          };
+        });
+
+      // Count unique worked dates and rest dates
       const workedDates = new Set(rows.filter(r => !r.isRest && r.date).map(r => r.date));
-      const restDateSet = new Set(rows.filter(r => r.isRest).map(r => r.date));
-      setSummaryStats({ worked: workedDates.size, rest: restDateSet.size, salary: workedDates.size * DAILY_RATE });
-      setSummaryRows(rows.reverse());
-    } catch { setError('Could not load summary. Try reconnecting.'); }
+      const restDateSet = new Set(rows.filter(r => r.isRest && r.date).map(r => r.date));
+
+      setSummaryStats({
+        worked: workedDates.size,
+        rest: restDateSet.size,
+        salary: workedDates.size * DAILY_RATE,
+      });
+      // Show newest first
+      setSummaryRows([...rows].reverse());
+    } catch (e) {
+      console.error(e);
+      setError('Could not load summary. Try reconnecting.');
+    }
     setSummaryLoading(false);
   };
 
-  // ── Rest days ──
+  // ── Rest day helpers ──
   const dateCounts = {};
   restDays.forEach(r => { dateCounts[r.date] = (dateCounts[r.date] || 0) + 1; });
   const upcoming = restDays.filter(r => r.date >= today);
@@ -412,7 +486,9 @@ export default function Attendance({ role, userName }) {
     try {
       let inSheet = false;
       if (accessToken) inSheet = await appendRestRow(activeStaff, sheetDateFromIso(restDate), accessToken);
-      await addDoc(collection(db, 'restDays'), { staff: activeStaff, date: restDate, inSheet, createdAt: serverTimestamp() });
+      await addDoc(collection(db, 'restDays'), {
+        staff: activeStaff, date: restDate, inSheet, createdAt: serverTimestamp()
+      });
       setRestWarning(clash ? `Heads up — ${clash.staff} also has a rest day on ${prettyDate(restDate)}.` : '');
       setRestDate('');
     } catch { setRestWarning('Could not save. Try again.'); }
@@ -432,7 +508,7 @@ export default function Attendance({ role, userName }) {
       <div style={s.title}>Attendance</div>
       <div style={s.sub}>Time In / Time Out</div>
 
-      {/* connect + summary row */}
+      {/* Connect + Summary row */}
       <div style={s.actionRow}>
         {!accessToken
           ? <button style={{ ...s.smallBtn, ...s.connectBtn }} onClick={() => tokenClientRef.current?.requestAccessToken()}>{Ic.link} Connect to record log</button>
@@ -440,7 +516,8 @@ export default function Attendance({ role, userName }) {
         }
         <button style={{ ...s.smallBtn, ...s.summaryBtn }} onClick={openSummary}>{Ic.list} Summary</button>
         {role === 'manager' && (
-          <button onClick={() => { setNotifOpen(true); setNotifications(n => n.map(x => ({ ...x, read: true }))); }}
+          <button
+            onClick={() => { setNotifOpen(true); setNotifications(n => n.map(x => ({ ...x, read: true }))); }}
             style={{ position: 'relative', padding: '9px 13px', borderRadius: 10, fontSize: 18, background: unreadCount > 0 ? C.gold : C.white, color: unreadCount > 0 ? C.white : C.muted, border: `1px solid ${C.border}`, cursor: 'pointer', lineHeight: 1 }}>
             🔔
             {unreadCount > 0 && (
@@ -456,7 +533,7 @@ export default function Attendance({ role, userName }) {
       {error && <div style={s.banner('err')}>{Ic.warn} {error}</div>}
       {success && <div style={s.banner('ok')}>{Ic.check} {success}</div>}
 
-      {/* staff tabs */}
+      {/* Staff tabs */}
       {visibleStaff.length > 1 && (
         <div style={s.tabRow}>
           {visibleStaff.map(name => (
@@ -465,13 +542,17 @@ export default function Attendance({ role, userName }) {
         </div>
       )}
 
+      {/* Clock In/Out card */}
       {activeStaff && (
         <div style={s.card}>
           <div style={s.staffName}>{activeStaff}</div>
           <div style={s.statusText}>
             <span style={s.dot(isActive)} />
-            {onRestToday ? 'Rest day today'
-              : rec(activeStaff).timeIn ? `In: ${rec(activeStaff).timeIn}` : 'Not clocked in today'}
+            {onRestToday
+              ? 'Rest day today'
+              : rec(activeStaff).timeIn
+                ? `In: ${rec(activeStaff).timeIn}`
+                : 'Not clocked in today'}
             {!onRestToday && rec(activeStaff).timeOut ? `  ·  Out: ${rec(activeStaff).timeOut}` : ''}
           </div>
 
@@ -498,7 +579,7 @@ export default function Attendance({ role, userName }) {
         </div>
       )}
 
-      {/* Manager: today's staff status + selfie cards */}
+      {/* Manager: today's selfie cards */}
       {role === 'manager' && STAFF_LIST.some(n => firestoreRecords[n]?.timeIn) && (
         <div style={{ marginBottom: 14 }}>
           <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 700, marginBottom: 8 }}>Today's Selfies</div>
@@ -511,7 +592,6 @@ export default function Attendance({ role, userName }) {
                 <div key={name} style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 14, padding: '12px', flex: 1, minWidth: 140 }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: C.ink, marginBottom: 8 }}>{name}</div>
                   <div style={{ display: 'flex', gap: 8 }}>
-                    {/* Clock In photo */}
                     <div style={{ flex: 1 }}>
                       {r.photoInData
                         ? <div style={{ cursor: 'pointer' }} onClick={() => setPhotoViewer({ url: r.photoInData, docId: r.docId, field: 'photoInData', staff: name, label: 'Clock In' })}>
@@ -519,9 +599,8 @@ export default function Attendance({ role, userName }) {
                           </div>
                         : <div style={noPhoto}>👤</div>
                       }
-                      <div style={{ fontSize: 9.5, color: C.green, fontWeight: 700, textAlign: 'center', marginTop: 3 }}>IN {r.timeIn ? r.timeIn.slice(0,8) : ''}</div>
+                      <div style={{ fontSize: 9.5, color: C.green, fontWeight: 700, textAlign: 'center', marginTop: 3 }}>IN {r.timeIn ? r.timeIn.slice(0, 8) : ''}</div>
                     </div>
-                    {/* Clock Out photo — only if clocked out */}
                     {r.timeOut && (
                       <div style={{ flex: 1 }}>
                         {r.photoOutData
@@ -530,7 +609,7 @@ export default function Attendance({ role, userName }) {
                             </div>
                           : <div style={noPhoto}>👤</div>
                         }
-                        <div style={{ fontSize: 9.5, color: C.terra, fontWeight: 700, textAlign: 'center', marginTop: 3 }}>OUT {r.timeOut.slice(0,8)}</div>
+                        <div style={{ fontSize: 9.5, color: C.terra, fontWeight: 700, textAlign: 'center', marginTop: 3 }}>OUT {r.timeOut.slice(0, 8)}</div>
                       </div>
                     )}
                   </div>
@@ -541,7 +620,7 @@ export default function Attendance({ role, userName }) {
         </div>
       )}
 
-      {/* rest days */}
+      {/* Rest days card */}
       <div style={s.card}>
         <div style={s.restHead}>{Ic.cal}<span style={s.restTitle}>Rest Days</span></div>
         <div style={s.restSub}>Pick your day off. On a rest day, clock in/out is disabled — and it shows in the summary and record sheet.</div>
@@ -582,7 +661,7 @@ export default function Attendance({ role, userName }) {
         }
       </div>
 
-      {/* selfie modal */}
+      {/* Selfie modal */}
       {pendingAction && (
         <div style={s.modal}>
           <div style={s.modalCard}>
@@ -610,7 +689,7 @@ export default function Attendance({ role, userName }) {
         </div>
       )}
 
-      {/* summary modal */}
+      {/* Summary modal */}
       {summaryOpen && (
         <div style={s.modal} onClick={() => setSummaryOpen(false)}>
           <div style={s.modalCard} onClick={e => e.stopPropagation()}>
@@ -647,15 +726,25 @@ export default function Attendance({ role, userName }) {
                     <thead>
                       <tr>
                         <th style={s.sumTh}>Date</th>
-                        <th style={s.sumTh}>Time In</th>
-                        <th style={s.sumTh}>Time Out</th>
+                        <th style={s.sumTh}>Clock In</th>
+                        <th style={s.sumTh}>Clock Out</th>
                       </tr>
                     </thead>
                     <tbody>
                       {summaryRows.map((r, i) => (
                         r.isRest
-                          ? <tr key={i}><td style={s.sumTd}>{r.date}</td><td style={s.sumTd} colSpan={2}><span style={s.restPill}>Rest Day</span></td></tr>
-                          : <tr key={i}><td style={s.sumTd}>{r.date}</td><td style={s.sumTd}>{r.timeIn}</td><td style={s.sumTd}>{r.timeOut}</td></tr>
+                          ? (
+                            <tr key={i}>
+                              <td style={s.sumTd}>{r.date}</td>
+                              <td style={s.sumTd} colSpan={2}><span style={s.restPill}>Rest Day</span></td>
+                            </tr>
+                          ) : (
+                            <tr key={i}>
+                              <td style={s.sumTd}>{r.date}</td>
+                              <td style={s.sumTd}>{r.timeIn}</td>
+                              <td style={s.sumTd}>{r.timeOut}</td>
+                            </tr>
+                          )
                       ))}
                     </tbody>
                   </table>
@@ -678,14 +767,16 @@ export default function Attendance({ role, userName }) {
             ) : (
               notifications.map(n => (
                 <div key={n.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px', borderRadius: 12, marginBottom: 8, background: n.read ? C.cream : '#fff8e8', border: `1px solid ${n.read ? C.border : '#f0d090'}` }}>
-                  {n.photoData ? (
-                    <img src={n.photoData} alt="selfie"
-                      style={{ width: 52, height: 52, borderRadius: 10, objectFit: 'cover', flexShrink: 0, cursor: 'pointer', border: `2px solid ${C.gold}` }}
-                      onClick={() => { setPhotoViewer({ url: n.photoData, docId: firestoreRecords[n.staff]?.docId, field: n.type === 'IN' ? 'photoInData' : 'photoOutData', staff: n.staff, label: `Clock ${n.type}` }); setNotifOpen(false); }}
-                    />
-                  ) : (
-                    <div style={{ width: 52, height: 52, borderRadius: 10, background: C.soft, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>👤</div>
-                  )}
+                  {n.photoData
+                    ? (
+                      <img src={n.photoData} alt="selfie"
+                        style={{ width: 52, height: 52, borderRadius: 10, objectFit: 'cover', flexShrink: 0, cursor: 'pointer', border: `2px solid ${C.gold}` }}
+                        onClick={() => { setPhotoViewer({ url: n.photoData, docId: firestoreRecords[n.staff]?.docId, field: n.type === 'IN' ? 'photoInData' : 'photoOutData', staff: n.staff, label: `Clock ${n.type}` }); setNotifOpen(false); }}
+                      />
+                    ) : (
+                      <div style={{ width: 52, height: 52, borderRadius: 10, background: C.soft, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>👤</div>
+                    )
+                  }
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 14, fontWeight: 700, color: C.ink }}>{n.staff}</div>
                     <div style={{ fontSize: 12, color: n.type === 'IN' ? C.green : C.terra, fontWeight: 600 }}>
@@ -712,11 +803,12 @@ export default function Attendance({ role, userName }) {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
               <div>
                 <div style={{ fontFamily: 'var(--font-display)', fontSize: 15, fontWeight: 700, color: C.ink }}>{photoViewer.staff} — {photoViewer.label}</div>
-                <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>Tap image to zoom · Manager only</div>
+                <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>Manager only</div>
               </div>
               <button onClick={() => setPhotoViewer(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4, lineHeight: 0 }}>{Ic.close}</button>
             </div>
-            <img src={photoViewer.url} alt="selfie"
+            <img
+              src={photoViewer.url} alt="selfie"
               style={{ width: '100%', borderRadius: 14, objectFit: 'cover', maxHeight: 340, marginBottom: 14 }}
               onError={e => { e.target.src = ''; e.target.alt = 'Image unavailable'; }}
             />
