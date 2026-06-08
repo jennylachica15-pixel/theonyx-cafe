@@ -5,6 +5,7 @@ import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const REPORT_START = new Date('2025-06-04T00:00:00');
 const DAY_COLORS = ['#e07b39','#c8956c','#d4a853','#6b3a1f','#1a0a00','#888','#c8956c'];
+const PRODUCT_COLORS = ['#e07b39','#6b3a1f','#d4a853','#c8956c','#1a0a00','#a0522d','#888','#b8860b','#cd853f','#8b4513'];
 
 const s = {
   page: { padding: '16px 16px 0', animation: 'fadeIn 0.3s ease' },
@@ -20,29 +21,49 @@ const s = {
   statLabel: { fontSize: 11, color: 'var(--brown-light)', marginTop: 2 },
   productRow: { display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', borderBottom: '1px solid #f5ede4' },
   rank: { width: 22, height: 22, borderRadius: '50%', background: 'var(--brown-dark)', color: 'var(--gold-light)', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  tooltip: { position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', background: 'var(--brown-dark)', color: 'var(--gold-light)', borderRadius: 10, padding: '6px 14px', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap', zIndex: 10, boxShadow: '0 2px 8px rgba(0,0,0,0.18)', pointerEvents: 'none' },
+  tooltip: { position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', background: 'var(--brown-dark)', color: 'var(--gold-light)', borderRadius: 10, padding: '6px 14px', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', zIndex: 10, boxShadow: '0 2px 8px rgba(0,0,0,0.18)', pointerEvents: 'none', maxWidth: '90%', textAlign: 'center', lineHeight: 1.6 },
 };
 
 function formatAmount(val) {
   return val >= 1000 ? `P${(val / 1000).toFixed(1)}k` : `P${val.toLocaleString()}`;
 }
 
+function formatDateShort(date) {
+  return `${date.toLocaleString('default', { month: 'short' })} ${date.getDate()}`;
+}
+
 function isAfterReportStart(date) {
   return date >= REPORT_START;
 }
 
+// Assign a consistent color per product name
+function getProductColor(name, colorMap) {
+  if (!colorMap[name]) {
+    const idx = Object.keys(colorMap).length % PRODUCT_COLORS.length;
+    colorMap[name] = PRODUCT_COLORS[idx];
+  }
+  return colorMap[name];
+}
+
 function DailyChart({ dailyData, maxDaily }) {
   const [tooltip, setTooltip] = useState(null);
+  const colorMap = {};
 
   return (
     <div style={{ position: 'relative' }}>
       {tooltip && (
         <div style={s.tooltip}>
-          {tooltip.label} · {formatAmount(tooltip.total)}
+          <div style={{ fontWeight: 700, marginBottom: 2 }}>{tooltip.label} · {formatAmount(tooltip.total)}</div>
+          {tooltip.products.map((p, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10 }}>
+              <div style={{ width: 8, height: 8, borderRadius: 2, background: p.color, flexShrink: 0 }} />
+              <span>{p.name}: {formatAmount(p.sales)}</span>
+            </div>
+          ))}
         </div>
       )}
       <div
-        style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 100, marginBottom: 4, marginTop: 32 }}
+        style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 100, marginBottom: 4, marginTop: tooltip ? Math.max(48, 24 + (tooltip.products.length * 16)) : 32 }}
         onClick={() => setTooltip(null)}
       >
         {dailyData.map((d, i) => {
@@ -56,17 +77,28 @@ function DailyChart({ dailyData, maxDaily }) {
               <div
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (!d.disabled && d.total > 0) setTooltip(isActive ? null : { label: d.label, total: d.total });
+                  if (!d.disabled && d.total > 0) {
+                    if (isActive) { setTooltip(null); return; }
+                    const cm = {};
+                    const products = d.products.map(p => ({ ...p, color: getProductColor(p.name, cm) }));
+                    setTooltip({ label: d.label, total: d.total, products });
+                  }
                 }}
                 style={{
                   width: '70%',
                   height: `${barHeight}px`,
-                  background: isActive ? 'var(--gold)' : (d.disabled ? '#e8e8e8' : 'var(--brown-dark)'),
                   borderRadius: '4px 4px 0 0',
-                  transition: 'height 0.4s ease, background 0.2s ease',
+                  overflow: 'hidden',
+                  display: 'flex',
+                  flexDirection: 'column-reverse',
                   cursor: d.total > 0 ? 'pointer' : 'default',
+                  outline: isActive ? '2px solid var(--gold)' : 'none',
                 }}
-              />
+              >
+                {d.products && d.products.map((p, pi) => (
+                  <div key={pi} style={{ background: getProductColor(p.name, colorMap), flex: p.sales, minHeight: 2 }} />
+                ))}
+              </div>
             </div>
           );
         })}
@@ -87,11 +119,12 @@ function WeeklyChart({ weeklyData, maxWeekly }) {
     <div style={{ position: 'relative' }}>
       {tooltip && (
         <div style={s.tooltip}>
-          {tooltip.label} · {formatAmount(tooltip.total)}
+          {tooltip.label} · {formatAmount(tooltip.total)}{'\n'}
+          <span style={{ fontSize: 10, fontWeight: 400 }}>{tooltip.dateRange}</span>
         </div>
       )}
       <div
-        style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 100, marginBottom: 4, marginTop: 32 }}
+        style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 100, marginBottom: 4, marginTop: 40 }}
         onClick={() => setTooltip(null)}
       >
         {weeklyData.map((w, i) => {
@@ -105,7 +138,7 @@ function WeeklyChart({ weeklyData, maxWeekly }) {
               <div
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (w.total > 0) setTooltip(isActive ? null : { label: w.label, total: w.total });
+                  if (w.total > 0) setTooltip(isActive ? null : { label: w.label, total: w.total, dateRange: w.dateRange });
                 }}
                 style={{
                   width: '70%',
@@ -116,7 +149,6 @@ function WeeklyChart({ weeklyData, maxWeekly }) {
                   flexDirection: 'column-reverse',
                   cursor: w.total > 0 ? 'pointer' : 'default',
                   outline: isActive ? '2px solid var(--gold)' : 'none',
-                  transition: 'outline 0.2s ease',
                 }}
               >
                 {w.days.map((dayVal, di) => dayVal > 0 ? (
@@ -127,9 +159,13 @@ function WeeklyChart({ weeklyData, maxWeekly }) {
           );
         })}
       </div>
+      {/* Week labels with date range */}
       <div style={{ display: 'flex', gap: 6 }}>
         {weeklyData.map((w, i) => (
-          <div key={i} style={{ flex: 1, fontSize: 9, color: 'var(--brown-light)', textAlign: 'center' }}>{w.label}</div>
+          <div key={i} style={{ flex: 1, textAlign: 'center' }}>
+            <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--brown-light)' }}>{w.label}</div>
+            <div style={{ fontSize: 8, color: '#bbb', marginTop: 1, lineHeight: 1.3 }}>{w.dateRange}</div>
+          </div>
         ))}
       </div>
     </div>
@@ -154,17 +190,26 @@ export default function Reports() {
 
   const now = new Date();
 
-  // Daily
+  // Daily — with per-product breakdown
   const dailyData = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(now); d.setDate(d.getDate() - (6 - i));
-    if (d < REPORT_START) return { label: DAYS[d.getDay()], total: 0, disabled: true };
+    if (d < REPORT_START) return { label: DAYS[d.getDay()], total: 0, disabled: true, products: [] };
     const dayKey = d.toDateString();
-    const total = orders.filter(o => o.createdAt?.toDate && o.createdAt.toDate().toDateString() === dayKey).reduce((s, o) => s + (o.total || 0), 0);
-    return { label: DAYS[d.getDay()], total, disabled: false };
+    const dayOrders = orders.filter(o => o.createdAt?.toDate && o.createdAt.toDate().toDateString() === dayKey);
+    const productMap = {};
+    dayOrders.forEach(order => {
+      (order.items || []).forEach(item => {
+        if (!productMap[item.name]) productMap[item.name] = 0;
+        productMap[item.name] += (item.price || 0) * (item.qty || 1);
+      });
+    });
+    const products = Object.entries(productMap).sort((a, b) => b[1] - a[1]).map(([name, sales]) => ({ name, sales }));
+    const total = products.reduce((s, p) => s + p.sales, 0);
+    return { label: DAYS[d.getDay()], total, disabled: false, products };
   });
   const maxDaily = Math.max(...dailyData.map(d => d.total), 1);
 
-  // Weekly
+  // Weekly — with date range labels
   const weeklyData = Array.from({ length: 4 }, (_, i) => {
     const weekStart = new Date(now); weekStart.setDate(weekStart.getDate() - weekStart.getDay() - (3 - i) * 7);
     const weekDays = Array.from({ length: 7 }, (_, d) => { const day = new Date(weekStart); day.setDate(day.getDate() + d); return day; });
@@ -173,7 +218,15 @@ export default function Reports() {
       const ds = day.toDateString();
       return orders.filter(o => o.createdAt?.toDate && o.createdAt.toDate().toDateString() === ds).reduce((s, o) => s + (o.total || 0), 0);
     });
-    return { label: `W${i + 1}`, days: totals, total: totals.reduce((a, b) => a + b, 0) };
+
+    // Date range: clamp start to REPORT_START, end to today
+    const effectiveStart = weekDays[0] < REPORT_START ? REPORT_START : weekDays[0];
+    const effectiveEnd = weekDays[6] > now ? now : weekDays[6];
+    const dateRange = effectiveStart > effectiveEnd
+      ? '—'
+      : `${formatDateShort(effectiveStart)}–${formatDateShort(effectiveEnd)}`;
+
+    return { label: `W${i + 1}`, days: totals, total: totals.reduce((a, b) => a + b, 0), dateRange };
   });
   const maxWeekly = Math.max(...weeklyData.map(w => w.total), 1);
 
@@ -191,9 +244,8 @@ export default function Reports() {
   const productMap = {};
   orders.forEach(order => {
     (order.items || []).forEach(item => {
-      const key = item.name;
-      if (!productMap[key]) productMap[key] = 0;
-      productMap[key] += (item.price || 0) * (item.qty || 1);
+      if (!productMap[item.name]) productMap[item.name] = 0;
+      productMap[item.name] += (item.price || 0) * (item.qty || 1);
     });
   });
   const totalSales = Object.values(productMap).reduce((a, b) => a + b, 0);
