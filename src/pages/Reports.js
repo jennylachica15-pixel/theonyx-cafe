@@ -37,8 +37,6 @@ const s = {
   barValue: { fontSize: 9, color: 'var(--brown-mid)', textAlign: 'center', marginBottom: 2 },
   productRow: { display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', borderBottom: '1px solid #f5ede4' },
   rank: { width: 22, height: 22, borderRadius: '50%', background: 'var(--brown-dark)', color: 'var(--gold-light)', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  alertRow: { display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderBottom: '1px solid #f5ede4' },
-  badge: (status) => ({ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: STATUS_CONFIG[status].bg, color: STATUS_CONFIG[status].color }),
 };
 
 const DAY_COLORS = ['#e07b39','#c8956c','#d4a853','#6b3a1f','#1a0a00','#888','#c8956c'];
@@ -49,28 +47,24 @@ function isAfterReportStart(date) {
 
 export default function Reports() {
   const [orders, setOrders] = useState([]);
-  const [items, setItems] = useState([]);
   const [activeTab, setActiveTab] = useState('daily');
 
   useEffect(() => {
     const unsub1 = onSnapshot(query(collection(db, 'orders'), orderBy('createdAt', 'desc')), snap => {
       const allOrders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      // Filter to only include orders from June 3 onwards
       const filtered = allOrders.filter(o => {
         if (!o.createdAt?.toDate) return false;
         return isAfterReportStart(o.createdAt.toDate());
       });
       setOrders(filtered);
     });
-    const unsub2 = onSnapshot(query(collection(db, 'inventory'), orderBy('createdAt', 'desc')), snap => setItems(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-    return () => { unsub1(); unsub2(); };
+    return () => unsub1();
   }, []);
 
   const now = new Date();
 
   const dailyData = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(now); d.setDate(d.getDate() - (6 - i));
-    // Skip days before REPORT_START
     if (d < REPORT_START) return { label: DAYS[d.getDay()], total: 0, disabled: true };
     const dayKey = d.toDateString();
     const total = orders.filter(o => o.createdAt?.toDate && o.createdAt.toDate().toDateString() === dayKey).reduce((s, o) => s + (o.total || 0), 0);
@@ -81,7 +75,6 @@ export default function Reports() {
   const weeklyData = Array.from({ length: 4 }, (_, i) => {
     const weekStart = new Date(now); weekStart.setDate(weekStart.getDate() - weekStart.getDay() - (3 - i) * 7);
     const weekDays = Array.from({ length: 7 }, (_, d) => { const day = new Date(weekStart); day.setDate(day.getDate() + d); return day; });
-    // Only count days from REPORT_START onwards
     const totals = weekDays.map(day => {
       if (day < REPORT_START) return 0;
       const ds = day.toDateString();
@@ -118,8 +111,6 @@ export default function Reports() {
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const effectiveMonthStart = monthStart < REPORT_START ? REPORT_START : monthStart;
   const monthTotal = orders.filter(o => { if (!o.createdAt?.toDate) return false; const d = o.createdAt.toDate(); return d >= effectiveMonthStart; }).reduce((s, o) => s + (o.total || 0), 0);
-
-  const alerts = items.filter(i => getStatus(i.quantity, i.threshold) !== 'ok');
 
   return (
     <div style={s.page}>
@@ -201,24 +192,6 @@ export default function Reports() {
               </div>
             </div>
           ))}
-        </div>
-      )}
-
-      {alerts.length > 0 && (
-        <div style={s.card}>
-          <div style={s.cardTitle}>Inventory Alerts</div>
-          {alerts.map(item => {
-            const status = getStatus(item.quantity, item.threshold);
-            return (
-              <div key={item.id} style={s.alertRow}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--brown-dark)' }}>{item.name}</div>
-                  <div style={{ fontSize: 11, color: 'var(--brown-light)' }}>{item.quantity} {item.unit} left</div>
-                </div>
-                <span style={s.badge(status)}>{STATUS_CONFIG[status].label}</span>
-              </div>
-            );
-          })}
         </div>
       )}
 
