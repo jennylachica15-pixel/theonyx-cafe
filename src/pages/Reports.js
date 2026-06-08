@@ -3,7 +3,7 @@ import { db } from '../firebase/config';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 
 const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-const REPORT_START = new Date('2025-06-04T00:00:00');
+const REPORT_START = new Date('2026-06-04T00:00:00');
 const DAY_COLORS = ['#e07b39','#c8956c','#d4a853','#6b3a1f','#1a0a00','#888','#c8956c'];
 const PRODUCT_COLORS = ['#e07b39','#6b3a1f','#d4a853','#c8956c','#1a0a00','#a0522d','#888','#b8860b','#cd853f','#8b4513'];
 
