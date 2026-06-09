@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 const SLIDES = [
   '/1.jpg','/2.jpg','/3.jpg','/4.jpg','/5.jpg','/6.jpg',
@@ -19,7 +19,7 @@ const MENU_CATEGORIES = [
       { name: 'Rhumpuccino', mini: 99, classic: 135, upgrade: 150 },
       { name: 'Brewed', mini: 25, classic: 50, upgrade: 85 },
       { name: 'Dirty Matcha', classic: 120, upgrade: 150 },
-       { name: 'Frappe Caramel Macchiato', regular: 150 },
+      { name: 'Frappe Caramel Macchiato', regular: 150 },
     ]
   },
   { id: 'noncoffee', label: 'Non-Coffee',
@@ -110,7 +110,6 @@ const MENU_CATEGORIES = [
   },
 ];
 
-// SVG Icons for menu categories
 const CAT_ICONS = {
   espresso: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 8h1a4 4 0 0 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/><line x1="14" y1="2" x2="14" y2="4"/></svg>,
   noncoffee: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a10 10 0 0 1 10 10"/><path d="M12 2v4"/><path d="M4.93 4.93l2.83 2.83"/><path d="M2 12h4"/><path d="M4.93 19.07l2.83-2.83"/><path d="M12 22v-4"/><circle cx="12" cy="12" r="4"/></svg>,
@@ -133,16 +132,39 @@ const getPriceRange = (item) => {
 export default function GuestLanding() {
   const [openCat, setOpenCat] = useState(null);
   const [slide, setSlide] = useState(0);
+  const touchStartX = useRef(null);
+  const touchStartY = useRef(null);
 
   useEffect(() => {
     const timer = setInterval(() => setSlide(s => (s + 1) % SLIDES.length), 4000);
     return () => clearInterval(timer);
   }, []);
 
+  const handleTouchStart = (e) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = (e) => {
+    if (touchStartX.current === null) return;
+    const dx = e.changedTouches[0].clientX - touchStartX.current;
+    const dy = e.changedTouches[0].clientY - touchStartY.current;
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 40) {
+      if (dx < 0) setSlide(s => (s + 1) % SLIDES.length);
+      else setSlide(s => (s - 1 + SLIDES.length) % SLIDES.length);
+    }
+    touchStartX.current = null;
+    touchStartY.current = null;
+  };
+
   return (
     <div style={{ minHeight: '100vh', background: 'transparent', paddingBottom: 40 }}>
       {/* Hero with slideshow */}
-      <div style={{ position: 'relative', height: 280, overflow: 'hidden' }}>
+      <div
+        style={{ position: 'relative', height: 280, overflow: 'hidden' }}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
         {SLIDES.map((src, i) => (
           <div key={i} style={{
             position: 'absolute', inset: 0, backgroundImage: `url(${src})`,
@@ -150,14 +172,11 @@ export default function GuestLanding() {
             opacity: slide === i ? 1 : 0, transition: 'opacity 1.2s ease',
           }} />
         ))}
-        {/* Dark overlay — less transparent so text is readable */}
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(20,8,0,0.55) 0%, rgba(20,8,0,0.70) 60%, rgba(20,8,0,0.88) 100%)' }} />
-        {/* Hero content */}
         <div style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', padding: '0 20px' }}>
           <img src="/logo.jpg" alt="Theonyx Cafe" style={{ width: 72, height: 72, borderRadius: '50%', objectFit: 'cover', border: '2.5px solid #d4a853', marginBottom: 10 }} />
           <div style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 700, color: '#f0d080', letterSpacing: 2, textAlign: 'center', textShadow: '0 2px 8px rgba(0,0,0,0.6)' }}>THEONYX CAFE</div>
           <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)', marginTop: 4, letterSpacing: 1.5, textAlign: 'center', textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>COFFEE · PASTRY · STEAK · WINE</div>
-          {/* Social + Map icons */}
           <div style={{ display: 'flex', gap: 14, marginTop: 16 }}>
             {[
               { href: 'https://www.facebook.com/theonyxs', label: 'Facebook', svg: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg> },
@@ -171,7 +190,6 @@ export default function GuestLanding() {
               </a>
             ))}
           </div>
-          {/* Slide dots */}
           <div style={{ display: 'flex', gap: 5, marginTop: 12 }}>
             {SLIDES.map((_, i) => (
               <div key={i} onClick={() => setSlide(i)} style={{ width: slide === i ? 16 : 5, height: 5, borderRadius: 3, background: slide === i ? '#d4a853' : 'rgba(255,255,255,0.4)', cursor: 'pointer', transition: 'all 0.3s' }} />
@@ -182,7 +200,6 @@ export default function GuestLanding() {
 
       {/* Body */}
       <div style={{ padding: '18px 16px 0' }}>
-        {/* Welcome card */}
         <div style={{ background: 'rgba(20,8,0,0.55)', borderRadius: 14, padding: '16px 18px', marginBottom: 16, border: '1px solid rgba(212,168,83,0.25)', backdropFilter: 'blur(8px)' }}>
           <div style={{ fontFamily: 'var(--font-display)', fontSize: 15, fontWeight: 700, color: '#f0d080', marginBottom: 6 }}>Welcome to Theonyx Cafe</div>
           <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.85)', lineHeight: 1.7 }}>
@@ -191,7 +208,6 @@ export default function GuestLanding() {
           <div style={{ fontSize: 12, color: '#d4a853', marginTop: 8, fontWeight: 500 }}>Open everyday · 10:00 AM – 11:00 PM</div>
         </div>
 
-        {/* Menu */}
         <div style={{ fontFamily: 'var(--font-display)', fontSize: 17, fontWeight: 700, color: '#f0d080', marginBottom: 12 }}>Our Menu</div>
 
         {MENU_CATEGORIES.map(cat => (
