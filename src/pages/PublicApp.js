@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { auth } from '../firebase/config';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import GuestLanding from './GuestLanding';
@@ -48,6 +48,8 @@ export default function PublicApp({ onAdminLogin, user }) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const touchStartX = useRef(null);
+  const touchStartY = useRef(null);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -60,6 +62,27 @@ export default function PublicApp({ onAdminLogin, user }) {
       setError('Invalid email or password.');
     }
     setLoading(false);
+  };
+
+  const handleTouchStart = (e) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = (e) => {
+    if (touchStartX.current === null) return;
+    const dx = e.changedTouches[0].clientX - touchStartX.current;
+    const dy = e.changedTouches[0].clientY - touchStartY.current;
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
+      const currentIndex = TABS.findIndex(t => t.id === activeTab);
+      if (dx < 0 && currentIndex < TABS.length - 1) {
+        setActiveTab(TABS[currentIndex + 1].id);
+      } else if (dx > 0 && currentIndex > 0) {
+        setActiveTab(TABS[currentIndex - 1].id);
+      }
+    }
+    touchStartX.current = null;
+    touchStartY.current = null;
   };
 
   return (
@@ -75,7 +98,11 @@ export default function PublicApp({ onAdminLogin, user }) {
         </button>
       </div>
 
-      <div style={styles.content}>
+      <div
+        style={styles.content}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
         {activeTab === 'home'      && <GuestLanding />}
         {activeTab === 'gallery'   && <Gallery />}
         {activeTab === 'snapshots' && <Snapshots />}
