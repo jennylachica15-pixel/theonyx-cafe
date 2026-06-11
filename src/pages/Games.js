@@ -44,6 +44,7 @@ const GAME_LIST = [
   { id: 'guessword',     title: 'Guess the Word',       sub: 'Clues & letters',         mode: 'Single player' },
   { id: 'cafemystery',   title: 'Cafe Mystery',         sub: 'Who is the impostor?',    mode: 'Multiplayer'   },
   { id: 'fairyq',        title: 'Friends & Questions',  sub: 'Funny, deep & spicy',     mode: 'Group play'    },
+  { id: 'maze',          title: 'Maze Runner 3D',       sub: 'Escape the dark maze',    mode: 'Single player' },
 ];
 
 const LEADERBOARD_GAMES = GAME_LIST.filter(g => g.id !== 'cafemystery' && g.id !== 'fairyq');
@@ -141,7 +142,7 @@ const weeklyDateRange = `${_fmt(_ws)} – ${_fmt(_we)}`;
 const FEATURED_GAME_WEEKS = LEADERBOARD_GAMES.map(g => g.id);
 const FEATURED_WEEK_NUM = Math.floor(getCurrentWeekStart() / (7 * 24 * 60 * 60 * 1000));
 const FEATURED_GAME = FEATURED_GAME_WEEKS[FEATURED_WEEK_NUM % FEATURED_GAME_WEEKS.length];
-const GAME_NAMES = { snake:'Snake', tetris:'Tetris', racing:'Cafe Racer', flappybarista:'Flappy Barista', zombie:'Zombie Barista', guessword:'Guess the Word' };
+const GAME_NAMES = { snake:'Snake', tetris:'Tetris', racing:'Cafe Racer', flappybarista:'Flappy Barista', zombie:'Zombie Barista', guessword:'Guess the Word', maze:'Maze Runner 3D' };
 
 // ─── MODALS ───────────────────────────────────────────────────────────────────
 
@@ -881,6 +882,30 @@ function FairyQGame({ playerName, onBack }) {
 }
 
 
+
+// ─── MAZE RUNNER 3D ───────────────────────────────────────────────────────────
+
+function MazeGame({ onScore }) {
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.data && e.data.type === 'MAZE_SCORE') {
+        onScore(e.data.score);
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, [onScore]);
+
+  return (
+    <iframe
+      src="https://63fc9f4d-de57-4e56-86d0-2d7c8c75273c-00-1xy9zyge2ykdb.pike.replit.dev/"
+      style={{ flex: 1, border: 'none', width: '100%', height: '100%', display: 'block' }}
+      allow="pointer-lock"
+      title="Maze Runner 3D"
+    />
+  );
+}
+
 // ─── MAIN GAMES PAGE ─────────────────────────────────────────────────────────
 
 const FEATURED_GAME_WEEKS_LB = LEADERBOARD_GAMES.map(g => g.id);
@@ -956,7 +981,7 @@ export default function GamesPage() {
   };
 
   const handleGameSelect = (game) => {
-    if (game.id==='cafemystery' || game.id==='zombie' || game.id==='fairyq') { setActiveGame(game); return; }
+    if (game.id==='cafemystery' || game.id==='zombie' || game.id==='fairyq' || game.id==='maze') { setActiveGame(game); return; }
     setPendingGame(game); setShowName(true);
   };
   const handleNameStart = (name) => {
@@ -992,6 +1017,7 @@ export default function GamesPage() {
           {activeGame.id==='guessword'     && <GuessWordGame    playerName={playerName} onScore={s=>handleScore('guessword',s)}/>}
           {activeGame.id==='cafemystery'   && <CafeGame         playerName={playerName} onBack={()=>setActiveGame(null)}/>}
           {activeGame.id==='fairyq'        && <FairyQGame       playerName={playerName} onBack={()=>setActiveGame(null)}/>}
+          {activeGame.id==='maze'           && <MazeGame          onScore={s=>handleScore('maze',s)}/>}
         </div>
       </div>
     );
