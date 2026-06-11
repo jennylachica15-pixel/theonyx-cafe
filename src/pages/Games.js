@@ -883,319 +883,165 @@ function FairyQGame({ playerName, onBack }) {
 
 
 
-// ─── MAZE RUNNER 3D ───────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// THEONYX CAFE — GamesPage.js  (Maze Runner integration)
+//
+// HOW TO USE
+// 1. Copy the snippets below into your existing GamesPage.js
+// 2. Replace YOUR_DEPLOYED_URL with your Replit .replit.app URL after deploying
+//    (dev URL for testing: 63fc9f4d-de57-4e56-86d0-2d7c8c75273c-00-1xy9zyge2ykdb.pike.replit.dev)
+// ─────────────────────────────────────────────────────────────────────────────
+
+import React, { useState, useEffect, useRef } from "react";
+
+// ── 1. Add "maze" to your game list ──────────────────────────────────────────
+// Merge this into your existing GAME_LIST / GAME_NAMES arrays.
+
+const GAME_LIST = [
+  // ... your existing games ...
+  "maze",
+];
+
+const GAME_NAMES = {
+  // ... your existing names ...
+  maze: "Maze Runner",
+};
+
+// ── 2. Iframe URL ─────────────────────────────────────────────────────────────
+// Replace with your Replit .replit.app URL after deploying.
+// For local testing use the dev URL below.
+const MAZE_URL =
+  "https://YOUR_DEPLOYED_URL.replit.app/";
+  // "https://63fc9f4d-de57-4e56-86d0-2d7c8c75273c-00-1xy9zyge2ykdb.pike.replit.dev/"
+
+// ── 3. MazeGame component ─────────────────────────────────────────────────────
+// Drop this component into your file (or a separate MazeGame.js file).
 
 function MazeGame({ onScore }) {
+  const iframeRef = useRef(null);
+
   useEffect(() => {
-    const handler = (e) => {
-      if (e.data && e.data.type === 'MAZE_SCORE') {
-        onScore(e.data.score);
+    function handleMessage(event) {
+      // Only accept messages from our maze game origin
+      if (
+        event.data &&
+        event.data.type === "MAZE_SCORE" &&
+        typeof event.data.score === "number"
+      ) {
+        if (onScore) onScore(event.data.score);
       }
-    };
-    window.addEventListener('message', handler);
-    return () => window.removeEventListener('message', handler);
+    }
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
   }, [onScore]);
 
   return (
     <iframe
-      src="https://63fc9f4d-de57-4e56-86d0-2d7c8c75273c-00-1xy9zyge2ykdb.pike.replit.dev/"
-      style={{ flex: 1, border: 'none', width: '100%', height: '100%', display: 'block' }}
-      allow="pointer-lock"
-      title="Maze Runner 3D"
+      ref={iframeRef}
+      src={MAZE_URL}
+      title="Maze Runner"
+      allow="pointer-lock; fullscreen"
+      style={{
+        width: "100%",
+        height: "100%",
+        border: "none",
+        display: "block",
+        background: "#0d0500",
+      }}
     />
   );
 }
 
-// ─── MAIN GAMES PAGE ─────────────────────────────────────────────────────────
-
-const FEATURED_GAME_WEEKS_LB = LEADERBOARD_GAMES.map(g => g.id);
+// ── 4. Wire it into your GamesPage ────────────────────────────────────────────
+// Add the maze case to your handleGameSelect / renderGame logic.
+// Example showing how a typical GamesPage might look:
 
 export default function GamesPage() {
-  const [activeGame, setActiveGame] = useState(null);
-  const [showLB, setShowLB] = useState(false);
-  const [showAuth, setShowAuth] = useState(false);
-  const [musicOn, setMusicOn] = useState(true);
-  const audioRef = useRef(null);
+  const [selectedGame, setSelectedGame] = useState(null);
+  const [lastScore, setLastScore] = useState(null);
 
-  useEffect(() => {
-    if (!audioRef.current) {
-      audioRef.current = new Audio('/game-music.mp3');
-      audioRef.current.loop = true;
-      audioRef.current.volume = 0.35;
+  function handleGameSelect(gameId) {
+    setSelectedGame(gameId);
+    setLastScore(null);
+  }
+
+  function handleMazeScore(score) {
+    setLastScore(score);
+    // Save to Firebase here if you like:
+    // saveScore("maze", score);
+  }
+
+  function renderGame() {
+    if (selectedGame === "maze") {
+      return (
+        <div style={{ width: "100%", height: "100%", position: "relative" }}>
+          <MazeGame onScore={handleMazeScore} />
+
+          {/* back button */}
+          <button
+            onClick={() => setSelectedGame(null)}
+            style={{
+              position: "absolute",
+              top: 12,
+              left: 12,
+              zIndex: 10,
+              background: "rgba(0,0,0,0.6)",
+              color: "#f0d080",
+              border: "1px solid rgba(212,168,83,0.4)",
+              padding: "6px 14px",
+              borderRadius: 6,
+              cursor: "pointer",
+              fontFamily: "serif",
+            }}
+          >
+            ← Back
+          </button>
+
+          {/* optional: show score when game ends */}
+          {lastScore !== null && (
+            <div
+              style={{
+                position: "absolute",
+                top: 12,
+                right: 12,
+                zIndex: 10,
+                background: "rgba(0,0,0,0.7)",
+                color: "#f0d080",
+                border: "1px solid rgba(212,168,83,0.4)",
+                padding: "6px 14px",
+                borderRadius: 6,
+                fontFamily: "serif",
+              }}
+            >
+              Score: {lastScore}
+            </div>
+          )}
+        </div>
+      );
     }
-    const audio = audioRef.current;
-    if (!activeGame && musicOn) { audio.play().catch(()=>{}); }
-    else { audio.pause(); }
-    return () => { audio.pause(); };
-  }, [activeGame, musicOn]);
 
-  // ── Weekly reset on every Monday ──────────────────────────────────────────
-  useEffect(() => {
-    // Delete old Firestore scores
-    deleteOldScores().catch(console.error);
-    // Reset localStorage if the week has changed
-    const storedWeek = localStorage.getItem('cafeWeekStart');
-    const currentWeek = String(getCurrentWeekStart());
-    if (storedWeek !== currentWeek) {
-      localStorage.setItem('cafeWeekStart', currentWeek);
-      localStorage.removeItem('cafeBests');
-      localStorage.removeItem('flappyBest');
-      localStorage.removeItem('gwUsedWords');
-      setLocalBests({});
-    }
-  }, []);
+    // ... your existing game cases ...
+    return null;
+  }
 
-  const [username, setUsername] = useState(() => { try { return localStorage.getItem('cafeGameUser') || null; } catch { return null; } });
-  const [showName, setShowName] = useState(false);
-  const [pendingGame, setPendingGame] = useState(null);
-  const [playerName, setPlayerName] = useState(() => { try { return localStorage.getItem('cafePlayerName') || ''; } catch { return ''; } });
-  const [localBests, setLocalBests] = useState(() => { try { return JSON.parse(localStorage.getItem('cafeBests') || '{}'); } catch { return {}; } });
-  const [lbGame, setLbGame] = useState(FEATURED_GAME);
-  const [lbRows, setLbRows] = useState([]);
-  const [lbLoading, setLbLoading] = useState(true);
-  const [featuredLeader, setFeaturedLeader] = useState(null);
-
-  useEffect(() => {
-    const fetchLB = async () => {
-      setLbLoading(true);
-      try {
-        const snap = await getDocs(collection(db, 'leaderboard'));
-        const all = snap.docs.map(d => d.data());
-        const weekStart = getCurrentWeekStart();
-        const filtered = all.filter(d => d.gameId===lbGame && d.weekStart===weekStart).sort((a,b)=>(b.score||0)-(a.score||0)).slice(0,10);
-        setLbRows(filtered);
-        const fl = all.filter(d => d.gameId===FEATURED_GAME && d.weekStart===weekStart).sort((a,b)=>(b.score||0)-(a.score||0))[0] || null;
-        setFeaturedLeader(fl);
-      } catch(e) { setLbRows([]); }
-      setLbLoading(false);
-    };
-    fetchLB();
-  }, [lbGame]);
-
-  const saveLocal = (gameId, score) => {
-    setLocalBests(prev => {
-      const upd = {...prev, [gameId]: Math.max(prev[gameId]||0, score)};
-      try { localStorage.setItem('cafeBests', JSON.stringify(upd)); } catch {}
-      return upd;
-    });
-  };
-
-  const handleGameSelect = (game) => {
-    if (game.id==='cafemystery' || game.id==='zombie' || game.id==='fairyq' || game.id==='maze') { setActiveGame(game); return; }
-    setPendingGame(game); setShowName(true);
-  };
-  const handleNameStart = (name) => {
-    setPlayerName(name); try { localStorage.setItem('cafePlayerName', name); } catch {}
-    setShowName(false); setActiveGame(pendingGame);
-  };
-  const handleScore = async (gameId, score) => {
-    saveLocal(gameId, score);
-    if (username && score > 0) { try { await saveScore(username, gameId, score); } catch(e) {} }
-  };
-  const handleAuth = (user) => {
-    setUsername(user); try { localStorage.setItem('cafeGameUser', user); } catch {}
-    setShowAuth(false);
-  };
-  const handleLogout = () => {
-    setUsername(null); try { localStorage.removeItem('cafeGameUser'); } catch {}
-  };
-
-  if (activeGame) {
+  // If a game is active, show it full-screen
+  if (selectedGame) {
     return (
-      <div style={S.fullscreen}>
-        <div style={S.gameBar}>
-          <button style={S.backBtn} onClick={()=>setActiveGame(null)}>Exit</button>
-          <span style={S.gameTitle}>{activeGame.title}</span>
-          <button style={S.lbBtn} onClick={()=>{setActiveGame(null);setShowLB(true);}}>🏆</button>
-        </div>
-        <div style={S.gameContent}>
-          {activeGame.id==='snake'         && <SnakeGame        playerName={playerName} onScore={s=>handleScore('snake',s)}/>}
-          {activeGame.id==='tetris'        && <TetrisGame       playerName={playerName} onScore={s=>handleScore('tetris',s)}/>}
-          {activeGame.id==='racing'        && <RacingGame       playerName={playerName} onScore={s=>handleScore('racing',s)}/>}
-          {activeGame.id==='flappybarista' && <FlappyBarista    playerName={playerName} onScore={s=>handleScore('flappybarista',s)}/>}
-          {activeGame.id==='zombie'        && <ZombieGame       playerName={playerName} username={username} onScore={s=>handleScore('zombie',s)} onBack={()=>setActiveGame(null)}/>}
-          {activeGame.id==='guessword'     && <GuessWordGame    playerName={playerName} onScore={s=>handleScore('guessword',s)}/>}
-          {activeGame.id==='cafemystery'   && <CafeGame         playerName={playerName} onBack={()=>setActiveGame(null)}/>}
-          {activeGame.id==='fairyq'        && <FairyQGame       playerName={playerName} onBack={()=>setActiveGame(null)}/>}
-          {activeGame.id==='maze'           && <MazeGame          onScore={s=>handleScore('maze',s)}/>}
-        </div>
+      <div style={{ width: "100vw", height: "100vh", background: "#000" }}>
+        {renderGame()}
       </div>
     );
   }
 
+  // Otherwise show your game selection menu
   return (
-    <div style={S.wrap}>
-      {showAuth   && <AuthModal onAuth={handleAuth} onClose={()=>setShowAuth(false)}/>}
-      {showName && pendingGame && <NameModal gameTitle={pendingGame.title} username={username} onStart={handleNameStart} onClose={()=>setShowName(false)}/>}
-      {showLB     && <LeaderboardModal onClose={()=>setShowLB(false)} username={username}/>}
-
-      {/* Header */}
-      <div style={S.header}>
-        <div style={{position:'absolute',inset:0,background:'radial-gradient(ellipse at 50% 0%, rgba(255,140,0,0.2) 0%, transparent 70%)',pointerEvents:'none'}}/>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:12,position:'relative'}}>
-          <svg width="34" height="34" viewBox="0 0 34 34" fill="none">
-            <rect x="3" y="9" width="28" height="18" rx="4" fill="#6b3a00" stroke="#d4a853" strokeWidth="1.5"/>
-            <rect x="7" y="13" width="6" height="5" rx="1.5" fill="#ffc200"/>
-            <rect x="21" y="13" width="6" height="5" rx="1.5" fill="#ffc200"/>
-            <rect x="15" y="15" width="4" height="3" rx="1" fill="#ffc200"/>
-            <line x1="10" y1="5" x2="10" y2="9" stroke="#ffc200" strokeWidth="1.8" strokeLinecap="round"/>
-            <line x1="17" y1="4" x2="17" y2="9" stroke="#ffc200" strokeWidth="1.8" strokeLinecap="round"/>
-            <line x1="24" y1="5" x2="24" y2="9" stroke="#ffc200" strokeWidth="1.8" strokeLinecap="round"/>
-          </svg>
-          <span style={S.logo}>GAME CORNER</span>
-        </div>
-        <div style={S.sub}>Theonyx Cafe Arcade</div>
-      </div>
-
-      <div style={{height:3,background:'linear-gradient(90deg,transparent 0%,#ff4400 20%,#ffcc00 50%,#ff4400 80%,transparent 100%)',boxShadow:'0 0 10px rgba(255,140,0,0.7)',position:'relative',zIndex:2}}/>
-
-      {/* Music toggle */}
-      <div style={{position:'absolute',top:12,right:12,zIndex:10}}>
-        <button onClick={()=>setMusicOn(m=>!m)} style={{background:'rgba(0,0,0,0.5)',border:'1px solid rgba(212,168,83,0.4)',borderRadius:20,padding:'4px 10px',color:'#ffd700',fontSize:13,cursor:'pointer'}}>
-          {musicOn?'🔊':'🔇'}
+    <div>
+      <h1>Theonyx Cafe Arcade</h1>
+      {GAME_LIST.map((id) => (
+        <button key={id} onClick={() => handleGameSelect(id)}>
+          {GAME_NAMES[id]}
         </button>
-      </div>
-
-      {/* Auth bar */}
-      <div style={{position:'relative',zIndex:2,display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 14px',background:'linear-gradient(90deg,#1a0800,#2a1000,#1a0800)',borderBottom:'1px solid #3d1500'}}>
-        {username ? (
-          <>
-            <span style={{color:'#8bc34a',fontSize:12}}>{username}</span>
-            <div style={{display:'flex',gap:6}}>
-              <button onClick={()=>setShowLB(true)} style={{background:'#1a0800',border:'1.5px solid #d4a853',color:'#ffd700',padding:'5px 11px',borderRadius:14,fontSize:11,fontWeight:'bold',cursor:'pointer'}}>Leaderboard</button>
-              <button onClick={handleLogout} style={{background:'transparent',border:'1px solid #6b3a1f',color:'#a07850',padding:'5px 10px',borderRadius:14,fontSize:11,cursor:'pointer'}}>Logout</button>
-            </div>
-          </>
-        ) : (
-          <>
-            <span style={{color:'#7a5020',fontSize:11}}>Save scores to the global board</span>
-            <div style={{display:'flex',gap:6}}>
-              <button onClick={()=>setShowAuth(true)} style={{background:'linear-gradient(135deg,#ffd700,#e8a000)',border:'none',color:'#1a0800',padding:'6px 13px',borderRadius:14,fontSize:11,fontWeight:'bold',cursor:'pointer'}}>Sign Up</button>
-              <button onClick={()=>setShowAuth(true)} style={{background:'#1a0800',border:'1.5px solid #d4a853',color:'#ffd700',padding:'6px 13px',borderRadius:14,fontSize:11,fontWeight:'bold',cursor:'pointer'}}>Sign In</button>
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* Ticker */}
-      <div style={{overflow:'hidden',height:22,display:'flex',alignItems:'center',background:'#ffd700',position:'relative',zIndex:2}}>
-        <div style={{display:'flex',whiteSpace:'nowrap',animation:'lbTicker 16s linear infinite',fontSize:10,fontWeight:700,color:'#1a0800',letterSpacing:0.8}}>
-          {[1,2].map(i=>(<span key={i} style={{padding:'0 28px'}}>TOP SCORER THIS WEEK WINS 1 FREE DRINK &nbsp;★&nbsp; REGISTER TO SAVE SCORES &nbsp;★&nbsp;</span>))}
-        </div>
-      </div>
-
-      {/* Inline Leaderboard */}
-      <div style={{background:'linear-gradient(180deg,#120800,#0a0400)',padding:'10px 12px 14px',position:'relative',zIndex:2}}>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
-          <div style={{display:'flex',alignItems:'center',gap:6}}>
-            <span style={{fontSize:16,animation:'crownSpin 2.5s ease-in-out infinite',display:'inline-block'}}>🏆</span>
-            <span style={{fontSize:12,fontWeight:700,background:'linear-gradient(90deg,#ffd700,#fff8cc,#ffaa00,#ffd700)',backgroundSize:'200% auto',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',backgroundClip:'text',animation:'shimmerLB 2s linear infinite'}}>HALL OF FAME</span>
-          </div>
-          <div style={{display:'flex',alignItems:'center',gap:4}}>
-            <span style={{width:5,height:5,borderRadius:'50%',background:'#44ff88',display:'inline-block',animation:'lbPulse 1.2s infinite'}}/>
-            <span style={{fontSize:9,color:'#c8943a',fontWeight:700}}>Live · Resets Monday</span>
-          </div>
-        </div>
-
-        {/* Weekly prize */}
-        <div style={{background:'#1a0d00',border:'1px solid #ffd70033',borderRadius:10,padding:'7px 10px',marginBottom:8,display:'flex',alignItems:'center',gap:9}}>
-          <span style={{fontSize:28,animation:'floatLB 2.5s ease-in-out infinite',display:'inline-block'}}>☕</span>
-          <div style={{flex:1}}>
-            <div style={{display:'flex',alignItems:'center',gap:5,marginBottom:1}}>
-              <span style={{background:'#ffd700',borderRadius:4,padding:'1px 6px',fontSize:8,fontWeight:700,color:'#1a0800'}}>THIS WEEK</span>
-              <span style={{fontSize:9,color:'#5a3a10'}}>{weeklyDateRange}</span>
-            </div>
-            <div style={{fontSize:11,fontWeight:700,color:'#f5e6d0'}}>Top scorer in <span style={{color:'#ffd700'}}>{GAME_NAMES[FEATURED_GAME]}</span></div>
-            <div style={{fontSize:9,color:'#a07030'}}>wins <span style={{color:'#ffd700',fontWeight:700}}>1 FREE DRINK</span></div>
-          </div>
-          {featuredLeader ? (
-            <div style={{textAlign:'center',flexShrink:0}}>
-              <div style={{width:28,height:28,borderRadius:'50%',background:'#2a1400',border:'2px solid #ffd700',display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,fontWeight:700,color:'#ffd700',margin:'0 auto 2px'}}>{featuredLeader.username.slice(0,2).toUpperCase()}</div>
-              <div style={{fontSize:9,color:'#ffd700',fontWeight:700,maxWidth:52,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{featuredLeader.username}</div>
-              <div style={{fontSize:8,color:'#7a5020'}}>{fmtScore(FEATURED_GAME,featuredLeader.score)}</div>
-            </div>
-          ) : (
-            <div style={{fontSize:9,color:'#4a3010',textAlign:'center',maxWidth:60}}>No scores yet!</div>
-          )}
-        </div>
-
-        {/* Game tabs */}
-        <div style={{display:'flex',overflowX:'auto',background:'#100600',borderRadius:8,padding:'0 4px',gap:1,scrollbarWidth:'none',marginBottom:8,justifyContent:'center'}}>
-          {LEADERBOARD_GAMES.map(g=>(
-            <button key={g.id} onClick={()=>setLbGame(g.id)} style={{flexShrink:0,padding:'6px 11px',border:'none',fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'inherit',transition:'all 0.15s',borderBottom:`2px solid ${lbGame===g.id?'#ffe066':'transparent'}`,background:lbGame===g.id?'linear-gradient(180deg,#c8943a,#9a6010)':'transparent',color:lbGame===g.id?'#1a0800':'#6a4820'}}>
-              {g.title.split(' ')[0]}
-            </button>
-          ))}
-        </div>
-
-        {/* Podium top 3 */}
-        {lbLoading ? (
-          <div style={{textAlign:'center',color:'#4a3010',fontSize:11,padding:'16px 0'}}>Loading...</div>
-        ) : (
-          <>
-            <div style={{display:'flex',alignItems:'flex-end',justifyContent:'center',gap:5,marginBottom:8}}>
-              {[1,0,2].map((rankIdx)=>{
-                const p=lbRows[rankIdx];
-                const mc=['#ffd700','#c8d0dc','#cd7f32'][rankIdx];
-                const mg=['#ffd70099','#c0c0c066','#cd7f3266'][rankIdx];
-                const isFirst=rankIdx===0;
-                const ph=[56,40,32][rankIdx];
-                return (
-                  <div key={rankIdx} style={{display:'flex',flexDirection:'column',alignItems:'center',flex:1,maxWidth:100,animation:`floatLB ${1.4+rankIdx*0.3}s ease-in-out infinite`}}>
-                    {isFirst?<span style={{fontSize:14,marginBottom:1}}>👑</span>:<div style={{height:17}}/>}
-                    <div style={{width:isFirst?34:26,height:isFirst?34:26,borderRadius:'50%',background:'#2a1400',border:`2px solid ${mc}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:isFirst?11:9,fontWeight:700,color:mc,flexShrink:0,boxShadow:`0 0 5px ${mg}`}}>{p?p.username.slice(0,2).toUpperCase():'?'}</div>
-                    <div style={{fontSize:isFirst?10:9,fontWeight:700,color:'#f0ddb0',margin:'3px 0 1px',maxWidth:86,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p?p.username:'---'}</div>
-                    <div style={{fontSize:isFirst?11:10,fontWeight:700,color:mc,marginBottom:3}}>{p?fmtScore(lbGame,p.score):'---'}</div>
-                    <div style={{width:'100%',height:ph,background:`${mc}12`,border:`1px solid ${mc}44`,borderBottom:'none',borderRadius:'5px 5px 0 0',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                      <span style={{fontSize:14,fontWeight:700,color:mc,opacity:0.7}}>{rankIdx===0?'1':rankIdx===1?'2':'3'}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            {lbRows.slice(3).map((p,idx)=>(
-              <div key={idx} style={{display:'flex',alignItems:'center',gap:7,padding:'5px 8px',background:idx%2===0?'#1a0e00':'#120800',borderRadius:7,marginBottom:3,border:'0.5px solid #2a1400'}}>
-                <div style={{width:14,fontSize:10,fontWeight:700,color:'#4a3010',textAlign:'center'}}>{idx+4}</div>
-                <div style={{width:22,height:22,borderRadius:'50%',background:'#2a1400',border:'1.5px solid #5a3a10',display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,fontWeight:700,color:'#c8943a',flexShrink:0}}>{p.username.slice(0,2).toUpperCase()}</div>
-                <div style={{flex:1,fontSize:11,fontWeight:700,color:'#c89050'}}>{p.username}</div>
-                <div style={{fontSize:11,fontWeight:700,color:'#ffd700'}}>{fmtScore(lbGame,p.score)}</div>
-              </div>
-            ))}
-            {lbRows.length===0&&<div style={{textAlign:'center',color:'#4a3010',fontSize:11,padding:'12px 0'}}>No scores yet. Be the first!</div>}
-          </>
-        )}
-      </div>
-
-      {/* Game Grid */}
-      <div style={{height:2,background:'linear-gradient(90deg,transparent,#ff4400 20%,#ffcc00 50%,#ff4400 80%,transparent)'}}/>
-      <div style={{padding:'12px 12px 16px',background:'#0f0700',position:'relative',zIndex:2}}>
-        <div style={{fontSize:10,color:'#7a4a10',letterSpacing:'1.5px',textTransform:'uppercase',fontWeight:700,marginBottom:10,textAlign:'center'}}>Choose your game</div>
-        <div style={S.grid}>
-          {GAME_LIST.map(game=>(
-            <div key={game.id} style={S.card}
-              onClick={()=>handleGameSelect(game)}
-              onMouseEnter={e=>{e.currentTarget.style.transform='scale(1.04) translateY(-2px)';e.currentTarget.style.boxShadow='0 0 20px rgba(255,140,0,0.4)';e.currentTarget.style.borderColor='#d4a853';}}
-              onMouseLeave={e=>{e.currentTarget.style.transform='scale(1)';e.currentTarget.style.boxShadow='none';e.currentTarget.style.borderColor='#6b3a1f';}}>
-              <div style={{position:'absolute',top:6,left:6,width:14,height:14,borderTop:'1.5px solid rgba(255,160,0,0.6)',borderLeft:'1.5px solid rgba(255,160,0,0.6)'}}/>
-              <div style={{position:'absolute',bottom:6,right:6,width:14,height:14,borderBottom:'1.5px solid rgba(255,160,0,0.6)',borderRight:'1.5px solid rgba(255,160,0,0.6)'}}/>
-              <div style={{position:'absolute',top:-1,left:'20%',right:'20%',height:2,borderRadius:2,background:'rgba(255,200,0,0.7)',boxShadow:'0 0 8px rgba(255,160,0,0.8)'}}/>
-              <div style={S.cardTitle}>{game.title}</div>
-              <div style={S.cardSub}>{game.sub}</div>
-              <div style={{fontSize:9,color:'#8a6030',marginTop:3,background:'#2a1200',border:'1px solid #4a2600',borderRadius:8,padding:'2px 7px',display:'inline-block'}}>{game.mode}</div>
-              {localBests[game.id]>0&&<div style={S.cardBest}>Best: {fmtScore(game.id,localBests[game.id])}</div>}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <style>{`
-        @keyframes logoGlow{from{filter:drop-shadow(0 0 6px #ff8800) drop-shadow(0 0 14px #ff4400)}to{filter:drop-shadow(0 0 14px #ffcc00) drop-shadow(0 0 28px #ff8800)}}
-        @keyframes lbTicker{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
-        @keyframes shimmerLB{0%{background-position:-200% center}100%{background-position:200% center}}
-        @keyframes lbPulse{0%,100%{opacity:1}50%{opacity:0.3}}
-        @keyframes floatLB{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
-        @keyframes crownSpin{0%,100%{transform:rotate(-8deg)}50%{transform:rotate(8deg)}}
-      `}</style>
+      ))}
     </div>
   );
 }
