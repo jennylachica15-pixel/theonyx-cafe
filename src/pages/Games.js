@@ -881,8 +881,6 @@ function FairyQGame({ playerName, onBack }) {
   );
 }
 
-
-
 // ─────────────────────────────────────────────────────────────────────────────
 // THEONYX CAFE — GamesPage.js  (Maze Runner integration)
 //
