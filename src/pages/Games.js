@@ -7,6 +7,7 @@ import {
   deleteDoc
 } from 'firebase/firestore';
 import ZombieGame from './ZombieGame';
+import { registerUser, loginUser, logoutUser } from './authHelpers';
 
 const S = {
   wrap: { minHeight: '100vh', background: '#0a0400', color: '#f5e6d0', fontFamily: "'Georgia', serif", position:'relative', overflow:'hidden' },
@@ -77,22 +78,7 @@ async function deleteOldScores() {
 }
 
 // ─── AUTH / SCORE HELPERS ────────────────────────────────────────────────────
-
-async function registerUser(username, password) {
-  const ref = doc(db, 'gameUsers', username.toLowerCase());
-  const snap = await getDoc(ref);
-  if (snap.exists()) throw new Error('Username already taken!');
-  await setDoc(ref, { username, password, createdAt: serverTimestamp() });
-  return username;
-}
-
-async function loginUser(username, password) {
-  const ref = doc(db, 'gameUsers', username.toLowerCase());
-  const snap = await getDoc(ref);
-  if (!snap.exists()) throw new Error('Username not found!');
-  if (snap.data().password !== password) throw new Error('Wrong password!');
-  return snap.data().username;
-}
+// (registerUser / loginUser now live in authHelpers.js using real Firebase Auth)
 
 async function saveScore(username, gameId, score) {
   const weekStart = getCurrentWeekStart();
@@ -169,7 +155,7 @@ function AuthModal({ onAuth, onClose }) {
         <div style={{fontSize:20,fontWeight:'bold',color:'#d4a853',marginBottom:4}}>{mode==='login'?'Welcome Back!':'Join the Cafe'}</div>
         <div style={{fontSize:12,color:'#a07850',marginBottom:20}}>{mode==='login'?'Sign in to track your scores':'Create a unique cafe name'}</div>
         <input style={S.input} placeholder="Username (e.g. Latte)" value={username} onChange={e=>setUsername(e.target.value)} autoCapitalize="none"/>
-        <input style={S.input} placeholder="Password" type="password" value={password} onChange={e=>setPassword(e.target.value)}/>
+        <input style={S.input} placeholder="Password (6+ characters)" type="password" value={password} onChange={e=>setPassword(e.target.value)}/>
         {error && <div style={{color:'#ff6b6b',fontSize:13,marginBottom:8}}>{error}</div>}
         <button style={S.btn()} onClick={handle} disabled={loading}>{loading?'...':mode==='login'?'Sign In':'Create Account'}</button>
         <button style={S.btn('#6b3a1f')} onClick={()=>{setMode(mode==='login'?'register':'login');setError('');}}>{mode==='login'?'New? Create Account':'Already have one? Sign In'}</button>
@@ -885,7 +871,7 @@ function FairyQGame({ playerName, onBack }) {
 
 const FEATURED_GAME_WEEKS_LB = LEADERBOARD_GAMES.map(g => g.id);
 
-export default function GamesPage() {
+export default function GamesPage({ user }) {
   const [activeGame, setActiveGame] = useState(null);
   const [showLB, setShowLB] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
@@ -921,6 +907,18 @@ export default function GamesPage() {
   }, []);
 
   const [username, setUsername] = useState(() => { try { return localStorage.getItem('cafeGameUser') || null; } catch { return null; } });
+
+  // Keep username in sync with the shared Firebase Auth session
+  // (so signing in from the Chat tab also signs you in here, and vice versa)
+  useEffect(() => {
+    const name = user ? (user.displayName || (user.email ? user.email.split('@')[0] : null)) : null;
+    setUsername(name);
+    try {
+      if (name) localStorage.setItem('cafeGameUser', name);
+      else localStorage.removeItem('cafeGameUser');
+    } catch {}
+  }, [user]);
+
   const [showName, setShowName] = useState(false);
   const [pendingGame, setPendingGame] = useState(null);
   const [playerName, setPlayerName] = useState(() => { try { return localStorage.getItem('cafePlayerName') || ''; } catch { return ''; } });
@@ -972,6 +970,7 @@ export default function GamesPage() {
     setShowAuth(false);
   };
   const handleLogout = () => {
+    logoutUser().catch(()=>{});
     setUsername(null); try { localStorage.removeItem('cafeGameUser'); } catch {}
   };
 
