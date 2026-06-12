@@ -1,16 +1,18 @@
 import React, { useState, useRef } from 'react';
 import { auth } from '../firebase/config';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import GuestLanding from './GuestLanding';
 import Gallery from './Gallery';
 import Snapshots from './Snapshots';
 import GamesPage from './Games';
+import Chat from './Chat';
 
 const NAV_ICONS = {
   home: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
   gallery: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>,
   snapshots: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>,
   games: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="20" height="12" rx="3"/><circle cx="8" cy="12" r="1.5" fill="currentColor"/><circle cx="16" cy="12" r="1.5" fill="currentColor"/><path d="M12 9v6M9 12h6" strokeLinecap="round"/></svg>,
+  chat: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z"/><path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1"/></svg>,
 };
 
 const styles = {
@@ -32,6 +34,8 @@ const styles = {
   loginBtn: { width: '100%', padding: '13px', borderRadius: 12, background: '#d4a853', color: '#1a0a00', fontSize: 15, fontWeight: 700, border: 'none', cursor: 'pointer', marginTop: 4 },
   cancelBtn: { width: '100%', padding: '11px', borderRadius: 12, background: 'transparent', color: 'rgba(255,255,255,0.4)', fontSize: 13, border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer', marginTop: 8 },
   errorBox: { background: 'rgba(193,18,31,0.2)', color: '#ff6b6b', borderRadius: 8, padding: '9px 12px', fontSize: 13, marginBottom: 12, border: '1px solid rgba(193,18,31,0.3)' },
+  chatGate: { height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 },
+  switchLink: { background: 'none', border: 'none', color: '#d4a853', fontSize: 13, cursor: 'pointer', textDecoration: 'underline', marginTop: 12, width: '100%' },
 };
 
 const TABS = [
@@ -39,7 +43,65 @@ const TABS = [
   { id: 'gallery',   label: 'Snapshots' },
   { id: 'snapshots', label: 'Feedback'  },
   { id: 'games',     label: 'Games'     },
+  { id: 'chat',      label: 'Chat'      },
 ];
+
+function ChatGate({ user }) {
+  const [mode, setMode] = useState('signin'); // 'signin' | 'register'
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  if (user) return <Chat user={user} />;
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setError(''); setLoading(true);
+    try {
+      if (mode === 'register') {
+        const cred = await createUserWithEmailAndPassword(auth, email, password);
+        await updateProfile(cred.user, { displayName: name.trim() || email.split('@')[0] });
+      } else {
+        await signInWithEmailAndPassword(auth, email, password);
+      }
+    } catch (err) {
+      setError(mode === 'register'
+        ? 'Could not create account. Check the email or try a longer password (6+ characters).'
+        : 'Invalid email or password.');
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div style={styles.chatGate}>
+      <div style={{ ...styles.loginCard, animation: 'none' }}>
+        <div style={styles.loginTitle}>{mode === 'register' ? 'Join the Chat' : 'Sign In to Chat'}</div>
+        <div style={styles.loginSub}>THEONYX CAFE COMMUNITY</div>
+        {error && <div style={styles.errorBox}>{error}</div>}
+        <form onSubmit={submit}>
+          {mode === 'register' && (
+            <>
+              <label style={styles.label}>Display Name</label>
+              <input style={styles.input} type="text" placeholder="How others will see you" value={name} onChange={e => setName(e.target.value)} required maxLength={30} />
+            </>
+          )}
+          <label style={styles.label}>Email</label>
+          <input style={styles.input} type="email" placeholder="you@email.com" value={email} onChange={e => setEmail(e.target.value)} required />
+          <label style={styles.label}>Password</label>
+          <input style={styles.input} type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required />
+          <button type="submit" style={{ ...styles.loginBtn, opacity: loading ? 0.7 : 1 }} disabled={loading}>
+            {loading ? 'Please wait…' : (mode === 'register' ? 'Create Account' : 'Sign In')}
+          </button>
+        </form>
+        <button style={styles.switchLink} onClick={() => { setError(''); setMode(mode === 'register' ? 'signin' : 'register'); }}>
+          {mode === 'register' ? 'Already have an account? Sign in' : "New here? Create an account"}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function PublicApp({ onAdminLogin, user }) {
   const [activeTab, setActiveTab] = useState('home');
@@ -71,6 +133,7 @@ export default function PublicApp({ onAdminLogin, user }) {
 
   const handleTouchEnd = (e) => {
     if (touchStartX.current === null) return;
+    if (activeTab === 'chat') { touchStartX.current = null; touchStartY.current = null; return; }
     const dx = e.changedTouches[0].clientX - touchStartX.current;
     const dy = e.changedTouches[0].clientY - touchStartY.current;
     if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
@@ -107,6 +170,7 @@ export default function PublicApp({ onAdminLogin, user }) {
         {activeTab === 'gallery'   && <Gallery />}
         {activeTab === 'snapshots' && <Snapshots />}
         {activeTab === 'games'     && <GamesPage />}
+        {activeTab === 'chat'      && <ChatGate user={user} />}
       </div>
 
       <div style={styles.bottomNav}>
