@@ -1,130 +1,79 @@
 import { auth, db } from '../firebase/config';
 import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  updateProfile,
-  signOut,
+  createUserWithEmailAndPassword, signInWithEmailAndPassword,
+  updateProfile, signOut,
 } from 'firebase/auth';
-import {
-  doc, getDoc, setDoc, deleteDoc, serverTimestamp, collection, getDocs, query, where,
-} from 'firebase/firestore';
+import { doc, getDoc, deleteDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 
-const DOMAIN = '@theonyxcafe.games';
-const SESSION_KEY = 'onyxGameSession';
+// One account for the whole app (games + chat), username-only UX.
+// Behind the scenes each username maps to a hidden Firebase Auth email.
+const EMAIL_DOMAIN = 'theonyxcafe.games';
+const cleanName = (username) => username.trim();
+const keyOf = (username) => cleanName(username).toLowerCase();
+const emailFor = (username) => `${keyOf(username).replace(/[^a-z0-9._-]/g, '.')}@${EMAIL_DOMAIN}`;
+const VALID_USERNAME = /^[a-zA-Z0-9._-]{3,20}$/;
+// Firebase requires 6+ char passwords; legacy accounts may have shorter ones,
+// so short passwords get a deterministic pad (applied the same way every login).
+const fbPassword = (password) => (password.length >= 6 ? password : password + '#onyx');
 
-// ── localStorage helpers ──────────────────────────────────────────────────────
-export function saveGameSession(uid, username) {
-  try { localStorage.setItem(SESSION_KEY, JSON.stringify({ uid, username })); } catch (_) {}
-}
-export function clearGameSession() {
-  try { localStorage.removeItem(SESSION_KEY); } catch (_) {}
-}
-export function getStoredGameSession() {
-  try { return JSON.parse(localStorage.getItem(SESSION_KEY)); } catch (_) { return null; }
-}
-
-// ── validate username format ──────────────────────────────────────────────────
-function validateUsername(username) {
-  if (!username || username.length < 3 || username.length > 20)
-    return 'Username must be 3–20 characters.';
-  if (!/^[a-zA-Z0-9._-]+$/.test(username))
-    return 'Only letters, numbers, dots, dashes, and underscores allowed.';
-  return null;
-}
-
-// ── register new game user ────────────────────────────────────────────────────
-export async function registerUser(username, password) {
-  const usernameError = validateUsername(username);
-  if (usernameError) return { error: usernameError };
-  if (!password || password.length < 6)
-    return { error: 'Password must be at least 6 characters.' };
-
-  const email = `${username.toLowerCase()}${DOMAIN}`;
-
-  // check if username already taken
-  const existing = await getDocs(
-    query(collection(db, 'chatUsers'), where('nameLower', '==', username.toLowerCase()))
-  ).catch(() => null);
-  if (existing && !existing.empty) return { error: 'Username already taken.' };
-
+// Put/refresh the user in the chat "People" directory the moment they sign in,
+// no matter where they signed in from (Games tab or Chat tab).
+async function touchUserDoc(user, name) {
   try {
-    const cred = await createUserWithEmailAndPassword(auth, email, password);
-    await updateProfile(cred.user, { displayName: username });
-    await setDoc(doc(db, 'chatUsers', cred.user.uid), {
-      name: username, nameLower: username.toLowerCase(),
-      email, isAdmin: false, createdAt: serverTimestamp(), lastSeen: serverTimestamp(),
-    });
-    saveGameSession(cred.user.uid, username);
-    return { user: cred.user, username };
-  } catch (err) {
-    if (err.code === 'auth/email-already-in-use') return { error: 'Username already taken.' };
-    return { error: err.message };
-  }
-}
-
-// ── login existing game user ──────────────────────────────────────────────────
-export async function loginUser(username, password) {
-  if (!username || !password) return { error: 'Enter your username and password.' };
-
-  const email = `${username.toLowerCase()}${DOMAIN}`;
-
-  try {
-    const cred = await signInWithEmailAndPassword(auth, email, password);
-    if (!cred.user.displayName) {
-      await updateProfile(cred.user, { displayName: username });
-    }
-    // ensure chatUsers entry exists
-    await setDoc(doc(db, 'chatUsers', cred.user.uid), {
-      name: username, nameLower: username.toLowerCase(),
-      email, isAdmin: false, lastSeen: serverTimestamp(),
+    await setDoc(doc(db, 'chatUsers', user.uid), {
+      name: name || user.displayName || (user.email ? user.email.split('@')[0] : 'Guest'),
+      email: user.email || '',
+      lastSeen: serverTimestamp(),
     }, { merge: true });
-    saveGameSession(cred.user.uid, username);
-    return { user: cred.user, username };
-  } catch (err) {
-    // ── auto-migrate from old plain-text gameUsers system ──
-    if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
-      return migrateOldUser(username, password);
-    }
-    if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-      return { error: 'Incorrect password.' };
-    }
-    return { error: err.message };
-  }
+  } catch {}
 }
 
-async function migrateOldUser(username, password) {
+export async function registerUser(username, password) {
+  const name = cleanName(username);
+  if (!VALID_USERNAME.test(name)) throw new Error('Username must be 3-20 letters/numbers (no spaces).');
+  if (password.length < 6) throw new Error('Password must be at least 6 characters.');
+  const legacy = await getDoc(doc(db, 'gameUsers', keyOf(name)));
+  if (legacy.exists()) throw new Error('Username already taken!');
   try {
-    // look up old record
-    const oldRef = doc(db, 'gameUsers', username.toLowerCase());
-    const oldSnap = await getDoc(oldRef);
-    if (!oldSnap.exists()) return { error: 'Username not found.' };
-    const oldData = oldSnap.data();
-    if (oldData.password !== password) return { error: 'Incorrect password.' };
-
-    // create Firebase Auth account
-    const email = `${username.toLowerCase()}${DOMAIN}`;
-    const cred = await createUserWithEmailAndPassword(auth, email, password);
-    await updateProfile(cred.user, { displayName: username });
-    await setDoc(doc(db, 'chatUsers', cred.user.uid), {
-      name: username, nameLower: username.toLowerCase(),
-      email, isAdmin: false, migratedFrom: 'gameUsers',
-      createdAt: serverTimestamp(), lastSeen: serverTimestamp(),
-    });
-    // remove old plain-text record
-    await deleteDoc(oldRef).catch(() => {});
-    saveGameSession(cred.user.uid, username);
-    return { user: cred.user, username };
-  } catch (err) {
-    if (err.code === 'auth/email-already-in-use') {
-      // account was already created — just sign in
-      return loginUser(username, password);
-    }
-    return { error: err.message };
+    const cred = await createUserWithEmailAndPassword(auth, emailFor(name), password);
+    await updateProfile(cred.user, { displayName: name });
+    await touchUserDoc(cred.user, name);
+    return name;
+  } catch (e) {
+    if (e.code === 'auth/email-already-in-use') throw new Error('Username already taken!');
+    throw new Error('Could not create account. Please try again.');
   }
 }
 
-// ── logout ────────────────────────────────────────────────────────────────────
-export async function logoutUser() {
-  clearGameSession();
-  await signOut(auth);
+export async function loginUser(username, password) {
+  const name = cleanName(username);
+  const email = emailFor(name);
+
+  // 1) Normal path: account already exists in Firebase Auth
+  try {
+    const cred = await signInWithEmailAndPassword(auth, email, fbPassword(password));
+    await touchUserDoc(cred.user, cred.user.displayName || name);
+    return cred.user.displayName || name;
+  } catch (e) { /* fall through to legacy check below */ }
+
+  // 2) Legacy path: account still lives in the old gameUsers collection.
+  //    If the old credentials match, silently migrate to Firebase Auth
+  //    and remove the old record (which stored the password in plain text).
+  const ref = doc(db, 'gameUsers', keyOf(name));
+  const snap = await getDoc(ref);
+  if (!snap.exists()) throw new Error('Wrong username or password!');
+  if (snap.data().password !== password) throw new Error('Wrong password!');
+  try {
+    const cred = await createUserWithEmailAndPassword(auth, email, fbPassword(password));
+    await updateProfile(cred.user, { displayName: snap.data().username || name });
+    await touchUserDoc(cred.user, snap.data().username || name);
+    deleteDoc(ref).catch(() => {});
+    return cred.user.displayName || name;
+  } catch (e) {
+    throw new Error('Could not sign in. Please try again.');
+  }
+}
+
+export function logoutUser() {
+  return signOut(auth);
 }
