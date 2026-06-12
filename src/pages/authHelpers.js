@@ -3,7 +3,7 @@ import {
   createUserWithEmailAndPassword, signInWithEmailAndPassword,
   updateProfile, signOut,
 } from 'firebase/auth';
-import { doc, getDoc, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, deleteDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 // One account for the whole app (games + chat), username-only UX.
 // Behind the scenes each username maps to a hidden Firebase Auth email.
@@ -16,6 +16,18 @@ const VALID_USERNAME = /^[a-zA-Z0-9._-]{3,20}$/;
 // so short passwords get a deterministic pad (applied the same way every login).
 const fbPassword = (password) => (password.length >= 6 ? password : password + '#onyx');
 
+// Put/refresh the user in the chat "People" directory the moment they sign in,
+// no matter where they signed in from (Games tab or Chat tab).
+async function touchUserDoc(user, name) {
+  try {
+    await setDoc(doc(db, 'chatUsers', user.uid), {
+      name: name || user.displayName || (user.email ? user.email.split('@')[0] : 'Guest'),
+      email: user.email || '',
+      lastSeen: serverTimestamp(),
+    }, { merge: true });
+  } catch {}
+}
+
 export async function registerUser(username, password) {
   const name = cleanName(username);
   if (!VALID_USERNAME.test(name)) throw new Error('Username must be 3-20 letters/numbers (no spaces).');
@@ -25,6 +37,7 @@ export async function registerUser(username, password) {
   try {
     const cred = await createUserWithEmailAndPassword(auth, emailFor(name), password);
     await updateProfile(cred.user, { displayName: name });
+    await touchUserDoc(cred.user, name);
     return name;
   } catch (e) {
     if (e.code === 'auth/email-already-in-use') throw new Error('Username already taken!');
@@ -39,6 +52,7 @@ export async function loginUser(username, password) {
   // 1) Normal path: account already exists in Firebase Auth
   try {
     const cred = await signInWithEmailAndPassword(auth, email, fbPassword(password));
+    await touchUserDoc(cred.user, cred.user.displayName || name);
     return cred.user.displayName || name;
   } catch (e) { /* fall through to legacy check below */ }
 
@@ -52,6 +66,7 @@ export async function loginUser(username, password) {
   try {
     const cred = await createUserWithEmailAndPassword(auth, email, fbPassword(password));
     await updateProfile(cred.user, { displayName: snap.data().username || name });
+    await touchUserDoc(cred.user, snap.data().username || name);
     deleteDoc(ref).catch(() => {});
     return cred.user.displayName || name;
   } catch (e) {
