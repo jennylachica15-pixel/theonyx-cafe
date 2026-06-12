@@ -1,6 +1,7 @@
-import React, { useState, useRef } from 'react';
-import { auth } from '../firebase/config';
+import React, { useState, useEffect, useRef } from 'react';
+import { auth, db } from '../firebase/config';
 import { signInWithEmailAndPassword } from 'firebase/auth';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { registerUser, loginUser } from './authHelpers';
 import GuestLanding from './GuestLanding';
 import Gallery from './Gallery';
@@ -23,7 +24,7 @@ const styles = {
   topTitle: { fontFamily: 'var(--font-display)', fontSize: 17, fontWeight: 700, color: '#f0d080' },
   content: { flex: 1, overflowY: 'auto' },
   bottomNav: { display: 'flex', background: 'rgba(10,4,0,0.95)', borderTop: '1px solid rgba(212,168,83,0.2)', flexShrink: 0 },
-  navItem: (active) => ({ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '10px 4px 12px', cursor: 'pointer', borderTop: active ? '2px solid #d4a853' : '2px solid transparent', color: active ? '#d4a853' : 'rgba(255,255,255,0.35)' }),
+  navItem: (active) => ({ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '10px 4px 12px', cursor: 'pointer', borderTop: active ? '2px solid #d4a853' : '2px solid transparent', color: active ? '#d4a853' : 'rgba(255,255,255,0.35)', position: 'relative' }),
   navLabel: (active) => ({ fontSize: 10, fontWeight: active ? 600 : 400, marginTop: 3 }),
   adminBtn: { background: 'rgba(212,168,83,0.15)', border: '1px solid rgba(212,168,83,0.4)', borderRadius: 8, color: '#d4a853', fontSize: 12, padding: '6px 14px', cursor: 'pointer', fontWeight: 500 },
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 },
@@ -37,6 +38,7 @@ const styles = {
   errorBox: { background: 'rgba(193,18,31,0.2)', color: '#ff6b6b', borderRadius: 8, padding: '9px 12px', fontSize: 13, marginBottom: 12, border: '1px solid rgba(193,18,31,0.3)' },
   chatGate: { height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 },
   switchLink: { background: 'none', border: 'none', color: '#d4a853', fontSize: 13, cursor: 'pointer', textDecoration: 'underline', marginTop: 12, width: '100%' },
+  badge: { position: 'absolute', top: 6, right: 8, minWidth: 16, height: 16, borderRadius: 8, background: '#ff4444', color: '#fff', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px', lineHeight: 1, border: '1.5px solid rgba(10,4,0,0.95)' },
 };
 
 const TABS = [
@@ -48,7 +50,7 @@ const TABS = [
 ];
 
 function ChatGate({ user }) {
-  const [mode, setMode] = useState('signin'); // 'signin' | 'register'
+  const [mode, setMode] = useState('signin');
   const [username, setUsername] = useState(() => { try { return localStorage.getItem('cafeGameUser') || ''; } catch { return ''; } });
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -62,7 +64,6 @@ function ChatGate({ user }) {
     try {
       if (mode === 'register') await registerUser(username, password);
       else await loginUser(username, password);
-      // onAuthStateChanged in App.js picks up the session and the user prop updates
     } catch (err) {
       setError(err.message || 'Something went wrong. Please try again.');
     }
@@ -85,7 +86,7 @@ function ChatGate({ user }) {
           </button>
         </form>
         <button style={styles.switchLink} onClick={() => { setError(''); setMode(mode === 'register' ? 'signin' : 'register'); }}>
-          {mode === 'register' ? 'Already have an account? Sign in' : "New here? Create an account"}
+          {mode === 'register' ? 'Already have an account? Sign in' : 'New here? Create an account'}
         </button>
       </div>
     </div>
@@ -99,8 +100,18 @@ export default function PublicApp({ onAdminLogin, user }) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [mentionBadge, setMentionBadge] = useState(0);
   const touchStartX = useRef(null);
   const touchStartY = useRef(null);
+
+  // Listen for unread @mention notifications
+  useEffect(() => {
+    if (!user?.uid) { setMentionBadge(0); return; }
+    const q = query(collection(db, 'notifications'), where('recipientUid', '==', user.uid));
+    return onSnapshot(q, snap => {
+      setMentionBadge(snap.docs.filter(d => !d.data().read).length);
+    });
+  }, [user?.uid]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -127,11 +138,8 @@ export default function PublicApp({ onAdminLogin, user }) {
     const dy = e.changedTouches[0].clientY - touchStartY.current;
     if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
       const currentIndex = TABS.findIndex(t => t.id === activeTab);
-      if (dx < 0 && currentIndex < TABS.length - 1) {
-        setActiveTab(TABS[currentIndex + 1].id);
-      } else if (dx > 0 && currentIndex > 0) {
-        setActiveTab(TABS[currentIndex - 1].id);
-      }
+      if (dx < 0 && currentIndex < TABS.length - 1) setActiveTab(TABS[currentIndex + 1].id);
+      else if (dx > 0 && currentIndex > 0) setActiveTab(TABS[currentIndex - 1].id);
     }
     touchStartX.current = null;
     touchStartY.current = null;
@@ -150,11 +158,7 @@ export default function PublicApp({ onAdminLogin, user }) {
         </button>
       </div>
 
-      <div
-        style={styles.content}
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-      >
+      <div style={styles.content} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
         {activeTab === 'home'      && <GuestLanding />}
         {activeTab === 'gallery'   && <Gallery />}
         {activeTab === 'snapshots' && <Snapshots />}
@@ -167,6 +171,9 @@ export default function PublicApp({ onAdminLogin, user }) {
           <div key={tab.id} style={styles.navItem(activeTab === tab.id)} onClick={() => setActiveTab(tab.id)}>
             {NAV_ICONS[tab.id]}
             <span style={styles.navLabel(activeTab === tab.id)}>{tab.label}</span>
+            {tab.id === 'chat' && mentionBadge > 0 && (
+              <div style={styles.badge}>{mentionBadge > 9 ? '9+' : mentionBadge}</div>
+            )}
           </div>
         ))}
       </div>
