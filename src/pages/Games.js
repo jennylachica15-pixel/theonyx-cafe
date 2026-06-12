@@ -68,11 +68,13 @@ function getCurrentWeekStart() {
 }
 
 async function deleteOldScores() {
+  // Only the FEATURED game resets weekly. All other games keep their scores
+  // (so when a game becomes featured, its board starts fresh for the prize week).
   const weekStart = getCurrentWeekStart();
   const snap = await getDocs(collection(db, 'leaderboard'));
   const toDelete = snap.docs.filter(d => {
     const data = d.data();
-    return !data.weekStart || data.weekStart < weekStart;
+    return data.gameId === FEATURED_GAME && (!data.weekStart || data.weekStart < weekStart);
   });
   await Promise.all(toDelete.map(d => deleteDoc(doc(db, 'leaderboard', d.id))));
 }
@@ -86,6 +88,7 @@ async function saveScore(username, gameId, score) {
   const ref = doc(db, 'leaderboard', key);
   const snap = await getDoc(ref);
   const isExpired =
+    gameId === FEATURED_GAME &&
     snap.exists() &&
     snap.data().weekStart !== undefined &&
     snap.data().weekStart < weekStart;
@@ -105,7 +108,7 @@ async function getLeaderboard(gameId) {
   const snaps = await getDocs(q);
   return snaps.docs
     .map(d => d.data())
-    .filter(d => d.weekStart === weekStart)
+    .filter(d => gameId !== FEATURED_GAME || d.weekStart === weekStart)
     .slice(0, 10);
 }
 
@@ -198,6 +201,7 @@ function LeaderboardModal({ onClose, username }) {
         <div style={{display:'flex',flexWrap:'wrap',gap:6,justifyContent:'center',marginBottom:16}}>
           {LEADERBOARD_GAMES.map(g=>(<button key={g.id} onClick={()=>setTab(g.id)} style={{background:tab===g.id?'#d4a853':'#3d1f00',color:tab===g.id?'#1a0a00':'#d4a853',border:'1px solid #6b3a1f',borderRadius:20,padding:'6px 12px',fontSize:12,cursor:'pointer'}}>{g.title}</button>))}
         </div>
+        <div style={{fontSize:10,color:'#a07850',marginBottom:12}}>{tab===FEATURED_GAME ? '⭐ Featured this week — resets Monday' : 'All-time scores'}</div>
         {loading ? <div style={{color:'#a07850'}}>Loading...</div> : rows.length===0 ?
           <div style={{color:'#a07850',padding:20}}>No scores yet - be the first!</div> :
           rows.map((r,i)=>(<div key={i} style={{...S.lbRow(i),background:r.username===username?'rgba(212,168,83,0.15)':S.lbRow(i).background}}><span style={{width:28,fontSize:18}}>{S.medal(i)}</span><span style={{flex:1,fontWeight:'bold',color:r.username===username?'#d4a853':'#f5e6d0'}}>{r.username}</span><span style={{color:'#8bc34a',fontWeight:'bold'}}>{fmtScore(tab,r.score)}</span>{r.username===username&&<span style={{marginLeft:6,fontSize:11,color:'#d4a853'}}>YOU</span>}</div>))
@@ -899,10 +903,15 @@ export default function GamesPage({ user }) {
     const currentWeek = String(getCurrentWeekStart());
     if (storedWeek !== currentWeek) {
       localStorage.setItem('cafeWeekStart', currentWeek);
-      localStorage.removeItem('cafeBests');
-      localStorage.removeItem('flappyBest');
+      // Only the featured game's personal best resets; the rest are kept
+      try {
+        const bests = JSON.parse(localStorage.getItem('cafeBests') || '{}');
+        delete bests[FEATURED_GAME];
+        localStorage.setItem('cafeBests', JSON.stringify(bests));
+        if (FEATURED_GAME === 'flappybarista') localStorage.removeItem('flappyBest');
+        setLocalBests(bests);
+      } catch { setLocalBests({}); }
       localStorage.removeItem('gwUsedWords');
-      setLocalBests({});
     }
   }, []);
 
@@ -935,7 +944,7 @@ export default function GamesPage({ user }) {
         const snap = await getDocs(collection(db, 'leaderboard'));
         const all = snap.docs.map(d => d.data());
         const weekStart = getCurrentWeekStart();
-        const filtered = all.filter(d => d.gameId===lbGame && d.weekStart===weekStart).sort((a,b)=>(b.score||0)-(a.score||0)).slice(0,10);
+        const filtered = all.filter(d => d.gameId===lbGame && (lbGame !== FEATURED_GAME || d.weekStart===weekStart)).sort((a,b)=>(b.score||0)-(a.score||0)).slice(0,10);
         setLbRows(filtered);
         const fl = all.filter(d => d.gameId===FEATURED_GAME && d.weekStart===weekStart).sort((a,b)=>(b.score||0)-(a.score||0))[0] || null;
         setFeaturedLeader(fl);
@@ -1066,7 +1075,7 @@ export default function GamesPage({ user }) {
           </div>
           <div style={{display:'flex',alignItems:'center',gap:4}}>
             <span style={{width:5,height:5,borderRadius:'50%',background:'#44ff88',display:'inline-block',animation:'lbPulse 1.2s infinite'}}/>
-            <span style={{fontSize:9,color:'#c8943a',fontWeight:700}}>Live · Resets Monday</span>
+            <span style={{fontSize:9,color:'#c8943a',fontWeight:700}}>{lbGame===FEATURED_GAME ? 'Weekly · Resets Monday' : 'All-time scores'}</span>
           </div>
         </div>
 
