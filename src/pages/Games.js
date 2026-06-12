@@ -44,7 +44,6 @@ const GAME_LIST = [
   { id: 'guessword',     title: 'Guess the Word',       sub: 'Clues & letters',         mode: 'Single player' },
   { id: 'cafemystery',   title: 'Cafe Mystery',         sub: 'Who is the impostor?',    mode: 'Multiplayer'   },
   { id: 'fairyq',        title: 'Friends & Questions',  sub: 'Funny, deep & spicy',     mode: 'Group play'    },
-  { id: 'maze',          title: 'Maze Runner 3D',       sub: 'Escape the dark maze',    mode: 'Single player' },
 ];
 
 const LEADERBOARD_GAMES = GAME_LIST.filter(g => g.id !== 'cafemystery' && g.id !== 'fairyq');
