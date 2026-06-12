@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { auth } from '../firebase/config';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { registerUser, loginUser } from './authHelpers';
 import GuestLanding from './GuestLanding';
 import Gallery from './Gallery';
 import Snapshots from './Snapshots';
@@ -48,8 +49,7 @@ const TABS = [
 
 function ChatGate({ user }) {
   const [mode, setMode] = useState('signin'); // 'signin' | 'register'
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState(() => { try { return localStorage.getItem('cafeGameUser') || ''; } catch { return ''; } });
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -60,16 +60,11 @@ function ChatGate({ user }) {
     e.preventDefault();
     setError(''); setLoading(true);
     try {
-      if (mode === 'register') {
-        const cred = await createUserWithEmailAndPassword(auth, email, password);
-        await updateProfile(cred.user, { displayName: name.trim() || email.split('@')[0] });
-      } else {
-        await signInWithEmailAndPassword(auth, email, password);
-      }
+      if (mode === 'register') await registerUser(username, password);
+      else await loginUser(username, password);
+      // onAuthStateChanged in App.js picks up the session and the user prop updates
     } catch (err) {
-      setError(mode === 'register'
-        ? 'Could not create account. Check the email or try a longer password (6+ characters).'
-        : 'Invalid email or password.');
+      setError(err.message || 'Something went wrong. Please try again.');
     }
     setLoading(false);
   };
@@ -78,19 +73,13 @@ function ChatGate({ user }) {
     <div style={styles.chatGate}>
       <div style={{ ...styles.loginCard, animation: 'none' }}>
         <div style={styles.loginTitle}>{mode === 'register' ? 'Join the Chat' : 'Sign In to Chat'}</div>
-        <div style={styles.loginSub}>THEONYX CAFE COMMUNITY</div>
+        <div style={styles.loginSub}>SAME ACCOUNT AS THE GAMES</div>
         {error && <div style={styles.errorBox}>{error}</div>}
         <form onSubmit={submit}>
-          {mode === 'register' && (
-            <>
-              <label style={styles.label}>Display Name</label>
-              <input style={styles.input} type="text" placeholder="How others will see you" value={name} onChange={e => setName(e.target.value)} required maxLength={30} />
-            </>
-          )}
-          <label style={styles.label}>Email</label>
-          <input style={styles.input} type="email" placeholder="you@email.com" value={email} onChange={e => setEmail(e.target.value)} required />
+          <label style={styles.label}>Username</label>
+          <input style={styles.input} type="text" placeholder="e.g. Latte" value={username} onChange={e => setUsername(e.target.value)} autoCapitalize="none" required maxLength={20} />
           <label style={styles.label}>Password</label>
-          <input style={styles.input} type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required />
+          <input style={styles.input} type="password" placeholder={mode === 'register' ? '6+ characters' : '••••••••'} value={password} onChange={e => setPassword(e.target.value)} required />
           <button type="submit" style={{ ...styles.loginBtn, opacity: loading ? 0.7 : 1 }} disabled={loading}>
             {loading ? 'Please wait…' : (mode === 'register' ? 'Create Account' : 'Sign In')}
           </button>
@@ -169,7 +158,7 @@ export default function PublicApp({ onAdminLogin, user }) {
         {activeTab === 'home'      && <GuestLanding />}
         {activeTab === 'gallery'   && <Gallery />}
         {activeTab === 'snapshots' && <Snapshots />}
-        {activeTab === 'games'     && <GamesPage />}
+        {activeTab === 'games'     && <GamesPage user={user} />}
         {activeTab === 'chat'      && <ChatGate user={user} />}
       </div>
 
