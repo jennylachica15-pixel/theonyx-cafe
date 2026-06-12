@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db } from '../firebase/config';
 import {
-  collection, doc, setDoc, addDoc, query, orderBy, limit,
+  collection, doc, setDoc, addDoc, getDocs, query, orderBy, limit,
   where, onSnapshot, serverTimestamp,
 } from 'firebase/firestore';
 
@@ -125,6 +125,19 @@ export default function Chat({ user }) {
     });
   }, [uid]);
 
+  // legacy game players (old gameUsers system) who haven't signed in
+  // under the new system yet — shown as "not yet in chat"
+  const [legacyNames, setLegacyNames] = useState([]);
+  useEffect(() => {
+    getDocs(collection(db, 'gameUsers'))
+      .then((snap) => setLegacyNames(snap.docs.map((d) => d.data().username).filter(Boolean)))
+      .catch(() => {});
+  }, []);
+  const inChat = new Set(people.map((p) => (p.name || '').toLowerCase()));
+  const pendingPlayers = legacyNames.filter(
+    (n) => !inChat.has(n.toLowerCase()) && n.toLowerCase() !== myName.toLowerCase()
+  );
+
   // messages of the open DM
   useEffect(() => {
     if (!activeDM) return;
@@ -208,6 +221,16 @@ export default function Chat({ user }) {
               <div>
                 <div style={S.rowName}>{p.name}</div>
                 <div style={S.rowSub}>Tap to message</div>
+              </div>
+            </div>
+          ))}
+          {pendingPlayers.length > 0 && <div style={S.sectionLabel}>Game players — not in chat yet</div>}
+          {pendingPlayers.map((n) => (
+            <div key={n} style={{ ...S.row, cursor: 'default', opacity: 0.45 }}>
+              <div style={{ ...S.avatar, borderColor: '#6b3a1f', color: '#a07850' }}>{initialOf(n)}</div>
+              <div>
+                <div style={S.rowName}>{n}</div>
+                <div style={S.rowSub}>Will appear here after their next sign-in</div>
               </div>
             </div>
           ))}
