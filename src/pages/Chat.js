@@ -48,7 +48,7 @@ function MessageThread({ messages, uid }) {
         const mine = m.uid === uid;
         return (
           <div key={m.id} style={S.bubble(mine)}>
-            {!mine && <div style={S.msgName}>{m.name}</div>}
+            {!mine && <div style={{ ...S.msgName, ...(m.admin ? { color: '#ffd700' } : {}) }}>{m.admin ? '\u2b50 ' : ''}{m.name}</div>}
             <div style={S.msgText}>{m.text}</div>
             <div style={S.msgTime}>{fmtTime(m.createdAt)}</div>
           </div>
@@ -83,7 +83,7 @@ function InputBar({ onSend }) {
 }
 
 // ---------- main chat page ----------
-export default function Chat({ user }) {
+export default function Chat({ user, adminMode }) {
   const [tab, setTab] = useState('global');          // 'global' | 'dms'
   const [globalMsgs, setGlobalMsgs] = useState([]);
   const [threads, setThreads] = useState([]);
@@ -91,14 +91,15 @@ export default function Chat({ user }) {
   const [activeDM, setActiveDM] = useState(null);    // { id, otherName }
   const [dmMsgs, setDmMsgs] = useState([]);
   const uid = user.uid;
-  const myName = nameOf(user);
+  const isAdmin = !!adminMode;
+  const myName = isAdmin ? 'THEONYX ADMIN' : nameOf(user);
 
   // register myself in the user directory
   useEffect(() => {
     setDoc(doc(db, 'chatUsers', uid), {
-      name: myName, email: user.email || '', lastSeen: serverTimestamp(),
+      name: myName, email: user.email || '', isAdmin, lastSeen: serverTimestamp(),
     }, { merge: true });
-  }, [uid, myName, user.email]);
+  }, [uid, myName, isAdmin, user.email]);
 
   // global chat (last 100, live)
   useEffect(() => {
@@ -121,7 +122,7 @@ export default function Chat({ user }) {
   // user directory
   useEffect(() => {
     return onSnapshot(collection(db, 'chatUsers'), (snap) => {
-      setPeople(snap.docs.map((d) => ({ uid: d.id, ...d.data() })).filter((p) => p.uid !== uid && (p.email || '').endsWith('@theonyxcafe.games')));
+      setPeople(snap.docs.map((d) => ({ uid: d.id, ...d.data() })).filter((p) => p.uid !== uid && ((p.email || '').endsWith('@theonyxcafe.games') || p.isAdmin === true)));
     });
   }, [uid]);
 
@@ -148,19 +149,19 @@ export default function Chat({ user }) {
   }, [activeDM]);
 
   const sendGlobal = useCallback((text) => {
-    addDoc(collection(db, 'globalChat'), { uid, name: myName, text, createdAt: serverTimestamp() });
-  }, [uid, myName]);
+    addDoc(collection(db, 'globalChat'), { uid, name: myName, text, admin: isAdmin, createdAt: serverTimestamp() });
+  }, [uid, myName, isAdmin]);
 
   const sendDM = useCallback((text) => {
     if (!activeDM) return;
     addDoc(collection(db, 'dms', activeDM.id, 'messages'),
-      { uid, name: myName, text, createdAt: serverTimestamp() });
+      { uid, name: myName, text, admin: isAdmin, createdAt: serverTimestamp() });
     setDoc(doc(db, 'dms', activeDM.id), {
       participants: activeDM.id.split('_'),
       names: { ...(activeDM.names || {}), [uid]: myName },
       lastMessage: text, lastSender: uid, updatedAt: serverTimestamp(),
     }, { merge: true });
-  }, [activeDM, uid, myName]);
+  }, [activeDM, uid, myName, isAdmin]);
 
   const openDM = (otherUid, otherName, names) => {
     setDmMsgs([]);
@@ -219,8 +220,8 @@ export default function Chat({ user }) {
             <div key={p.uid} style={S.row} onClick={() => openDM(p.uid, p.name)}>
               <div style={S.avatar}>{initialOf(p.name)}</div>
               <div>
-                <div style={S.rowName}>{p.name}</div>
-                <div style={S.rowSub}>Tap to message</div>
+                <div style={{ ...S.rowName, ...(p.isAdmin ? { color: '#ffd700' } : {}) }}>{p.isAdmin ? '\u2b50 ' : ''}{p.name}</div>
+                <div style={S.rowSub}>{p.isAdmin ? 'Cafe staff \u2014 tap to message' : 'Tap to message'}</div>
               </div>
             </div>
           ))}
