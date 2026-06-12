@@ -18,6 +18,9 @@ const S = {
   msgText: { fontSize: 14, lineHeight: 1.4, wordBreak: 'break-word' },
   msgTime: { fontSize: 10, color: '#a07850', marginTop: 4, textAlign: 'right' },
   delBtn: { background: 'none', border: 'none', color: '#ff6b6b', fontSize: 10, cursor: 'pointer', padding: '2px 0 0', fontFamily: 'inherit', textDecoration: 'underline' },
+  adminBubble: { borderColor: '#ffd700', animation: 'adminGlow 2.2s ease-in-out infinite alternate' },
+  adminAvatar: { borderColor: '#ffd700', animation: 'adminGlow 2.2s ease-in-out infinite alternate' },
+  adminName: { color: '#ffd700', textShadow: '0 0 8px rgba(255,215,0,0.7)' },
   inputBar: { display: 'flex', gap: 8, padding: 12, background: '#140800', borderTop: '1px solid #2c1600', position: 'sticky', bottom: 0 },
   input: { flex: 1, background: '#0a0400', border: '1px solid #6b3a1f', borderRadius: 20, padding: '10px 16px', color: '#f5e6d0', fontSize: 14, fontFamily: 'inherit', outline: 'none' },
   sendBtn: { background: 'linear-gradient(180deg, #ffd98a 0%, #d4a853 100%)', color: '#1a0800', border: 'none', borderRadius: 20, padding: '0 20px', fontWeight: 'bold', fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' },
@@ -28,6 +31,10 @@ const S = {
   sectionLabel: { fontSize: 11, color: '#c87a30', letterSpacing: 2, textTransform: 'uppercase', padding: '14px 16px 6px' },
   empty: { textAlign: 'center', color: '#a07850', fontSize: 13, padding: 40 },
 };
+
+const GlowStyles = (
+  <style>{`@keyframes adminGlow{from{box-shadow:0 0 5px rgba(255,215,0,0.25)}to{box-shadow:0 0 16px rgba(255,215,0,0.65)}}`}</style>
+);
 
 const nameOf = (u) => u?.displayName || (u?.email ? u.email.split('@')[0] : 'Guest');
 const initialOf = (n) => (n || '?').charAt(0).toUpperCase();
@@ -48,8 +55,8 @@ function MessageThread({ messages, uid, onDelete }) {
       {messages.map((m) => {
         const mine = m.uid === uid;
         return (
-          <div key={m.id} style={S.bubble(mine)}>
-            {!mine && <div style={{ ...S.msgName, ...(m.admin ? { color: '#ffd700' } : {}) }}>{m.admin ? '\u2b50 ' : ''}{m.name}</div>}
+          <div key={m.id} style={{ ...S.bubble(mine), ...(m.admin ? S.adminBubble : {}) }}>
+            {!mine && <div style={{ ...S.msgName, ...(m.admin ? S.adminName : {}) }}>{m.admin ? '\u2b50 ' : ''}{m.name}</div>}
             <div style={S.msgText}>{m.text}</div>
             <div style={S.msgTime}>{fmtTime(m.createdAt)}</div>
             {onDelete && <button style={S.delBtn} onClick={() => onDelete(m)}>Delete message</button>}
@@ -180,6 +187,7 @@ export default function Chat({ user, adminMode }) {
   if (activeDM) {
     return (
       <div style={S.wrap}>
+        {GlowStyles}
         <div style={S.header}>
           <button style={S.backBtn} onClick={() => setActiveDM(null)}>‹ Back</button>
           <div style={S.avatar}>{initialOf(activeDM.otherName)}</div>
@@ -194,6 +202,7 @@ export default function Chat({ user, adminMode }) {
   // ---------- main view (tabs) ----------
   return (
     <div style={S.wrap}>
+      {GlowStyles}
       <div style={S.tabs}>
         <button style={S.tab(tab === 'global')} onClick={() => setTab('global')}>Global Chat</button>
         <button style={S.tab(tab === 'dms')} onClick={() => setTab('dms')}>Messages</button>
@@ -226,9 +235,9 @@ export default function Chat({ user, adminMode }) {
           {people.length === 0 && <div style={S.empty}>No one else has signed in yet.</div>}
           {people.map((p) => (
             <div key={p.uid} style={S.row} onClick={() => openDM(p.uid, p.name)}>
-              <div style={S.avatar}>{initialOf(p.name)}</div>
+              <div style={{ ...S.avatar, ...(p.isAdmin ? S.adminAvatar : {}) }}>{initialOf(p.name)}</div>
               <div>
-                <div style={{ ...S.rowName, ...(p.isAdmin ? { color: '#ffd700' } : {}) }}>{p.isAdmin ? '\u2b50 ' : ''}{p.name}</div>
+                <div style={{ ...S.rowName, ...(p.isAdmin ? S.adminName : {}) }}>{p.isAdmin ? '\u2b50 ' : ''}{p.name}</div>
                 <div style={S.rowSub}>{p.isAdmin ? 'Cafe staff \u2014 tap to message' : 'Tap to message'}</div>
               </div>
             </div>
