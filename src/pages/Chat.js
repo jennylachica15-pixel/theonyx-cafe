@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db } from '../firebase/config';
 import {
-  collection, doc, setDoc, addDoc, getDocs, query, orderBy, limit,
+  collection, doc, setDoc, addDoc, getDocs, deleteDoc, query, orderBy, limit,
   where, onSnapshot, serverTimestamp,
 } from 'firebase/firestore';
 
@@ -17,6 +17,7 @@ const S = {
   msgName: { fontSize: 11, color: '#d4a853', fontWeight: 'bold', marginBottom: 2 },
   msgText: { fontSize: 14, lineHeight: 1.4, wordBreak: 'break-word' },
   msgTime: { fontSize: 10, color: '#a07850', marginTop: 4, textAlign: 'right' },
+  delBtn: { background: 'none', border: 'none', color: '#ff6b6b', fontSize: 10, cursor: 'pointer', padding: '2px 0 0', fontFamily: 'inherit', textDecoration: 'underline' },
   inputBar: { display: 'flex', gap: 8, padding: 12, background: '#140800', borderTop: '1px solid #2c1600', position: 'sticky', bottom: 0 },
   input: { flex: 1, background: '#0a0400', border: '1px solid #6b3a1f', borderRadius: 20, padding: '10px 16px', color: '#f5e6d0', fontSize: 14, fontFamily: 'inherit', outline: 'none' },
   sendBtn: { background: 'linear-gradient(180deg, #ffd98a 0%, #d4a853 100%)', color: '#1a0800', border: 'none', borderRadius: 20, padding: '0 20px', fontWeight: 'bold', fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' },
@@ -38,7 +39,7 @@ const fmtTime = (ts) => {
 };
 
 // ---------- message thread (shared by global + DM) ----------
-function MessageThread({ messages, uid }) {
+function MessageThread({ messages, uid, onDelete }) {
   const endRef = useRef(null);
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
   return (
@@ -51,6 +52,7 @@ function MessageThread({ messages, uid }) {
             {!mine && <div style={{ ...S.msgName, ...(m.admin ? { color: '#ffd700' } : {}) }}>{m.admin ? '\u2b50 ' : ''}{m.name}</div>}
             <div style={S.msgText}>{m.text}</div>
             <div style={S.msgTime}>{fmtTime(m.createdAt)}</div>
+            {onDelete && <button style={S.delBtn} onClick={() => onDelete(m)}>Delete message</button>}
           </div>
         );
       })}
@@ -148,6 +150,12 @@ export default function Chat({ user, adminMode }) {
     });
   }, [activeDM]);
 
+  const deleteGlobalMsg = useCallback((m) => {
+    if (window.confirm(`Delete this message for everyone?\n\n"${(m.text || '').slice(0, 80)}"`)) {
+      deleteDoc(doc(db, 'globalChat', m.id)).catch(() => {});
+    }
+  }, []);
+
   const sendGlobal = useCallback((text) => {
     addDoc(collection(db, 'globalChat'), { uid, name: myName, text, admin: isAdmin, createdAt: serverTimestamp() });
   }, [uid, myName, isAdmin]);
@@ -193,7 +201,7 @@ export default function Chat({ user, adminMode }) {
 
       {tab === 'global' && (
         <>
-          <MessageThread messages={globalMsgs} uid={uid} />
+          <MessageThread messages={globalMsgs} uid={uid} onDelete={isAdmin ? deleteGlobalMsg : undefined} />
           <InputBar onSend={sendGlobal} />
         </>
       )}
