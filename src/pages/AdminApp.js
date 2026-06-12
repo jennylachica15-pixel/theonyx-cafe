@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { auth, db } from '../firebase/config';
 import { signOut } from 'firebase/auth';
+import Chat from './Chat';
 import { doc, getDoc, collection, addDoc, serverTimestamp, onSnapshot, query, where, getDocs, updateDoc, orderBy, limit, deleteDoc } from 'firebase/firestore';
 import Attendance from './Attendance';
 import Orders from './Orders';
@@ -538,6 +539,7 @@ export default function AdminApp({ user, onSignOut }) {
   const morePanels = [
     { id: 'cleanliness', label: 'Cleanliness', desc: 'Daily check', icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#c8943a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> },
     { id: 'feedback',    label: 'Feedback',    desc: 'Customer reviews', icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#c8943a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> },
+    ...(role === 'manager' ? [{ id: 'chat', label: 'Chat', desc: 'Message guests', icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#c8943a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z"/><path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1"/></svg> }] : []),
     ...(role === 'manager' ? [{ id: 'menu', label: 'Menu', desc: 'Edit items', icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#c8943a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg> }] : []),
     { id: 'approvals',   label: 'Approvals',   desc: 'Guest photos', icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#c8943a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> },
   ];
@@ -655,6 +657,7 @@ export default function AdminApp({ user, onSignOut }) {
               {activeTab === 'approvals'   && <Approvals role={role} />}
               {activeTab === 'reports'     && <Reports />}
               {activeTab === 'menu'        && role === 'manager' && <MenuManager />}
+              {activeTab === 'chat'        && role === 'manager' && <Chat user={user} adminMode />}
               {activeTab === 'cleanliness' && <CleanlinessPanel role={role} userName={userName} />}
               {activeTab === 'feedback'    && <FeedbackPanel role={role} />}
             </div>
