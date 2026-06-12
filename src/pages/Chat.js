@@ -95,7 +95,7 @@ export default function Chat({ user }) {
 
   // register myself in the user directory
   useEffect(() => {
-    setDoc(doc(db, 'users', uid), {
+    setDoc(doc(db, 'chatUsers', uid), {
       name: myName, email: user.email || '', lastSeen: serverTimestamp(),
     }, { merge: true });
   }, [uid, myName, user.email]);
@@ -120,8 +120,8 @@ export default function Chat({ user }) {
 
   // user directory
   useEffect(() => {
-    return onSnapshot(collection(db, 'users'), (snap) => {
-      setPeople(snap.docs.map((d) => ({ uid: d.id, ...d.data() })).filter((p) => p.uid !== uid));
+    return onSnapshot(collection(db, 'chatUsers'), (snap) => {
+      setPeople(snap.docs.map((d) => ({ uid: d.id, ...d.data() })).filter((p) => p.uid !== uid && (p.email || '').endsWith('@theonyxcafe.games')));
     });
   }, [uid]);
 
