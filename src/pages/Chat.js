@@ -416,13 +416,6 @@ export default function Chat({ user, adminMode }) {
     <div style={S.wrap}>
       {GlowStyles}
 
-      {/* header */}
-      <div style={{ ...S.header, justifyContent: 'center' }}>
-        <div style={{ ...S.title, textAlign: 'center', flex: 'unset' }}>
-          ☕ Theonyx Chat
-        </div>
-      </div>
-
       {/* tabs */}
       <div style={S.tabs}>
         <button style={S.tab(tab === 'global')} onClick={() => setTab('global')}>Global Chat</button>
