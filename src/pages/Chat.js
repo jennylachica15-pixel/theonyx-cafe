@@ -43,12 +43,6 @@ const S = {
   }),
   // little red counter badge for unread messages on a tab
   tabBadge: { minWidth: 18, height: 18, borderRadius: 9, background: C.danger, color: '#fff', fontSize: 11, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px' },
-  // in-app toast (slides in top-right; always visible, no permission needed)
-  toastWrap: { position: 'fixed', top: 14, left: '50%', transform: 'translateX(-50%)', zIndex: 9999, display: 'flex', flexDirection: 'column', gap: 8, pointerEvents: 'none', width: 'min(360px, 92vw)' },
-  toast: { background: C.white, border: `1px solid ${C.border}`, borderLeft: `4px solid ${C.primary}`, borderRadius: 12, boxShadow: '0 6px 24px rgba(100,50,0,0.18)', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10, pointerEvents: 'auto', cursor: 'pointer', animation: 'toastIn 0.25s ease' },
-  toastAvatar: { width: 36, height: 36, borderRadius: '50%', background: `linear-gradient(135deg, ${C.primaryDim}, ${C.primary})`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 15, flexShrink: 0 },
-  toastTitle: { fontSize: 13, fontWeight: 700, color: '#1a0800' },
-  toastBody: { fontSize: 12, color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 260 },
   msgList:  { flex: 1, overflowY: 'auto', padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: 6, background: C.bg },
   dateChip: { alignSelf: 'center', background: C.border, color: C.muted, fontSize: 11, borderRadius: 20, padding: '3px 12px', margin: '6px 0', fontWeight: 500 },
   bubble: (mine) => ({
@@ -104,10 +98,6 @@ const GlowStyles = (
     }
     .mention-row:active { background: ${C.bgAlt} !important; }
     .chat-row:active    { background: ${C.bgAlt} !important; }
-    @keyframes toastIn {
-      from { opacity: 0; transform: translateY(-12px) }
-      to   { opacity: 1; transform: translateY(0) }
-    }
   `}</style>
 );
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -118,61 +108,6 @@ const fmtTime   = (ts) => {
   if (!ts?.toDate) return '';
   return ts.toDate().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 };
-
-// ── new-message notifications (desktop popup + sound) ──────────────────────────
-// A small custom hook that bundles: permission request, a built-in "ding" sound
-// (via Web Audio so no audio file is needed), and a notify() you can call when a
-// new message arrives.
-function useMessageNotifier() {
-  // Ask the browser for desktop-notification permission once on mount.
-  useEffect(() => {
-    if (typeof window === 'undefined' || !('Notification' in window)) return;
-    if (Notification.permission === 'default') {
-      Notification.requestPermission().catch(() => {});
-    }
-  }, []);
-
-  // Short pleasant beep using the Web Audio API (no asset to host).
-  const playDing = useCallback(() => {
-    try {
-      const Ctx = window.AudioContext || window.webkitAudioContext;
-      if (!Ctx) return;
-      const ctx = new Ctx();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(880, ctx.currentTime);
-      osc.frequency.setValueAtTime(660, ctx.currentTime + 0.12);
-      gain.gain.setValueAtTime(0.0001, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.18, ctx.currentTime + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.35);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.35);
-      osc.onended = () => ctx.close().catch(() => {});
-    } catch (_) {}
-  }, []);
-
-  // Fire a notification: always pings sound; shows a desktop popup only when the
-  // tab is in the background (so it doesn't nag while you're already looking).
-  const notify = useCallback((title, body) => {
-    playDing();
-    if (
-      typeof window !== 'undefined' &&
-      'Notification' in window &&
-      Notification.permission === 'granted' &&
-      document.visibilityState === 'hidden'
-    ) {
-      try {
-        const n = new Notification(title, { body: (body || '').slice(0, 120), tag: 'theonyx-chat' });
-        n.onclick = () => { window.focus(); n.close(); };
-      } catch (_) {}
-    }
-  }, [playDing]);
-
-  return notify;
-}
 
 // ── notify @mentions ──────────────────────────────────────────────────────────
 async function notifyMentions(text, fromUid, fromName, chatType, threadId, allUsers) {
@@ -342,26 +277,9 @@ export default function Chat({ user, adminMode }) {
   const [activeDM, setActiveDM] = useState(null);
   const [dmMsgs, setDmMsgs]   = useState([]);
   const [globalUnread, setGlobalUnread] = useState(0);   // unread count for Global tab
-  const [toasts, setToasts] = useState([]);              // in-app toast popups
   const uid     = user.uid;
   const isAdmin = !!adminMode;
   const myName  = isAdmin ? 'THEONYX ADMIN' : nameOf(user);
-
-  const notify = useMessageNotifier();
-
-  // Show an in-app toast (auto-dismisses after 4s). Always visible, regardless
-  // of notification permission or whether the tab is focused.
-  const pushToast = useCallback((title, body) => {
-    const id = Date.now() + Math.random();
-    setToasts(list => [...list, { id, title, body }]);
-    setTimeout(() => setToasts(list => list.filter(t => t.id !== id)), 4000);
-  }, []);
-
-  // Fire both the system notification (sound + desktop popup) and the in-app toast.
-  const alertNewMessage = useCallback((title, body) => {
-    notify(title, body);
-    pushToast(title, body);
-  }, [notify, pushToast]);
 
   // Keep "current view" in refs so the live listeners below don't have to
   // re-subscribe every time you switch tabs / open a DM.
@@ -385,7 +303,7 @@ export default function Chat({ user, adminMode }) {
       ))
       .catch(() => {});
   }, [uid]);
-  // global chat live  (+ notify on new incoming messages)
+  // global chat live (+ count unread when you're not on the Global tab)
   const globalInit = useRef(false);
   useEffect(() => {
     globalInit.current = false; // reset guard if uid changes
@@ -403,19 +321,16 @@ export default function Chat({ user, adminMode }) {
           && document.visibilityState === 'visible';
         if (!viewing) {
           setGlobalUnread(c => c + 1);
-          alertNewMessage(`${m.name || 'Someone'} · Global Chat`, m.text);
         }
       });
     });
-  }, [uid, alertNewMessage]);
+  }, [uid]);
   // clear the Global unread counter whenever you actually look at that tab
   useEffect(() => {
     if (tab === 'global' && !activeDM) setGlobalUnread(0);
   }, [tab, activeDM]);
-  // DM threads  (+ notify on new incoming DMs)
-  const threadsInit = useRef(false);
+  // DM threads (live)
   useEffect(() => {
-    threadsInit.current = false;
     const q = query(collection(db, 'dms'), where('participants', 'array-contains', uid));
     return onSnapshot(q, snap => {
       const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -427,20 +342,8 @@ export default function Chat({ user, adminMode }) {
         return (b.updatedAt?.seconds || 0) - (a.updatedAt?.seconds || 0);
       });
       setThreads(list);
-      if (!threadsInit.current) { threadsInit.current = true; return; }
-      snap.docChanges().forEach(ch => {
-        if (ch.type !== 'added' && ch.type !== 'modified') return;
-        const t = ch.doc.data();
-        if (!t.lastSender || t.lastSender === uid) return;   // only incoming
-        const open = activeDMRef.current && activeDMRef.current.id === ch.doc.id
-          && document.visibilityState === 'visible';
-        if (open) return;                                    // already reading it
-        const otherUid  = (t.participants || []).find(p => p !== uid);
-        const otherName = t.names?.[otherUid] || 'New message';
-        alertNewMessage(otherName, t.lastMessage || 'sent you a message');
-      });
     });
-  }, [uid, alertNewMessage]);
+  }, [uid]);
   // user directory
   useEffect(() => {
     return onSnapshot(collection(db, 'chatUsers'), snap =>
@@ -451,18 +354,6 @@ export default function Chat({ user, adminMode }) {
       )
     );
   }, [uid]);
-  // legacy players
-  const [legacyNames, setLegacyNames] = useState([]);
-  useEffect(() => {
-    getDocs(collection(db, 'gameUsers'))
-      .then(snap => setLegacyNames(snap.docs.map(d => d.data().username).filter(Boolean)))
-      .catch(() => {});
-  }, []);
-  const inChat = new Set(people.map(p => (p.name || '').toLowerCase()));
-  const pendingPlayers = legacyNames.filter(
-    n => !inChat.has(n.toLowerCase()) && n.toLowerCase() !== myName.toLowerCase()
-  );
-
   // total unread DMs across all threads (used for the Messages tab badge + title)
   const dmUnreadTotal = threads.reduce((s, t) => s + (t.unreadFor?.[uid] || 0), 0);
 
@@ -503,9 +394,8 @@ export default function Chat({ user, adminMode }) {
       await notifyMentions(text, uid, myName, 'global', null, people);
     } catch (e) {
       console.error('[Chat] sendGlobal failed:', e);
-      pushToast('Message failed', e?.message || 'Could not send');
     }
-  }, [uid, myName, isAdmin, people, pushToast]);
+  }, [uid, myName, isAdmin, people]);
   const sendDM = useCallback(async (text) => {
     if (!activeDM) return;
     const otherUid = activeDM.id.split('_').find(p => p !== uid);
@@ -523,9 +413,8 @@ export default function Chat({ user, adminMode }) {
     } catch (e) {
       // Surface the real reason (very often Firestore security rules).
       console.error('[Chat] sendDM failed:', e);
-      pushToast('DM failed to send', e?.message || 'Check Firestore rules');
     }
-  }, [activeDM, uid, myName, isAdmin, people, pushToast]);
+  }, [activeDM, uid, myName, isAdmin, people]);
   const openDM = (otherUid, otherName, names) => {
     setDmMsgs([]);
     const tId = threadIdFor(uid, otherUid);
@@ -534,31 +423,11 @@ export default function Chat({ user, adminMode }) {
     updateDoc(doc(db, 'dms', tId), { [`unreadFor.${uid}`]: 0 })
       .catch(e => { if (e?.code !== 'not-found') console.error('[Chat] clear unread failed:', e); });
   };
-  // in-app toast overlay (rendered in both views)
-  const toastOverlay = toasts.length > 0 && (
-    <div style={S.toastWrap}>
-      {toasts.map(t => (
-        <div
-          key={t.id}
-          style={S.toast}
-          onClick={() => setToasts(list => list.filter(x => x.id !== t.id))}
-        >
-          <div style={S.toastAvatar}>{initialOf(t.title)}</div>
-          <div style={{ overflow: 'hidden' }}>
-            <div style={S.toastTitle}>{t.title}</div>
-            <div style={S.toastBody}>{t.body}</div>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-
   // ── DM thread view ──────────────────────────────────────────────────────────
   if (activeDM) {
     return (
       <div style={S.wrap}>
         {GlowStyles}
-        {toastOverlay}
         <div style={S.header}>
           <button style={S.backBtn} onClick={() => setActiveDM(null)}>‹</button>
           <div style={{ ...S.avatar, width: 34, height: 34, fontSize: 14 }}>{initialOf(activeDM.otherName)}</div>
@@ -579,7 +448,6 @@ export default function Chat({ user, adminMode }) {
   return (
     <div style={S.wrap}>
       {GlowStyles}
-      {toastOverlay}
       {/* tabs */}
       <div style={S.tabs}>
         <button style={S.tab(tab === 'global')} onClick={() => setTab('global')}>
@@ -663,18 +531,6 @@ export default function Chat({ user, adminMode }) {
               </div>
             );
           })}
-          {pendingPlayers.length > 0 && (
-            <div style={S.sectionLabel}>Not in chat yet</div>
-          )}
-          {pendingPlayers.map(n => (
-            <div key={n} style={S.rowDisabled}>
-              <div style={{ ...S.avatar, background: C.border, color: C.muted }}>{initialOf(n)}</div>
-              <div>
-                <div style={{ ...S.rowName, color: C.muted }}>{n}</div>
-                <div style={S.rowSub}>Will appear after their next sign-in</div>
-              </div>
-            </div>
-          ))}
         </div>
       )}
     </div>
