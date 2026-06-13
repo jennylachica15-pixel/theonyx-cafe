@@ -1,10 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-
 const SLIDES = [
   '/1.jpg','/2.jpg','/3.jpg','/4.jpg','/5.jpg','/6.jpg',
   '/7.jpg','/8.jpg','/9.jpg','/10.jpg','/11.jpg','/12.jpg','/13.jpg',
 ];
-
 const MENU_CATEGORIES = [
   { id: 'espresso', label: 'Espresso Based', count: 12,
     items: [
@@ -109,7 +107,6 @@ const MENU_CATEGORIES = [
     ]
   },
 ];
-
 const CAT_ICONS = {
   espresso: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 8h1a4 4 0 0 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/><line x1="14" y1="2" x2="14" y2="4"/></svg>,
   noncoffee: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a10 10 0 0 1 10 10"/><path d="M12 2v4"/><path d="M4.93 4.93l2.83 2.83"/><path d="M2 12h4"/><path d="M4.93 19.07l2.83-2.83"/><path d="M12 22v-4"/><circle cx="12" cy="12" r="4"/></svg>,
@@ -121,30 +118,25 @@ const CAT_ICONS = {
   snacks: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M3 11l3-7h12l3 7"/><line x1="12" y1="11" x2="12" y2="21"/><line x1="7" y1="11" x2="7" y2="21"/><line x1="17" y1="11" x2="17" y2="21"/></svg>,
   addons: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
 };
-
 const getPriceRange = (item) => {
   const prices = ['mini','classic','upgrade','regular'].map(s => item[s]).filter(Boolean);
   if (prices.length === 0) return '';
   if (prices.length === 1) return `₱${prices[0]}`;
   return `₱${Math.min(...prices)} – ₱${Math.max(...prices)}`;
 };
-
 export default function GuestLanding() {
   const [openCat, setOpenCat] = useState(null);
   const [slide, setSlide] = useState(0);
   const touchStartX = useRef(null);
   const touchStartY = useRef(null);
-
   useEffect(() => {
     const timer = setInterval(() => setSlide(s => (s + 1) % SLIDES.length), 4000);
     return () => clearInterval(timer);
   }, []);
-
   const handleTouchStart = (e) => {
     touchStartX.current = e.touches[0].clientX;
     touchStartY.current = e.touches[0].clientY;
   };
-
   const handleTouchEnd = (e) => {
     if (touchStartX.current === null) return;
     const dx = e.changedTouches[0].clientX - touchStartX.current;
@@ -156,7 +148,6 @@ export default function GuestLanding() {
     touchStartX.current = null;
     touchStartY.current = null;
   };
-
   return (
     <div style={{ minHeight: '100vh', background: 'transparent', paddingBottom: 40 }}>
       {/* Hero with slideshow */}
@@ -197,7 +188,6 @@ export default function GuestLanding() {
           </div>
         </div>
       </div>
-
       {/* Body */}
       <div style={{ padding: '18px 16px 0' }}>
         <div style={{ background: 'rgba(20,8,0,0.55)', borderRadius: 14, padding: '16px 18px', marginBottom: 16, border: '1px solid rgba(212,168,83,0.25)', backdropFilter: 'blur(8px)' }}>
@@ -207,9 +197,7 @@ export default function GuestLanding() {
           </div>
           <div style={{ fontSize: 12, color: '#d4a853', marginTop: 8, fontWeight: 500 }}>Open everyday · 10:00 AM – 11:00 PM</div>
         </div>
-
         <div style={{ fontFamily: 'var(--font-display)', fontSize: 17, fontWeight: 700, color: '#f0d080', marginBottom: 12 }}>Our Menu</div>
-
         {MENU_CATEGORIES.map(cat => (
           <div key={cat.id} style={{ background: 'rgba(20,8,0,0.55)', borderRadius: 14, marginBottom: 8, overflow: 'hidden', border: '1px solid rgba(212,168,83,0.2)', backdropFilter: 'blur(8px)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 16px', cursor: 'pointer' }} onClick={() => setOpenCat(openCat === cat.id ? null : cat.id)}>
@@ -232,7 +220,6 @@ export default function GuestLanding() {
             ))}
           </div>
         ))}
-
         {/* Footer CTA */}
         <div style={{ padding: '20px 4px 0', textAlign: 'center' }}>
           <div style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700, color: '#f0d080', marginBottom: 6 }}>
@@ -258,7 +245,6 @@ export default function GuestLanding() {
             Get Directions →
           </a>
         </div>
-
       </div>
       <div style={{ height: 80 }} />
     </div>
