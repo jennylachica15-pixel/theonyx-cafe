@@ -419,7 +419,13 @@ export default function Chat({ user, adminMode }) {
     const q = query(collection(db, 'dms'), where('participants', 'array-contains', uid));
     return onSnapshot(q, snap => {
       const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      list.sort((a, b) => (b.updatedAt?.seconds || 0) - (a.updatedAt?.seconds || 0));
+      // unread conversations float to the very top; within each group, newest first
+      list.sort((a, b) => {
+        const ua = (a.unreadFor?.[uid] || 0) > 0 ? 1 : 0;
+        const ub = (b.unreadFor?.[uid] || 0) > 0 ? 1 : 0;
+        if (ua !== ub) return ub - ua;
+        return (b.updatedAt?.seconds || 0) - (a.updatedAt?.seconds || 0);
+      });
       setThreads(list);
       if (!threadsInit.current) { threadsInit.current = true; return; }
       snap.docChanges().forEach(ch => {
@@ -467,6 +473,10 @@ export default function Chat({ user, adminMode }) {
     const other = (t.participants || []).find(p => p !== uid);
     if (other) unreadByUser[other] = t.unreadFor?.[uid] || 0;
   });
+  // People with unread messages float to the top of the People list.
+  const sortedPeople = [...people].sort(
+    (a, b) => (unreadByUser[b.uid] || 0) - (unreadByUser[a.uid] || 0)
+  );
 
   // tab title flash: prefix "(N)" while there are unread messages
   const baseTitle = useRef(typeof document !== 'undefined' ? document.title : '');
@@ -611,7 +621,7 @@ export default function Chat({ user, adminMode }) {
           })}
           <div style={S.sectionLabel}>People</div>
           {people.length === 0 && <div style={S.empty}>No one else is here yet ☕</div>}
-          {people.map(p => {
+          {sortedPeople.map(p => {
             const unread    = unreadByUser[p.uid] || 0;
             const hasUnread = unread > 0;
             return (
