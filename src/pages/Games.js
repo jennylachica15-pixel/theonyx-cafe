@@ -47,7 +47,7 @@ const GAME_LIST = [
   { id: 'fairyq',        title: 'Friends & Questions',  sub: 'Funny, deep & spicy',     mode: 'Group play'    },
 ];
 
-const LEADERBOARD_GAMES = GAME_LIST.filter(g => g.id !== 'cafemystery' && g.id !== 'fairyq');
+const LEADERBOARD_GAMES = GAME_LIST.filter(g => g.id !== 'cafemystery' && g.id !== 'fairyq' && g.id !== 'zombie');
 
 const fmtScore = (gameId, score) => {
   const n = (Number(score) || 0).toLocaleString();
