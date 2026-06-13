@@ -435,26 +435,16 @@ export default function Chat({ user, adminMode }) {
       });
     });
   }, [uid, alertNewMessage]);
-  // user directory  (+ notify when a new person joins the chat)
-  const peopleInit = useRef(false);
-  const isMember = useCallback(
-    (p) => p.uid !== uid && ((p.email || '').endsWith('@theonyxcafe.games') || p.isAdmin === true),
-    [uid]
-  );
+  // user directory
   useEffect(() => {
-    peopleInit.current = false;
-    return onSnapshot(collection(db, 'chatUsers'), snap => {
-      setPeople(snap.docs.map(d => ({ uid: d.id, ...d.data() })).filter(isMember));
-      // Skip the first snapshot (everyone already here = not "new").
-      if (!peopleInit.current) { peopleInit.current = true; return; }
-      snap.docChanges().forEach(ch => {
-        if (ch.type !== 'added') return;
-        const p = { uid: ch.doc.id, ...ch.doc.data() };
-        if (!isMember(p)) return;
-        alertNewMessage(`${p.name || 'Someone'} joined`, 'is now in the chat 👋');
-      });
-    });
-  }, [uid, isMember, alertNewMessage]);
+    return onSnapshot(collection(db, 'chatUsers'), snap =>
+      setPeople(
+        snap.docs
+          .map(d => ({ uid: d.id, ...d.data() }))
+          .filter(p => p.uid !== uid && ((p.email || '').endsWith('@theonyxcafe.games') || p.isAdmin === true))
+      )
+    );
+  }, [uid]);
   // legacy players
   const [legacyNames, setLegacyNames] = useState([]);
   useEffect(() => {
