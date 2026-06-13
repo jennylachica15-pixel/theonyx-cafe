@@ -510,18 +510,6 @@ export default function Chat({ user, adminMode }) {
   const groupUnreadTotal = groups.reduce((s, g) => s + (g.unreadFor?.[uid] || 0), 0);
   const messagesUnread   = dmUnreadTotal + groupUnreadTotal;
 
-  // unread count keyed by the *other* person's uid — lets the People list show
-  // bold + a dot for anyone who has unread messages waiting for you.
-  const unreadByUser = {};
-  threads.forEach(t => {
-    const other = (t.participants || []).find(p => p !== uid);
-    if (other) unreadByUser[other] = t.unreadFor?.[uid] || 0;
-  });
-  // People with unread messages float to the top of the People list.
-  const sortedPeople = [...people].sort(
-    (a, b) => (unreadByUser[b.uid] || 0) - (unreadByUser[a.uid] || 0)
-  );
-
   // tab title flash: prefix "(N)" while there are unread messages
   const baseTitle = useRef(typeof document !== 'undefined' ? document.title : '');
   useEffect(() => {
@@ -785,38 +773,9 @@ export default function Chat({ user, adminMode }) {
               </div>
             );
           })}
-          <div style={S.sectionLabel}>People</div>
-          {people.length === 0 && <div style={S.empty}>No one else is here yet ☕</div>}
-          {sortedPeople.map(p => {
-            const unread    = unreadByUser[p.uid] || 0;
-            const hasUnread = unread > 0;
-            return (
-              <div key={p.uid} className="chat-row" style={S.row} onClick={() => openDM(p.uid, p.name)}>
-                <div style={{ ...S.avatar, ...(p.isAdmin ? S.adminAvatar : {}) }}>
-                  {initialOf(p.name)}
-                </div>
-                <div style={{ flex: 1, overflow: 'hidden' }}>
-                  <div style={{
-                    ...(p.isAdmin ? S.adminRowName : S.rowName),
-                    fontWeight: hasUnread ? 800 : (p.isAdmin ? 700 : 600),
-                    color: hasUnread ? '#1a0800' : undefined,
-                  }}>
-                    {p.isAdmin ? '⭐ ' : ''}{p.name}
-                  </div>
-                  <div style={{ ...S.rowSub, color: hasUnread ? '#1a0800' : C.muted, fontWeight: hasUnread ? 700 : 400 }}>
-                    {hasUnread
-                      ? `${unread} new message${unread > 1 ? 's' : ''}`
-                      : (p.isAdmin ? 'Cafe staff · tap to message' : 'Tap to message')}
-                  </div>
-                </div>
-                {hasUnread && (
-                  unread === 1
-                    ? <div style={S.dmDot} />
-                    : <div style={S.dmBadge}>{unread > 99 ? '99+' : unread}</div>
-                )}
-              </div>
-            );
-          })}
+          {threads.length === 0 && groups.length === 0 && (
+            <div style={S.empty}>No conversations yet ☕<br /><span style={{ fontSize: 12 }}>Create a group to get started.</span></div>
+          )}
         </div>
       )}
     </div>
