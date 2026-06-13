@@ -385,8 +385,8 @@ function SnakeGame({ playerName, onScore }) {
           if (g.food.length === 0) { g.exitOpen = true; setExitOpen(true); }
         } else { g.snake.pop(); }
       }
-      const base = Math.max(70, 165 - (g ? g.level : 1) * 6);
-      const delay = boostRef.current ? Math.max(40, Math.round(base * 0.45)) : base;
+      const base = Math.max(100, 210 - (g ? g.level : 1) * 6);
+      const delay = boostRef.current ? Math.max(55, Math.round(base * 0.5)) : base;
       if (!stop) moveRef.current = setTimeout(step, delay);
     };
     moveRef.current = setTimeout(step, 220);
