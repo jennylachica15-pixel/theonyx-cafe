@@ -88,7 +88,8 @@ const S = {
   adminRowName:  { fontSize: 14, fontWeight: 700, color: C.admin },
   rowSub:        { fontSize: 12, color: C.muted, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 220 },
   empty:         { textAlign: 'center', color: C.mutedLight, fontSize: 13, padding: 48, lineHeight: 1.6 },
-  dmBadge:       { minWidth: 20, height: 20, borderRadius: 10, background: '#e03030', color: '#fff', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px', flexShrink: 0 },
+  dmBadge:       { minWidth: 20, height: 20, borderRadius: 10, background: '#a0522d', color: '#fff', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 6px', flexShrink: 0 },
+  dmDot:         { width: 10, height: 10, borderRadius: '50%', background: '#a0522d', flexShrink: 0 },
 
   // DM profile card (shown at top of a DM thread)
   dmCard:     { background: C.white, borderBottom: `1px solid ${C.border}`, padding: '18px 16px 14px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 },
@@ -457,13 +458,17 @@ export default function Chat({ user, adminMode }) {
               <div key={t.id} className="chat-row" style={S.row} onClick={() => openDM(otherUid, otherName, t.names)}>
                 <div style={S.avatar}>{initialOf(otherName)}</div>
                 <div style={{ flex: 1, overflow: 'hidden' }}>
-                  <div style={{ ...S.rowName, fontWeight: hasUnread ? 700 : 600 }}>{otherName}</div>
-                  <div style={{ ...S.rowSub, color: hasUnread ? C.primary : C.muted, fontWeight: hasUnread ? 600 : 400 }}>
+                  <div style={{ ...S.rowName, fontWeight: hasUnread ? 700 : 600, color: hasUnread ? '#1a0800' : '#3a2010' }}>
+                    {otherName}
+                  </div>
+                  <div style={{ ...S.rowSub, color: hasUnread ? '#1a0800' : C.muted, fontWeight: hasUnread ? 700 : 400 }}>
                     {t.lastSender === uid ? 'You: ' : ''}{t.lastMessage}
                   </div>
                 </div>
                 {hasUnread && (
-                  <div style={S.dmBadge}>{unread > 99 ? '99+' : unread}</div>
+                  unread === 1
+                    ? <div style={S.dmDot} />
+                    : <div style={S.dmBadge}>{unread > 99 ? '99+' : unread}</div>
                 )}
               </div>
             );
