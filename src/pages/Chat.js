@@ -43,6 +43,12 @@ const S = {
   }),
   // little red counter badge for unread messages on a tab
   tabBadge: { minWidth: 18, height: 18, borderRadius: 9, background: C.danger, color: '#fff', fontSize: 11, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px' },
+  // in-app toast (slides in top-right; always visible, no permission needed)
+  toastWrap: { position: 'fixed', top: 14, left: '50%', transform: 'translateX(-50%)', zIndex: 9999, display: 'flex', flexDirection: 'column', gap: 8, pointerEvents: 'none', width: 'min(360px, 92vw)' },
+  toast: { background: C.white, border: `1px solid ${C.border}`, borderLeft: `4px solid ${C.primary}`, borderRadius: 12, boxShadow: '0 6px 24px rgba(100,50,0,0.18)', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10, pointerEvents: 'auto', cursor: 'pointer', animation: 'toastIn 0.25s ease' },
+  toastAvatar: { width: 36, height: 36, borderRadius: '50%', background: `linear-gradient(135deg, ${C.primaryDim}, ${C.primary})`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 15, flexShrink: 0 },
+  toastTitle: { fontSize: 13, fontWeight: 700, color: '#1a0800' },
+  toastBody: { fontSize: 12, color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 260 },
   msgList:  { flex: 1, overflowY: 'auto', padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: 6, background: C.bg },
   dateChip: { alignSelf: 'center', background: C.border, color: C.muted, fontSize: 11, borderRadius: 20, padding: '3px 12px', margin: '6px 0', fontWeight: 500 },
   bubble: (mine) => ({
@@ -98,6 +104,10 @@ const GlowStyles = (
     }
     .mention-row:active { background: ${C.bgAlt} !important; }
     .chat-row:active    { background: ${C.bgAlt} !important; }
+    @keyframes toastIn {
+      from { opacity: 0; transform: translateY(-12px) }
+      to   { opacity: 1; transform: translateY(0) }
+    }
   `}</style>
 );
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -332,11 +342,26 @@ export default function Chat({ user, adminMode }) {
   const [activeDM, setActiveDM] = useState(null);
   const [dmMsgs, setDmMsgs]   = useState([]);
   const [globalUnread, setGlobalUnread] = useState(0);   // unread count for Global tab
+  const [toasts, setToasts] = useState([]);              // in-app toast popups
   const uid     = user.uid;
   const isAdmin = !!adminMode;
   const myName  = isAdmin ? 'THEONYX ADMIN' : nameOf(user);
 
   const notify = useMessageNotifier();
+
+  // Show an in-app toast (auto-dismisses after 4s). Always visible, regardless
+  // of notification permission or whether the tab is focused.
+  const pushToast = useCallback((title, body) => {
+    const id = Date.now() + Math.random();
+    setToasts(list => [...list, { id, title, body }]);
+    setTimeout(() => setToasts(list => list.filter(t => t.id !== id)), 4000);
+  }, []);
+
+  // Fire both the system notification (sound + desktop popup) and the in-app toast.
+  const alertNewMessage = useCallback((title, body) => {
+    notify(title, body);
+    pushToast(title, body);
+  }, [notify, pushToast]);
 
   // Keep "current view" in refs so the live listeners below don't have to
   // re-subscribe every time you switch tabs / open a DM.
@@ -378,11 +403,11 @@ export default function Chat({ user, adminMode }) {
           && document.visibilityState === 'visible';
         if (!viewing) {
           setGlobalUnread(c => c + 1);
-          notify(`${m.name || 'Someone'} · Global Chat`, m.text);
+          alertNewMessage(`${m.name || 'Someone'} · Global Chat`, m.text);
         }
       });
     });
-  }, [uid, notify]);
+  }, [uid, alertNewMessage]);
   // clear the Global unread counter whenever you actually look at that tab
   useEffect(() => {
     if (tab === 'global' && !activeDM) setGlobalUnread(0);
@@ -406,20 +431,30 @@ export default function Chat({ user, adminMode }) {
         if (open) return;                                    // already reading it
         const otherUid  = (t.participants || []).find(p => p !== uid);
         const otherName = t.names?.[otherUid] || 'New message';
-        notify(otherName, t.lastMessage || 'sent you a message');
+        alertNewMessage(otherName, t.lastMessage || 'sent you a message');
       });
     });
-  }, [uid, notify]);
-  // user directory
+  }, [uid, alertNewMessage]);
+  // user directory  (+ notify when a new person joins the chat)
+  const peopleInit = useRef(false);
+  const isMember = useCallback(
+    (p) => p.uid !== uid && ((p.email || '').endsWith('@theonyxcafe.games') || p.isAdmin === true),
+    [uid]
+  );
   useEffect(() => {
-    return onSnapshot(collection(db, 'chatUsers'), snap =>
-      setPeople(
-        snap.docs
-          .map(d => ({ uid: d.id, ...d.data() }))
-          .filter(p => p.uid !== uid && ((p.email || '').endsWith('@theonyxcafe.games') || p.isAdmin === true))
-      )
-    );
-  }, [uid]);
+    peopleInit.current = false;
+    return onSnapshot(collection(db, 'chatUsers'), snap => {
+      setPeople(snap.docs.map(d => ({ uid: d.id, ...d.data() })).filter(isMember));
+      // Skip the first snapshot (everyone already here = not "new").
+      if (!peopleInit.current) { peopleInit.current = true; return; }
+      snap.docChanges().forEach(ch => {
+        if (ch.type !== 'added') return;
+        const p = { uid: ch.doc.id, ...ch.doc.data() };
+        if (!isMember(p)) return;
+        alertNewMessage(`${p.name || 'Someone'} joined`, 'is now in the chat 👋');
+      });
+    });
+  }, [uid, isMember, alertNewMessage]);
   // legacy players
   const [legacyNames, setLegacyNames] = useState([]);
   useEffect(() => {
@@ -479,11 +514,31 @@ export default function Chat({ user, adminMode }) {
     // clear unread count for this user
     updateDoc(doc(db, 'dms', tId), { [`unreadFor.${uid}`]: 0 }).catch(() => {});
   };
+  // in-app toast overlay (rendered in both views)
+  const toastOverlay = toasts.length > 0 && (
+    <div style={S.toastWrap}>
+      {toasts.map(t => (
+        <div
+          key={t.id}
+          style={S.toast}
+          onClick={() => setToasts(list => list.filter(x => x.id !== t.id))}
+        >
+          <div style={S.toastAvatar}>{initialOf(t.title)}</div>
+          <div style={{ overflow: 'hidden' }}>
+            <div style={S.toastTitle}>{t.title}</div>
+            <div style={S.toastBody}>{t.body}</div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
   // ── DM thread view ──────────────────────────────────────────────────────────
   if (activeDM) {
     return (
       <div style={S.wrap}>
         {GlowStyles}
+        {toastOverlay}
         <div style={S.header}>
           <button style={S.backBtn} onClick={() => setActiveDM(null)}>‹</button>
           <div style={{ ...S.avatar, width: 34, height: 34, fontSize: 14 }}>{initialOf(activeDM.otherName)}</div>
@@ -504,6 +559,7 @@ export default function Chat({ user, adminMode }) {
   return (
     <div style={S.wrap}>
       {GlowStyles}
+      {toastOverlay}
       {/* tabs */}
       <div style={S.tabs}>
         <button style={S.tab(tab === 'global')} onClick={() => setTab('global')}>
