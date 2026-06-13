@@ -89,6 +89,23 @@ const S = {
   dmCardAvatar: { width: 56, height: 56, borderRadius: '50%', background: `linear-gradient(135deg, ${C.primaryDim}, ${C.primary})`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 24 },
   dmCardName:   { fontSize: 15, fontWeight: 700, color: '#1a0800' },
   dmCardSub:    { fontSize: 12, color: C.muted },
+  // group chat bits
+  groupAvatar:  { width: 46, height: 46, borderRadius: '50%', background: `linear-gradient(135deg, #6aa9a0, #3f7d74)`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 20, flexShrink: 0 },
+  sectionRow:   { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px 6px', background: C.bg },
+  newGroupBtn:  { background: C.primary, color: '#fff', border: 'none', borderRadius: 16, padding: '5px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: FONT },
+  manageBtn:    { background: C.bgAlt, color: C.primary, border: `1px solid ${C.border}`, borderRadius: 16, padding: '6px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: FONT, flexShrink: 0 },
+  // modal
+  modalBack:    { position: 'fixed', inset: 0, background: 'rgba(40,19,0,0.45)', zIndex: 9998, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 },
+  modalCard:    { background: C.white, borderRadius: 16, width: 'min(420px, 94vw)', maxHeight: '82vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 12px 40px rgba(100,50,0,0.3)' },
+  modalHead:    { padding: '16px 18px 10px', fontSize: 16, fontWeight: 700, color: '#1a0800', borderBottom: `1px solid ${C.borderLight}` },
+  modalBody:    { padding: '8px 0', overflowY: 'auto', flex: 1 },
+  modalInput:   { margin: '10px 18px', width: 'calc(100% - 36px)', background: C.bgAlt, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 14px', fontSize: 14, fontFamily: FONT, color: '#1a0800', outline: 'none', boxSizing: 'border-box' },
+  pickRow:      { display: 'flex', alignItems: 'center', gap: 12, padding: '10px 18px', cursor: 'pointer' },
+  checkbox:     (on) => ({ width: 22, height: 22, borderRadius: 6, border: `2px solid ${on ? C.primary : C.mutedLight}`, background: on ? C.primary : 'transparent', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }),
+  modalFoot:    { display: 'flex', gap: 10, padding: '12px 18px', borderTop: `1px solid ${C.borderLight}` },
+  btnPrimary:   { flex: 1, background: C.primary, color: '#fff', border: 'none', borderRadius: 12, padding: '11px 0', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: FONT },
+  btnGhost:     { flex: 1, background: C.bgAlt, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 12, padding: '11px 0', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: FONT },
+  removeBtn:    { background: 'none', border: 'none', color: C.danger, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: FONT, flexShrink: 0 },
 };
 const GlowStyles = (
   <style>{`
@@ -268,6 +285,115 @@ function InputBar({ onSend, chatUsers, myName }) {
     </div>
   );
 }
+// ── create-group modal ────────────────────────────────────────────────────────
+function NewGroupModal({ people, onCreate, onClose }) {
+  const [name, setName] = useState('');
+  const [picked, setPicked] = useState([]);   // array of uids
+  const toggle = (id) => setPicked(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
+  return (
+    <div style={S.modalBack} onClick={onClose}>
+      <div style={S.modalCard} onClick={e => e.stopPropagation()}>
+        <div style={S.modalHead}>New group chat</div>
+        <input
+          style={S.modalInput}
+          placeholder="Group name (e.g. Café Team)"
+          value={name}
+          maxLength={50}
+          onChange={e => setName(e.target.value)}
+          autoFocus
+        />
+        <div style={{ ...S.sectionLabel, padding: '4px 18px 6px' }}>Add people ({picked.length})</div>
+        <div style={S.modalBody}>
+          {people.length === 0 && <div style={S.empty}>No one else is here yet ☕</div>}
+          {people.map(p => {
+            const on = picked.includes(p.uid);
+            return (
+              <div key={p.uid} style={S.pickRow} onClick={() => toggle(p.uid)}>
+                <div style={S.checkbox(on)}>{on ? '✓' : ''}</div>
+                <div style={{ ...S.avatar, width: 36, height: 36, fontSize: 14, ...(p.isAdmin ? S.adminAvatar : {}) }}>
+                  {initialOf(p.name)}
+                </div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: '#1a0800' }}>
+                  {p.isAdmin ? '⭐ ' : ''}{p.name}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div style={S.modalFoot}>
+          <button style={S.btnGhost} onClick={onClose}>Cancel</button>
+          <button
+            style={{ ...S.btnPrimary, opacity: picked.length === 0 ? 0.5 : 1 }}
+            disabled={picked.length === 0}
+            onClick={() => onCreate(name, picked)}
+          >
+            Create
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+// ── manage-members modal (creator only) ───────────────────────────────────────
+function ManageGroupModal({ group, people, myUid, onAdd, onRemove, onClose }) {
+  const members   = group.members || [];
+  const memberSet = new Set(members);
+  const canAdd    = people.filter(p => !memberSet.has(p.uid));
+  const [picked, setPicked] = useState([]);
+  const toggle = (id) => setPicked(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
+  return (
+    <div style={S.modalBack} onClick={onClose}>
+      <div style={S.modalCard} onClick={e => e.stopPropagation()}>
+        <div style={S.modalHead}>Manage “{group.name}”</div>
+        <div style={S.modalBody}>
+          <div style={{ ...S.sectionLabel, padding: '4px 18px 6px' }}>Members ({members.length})</div>
+          {members.map(m => (
+            <div key={m} style={S.pickRow}>
+              <div style={{ ...S.avatar, width: 36, height: 36, fontSize: 14 }}>
+                {initialOf(group.memberNames?.[m])}
+              </div>
+              <div style={{ flex: 1, fontSize: 14, fontWeight: 600, color: '#1a0800' }}>
+                {group.memberNames?.[m] || 'Member'}{m === group.createdBy ? ' (owner)' : ''}{m === myUid ? ' · you' : ''}
+              </div>
+              {m !== group.createdBy && (
+                <button style={S.removeBtn} onClick={() => onRemove(m)}>Remove</button>
+              )}
+            </div>
+          ))}
+          {canAdd.length > 0 && (
+            <div style={{ ...S.sectionLabel, padding: '10px 18px 6px' }}>Add people ({picked.length})</div>
+          )}
+          {canAdd.map(p => {
+            const on = picked.includes(p.uid);
+            return (
+              <div key={p.uid} style={S.pickRow} onClick={() => toggle(p.uid)}>
+                <div style={S.checkbox(on)}>{on ? '✓' : ''}</div>
+                <div style={{ ...S.avatar, width: 36, height: 36, fontSize: 14, ...(p.isAdmin ? S.adminAvatar : {}) }}>
+                  {initialOf(p.name)}
+                </div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: '#1a0800' }}>
+                  {p.isAdmin ? '⭐ ' : ''}{p.name}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div style={S.modalFoot}>
+          <button style={S.btnGhost} onClick={onClose}>Done</button>
+          {canAdd.length > 0 && (
+            <button
+              style={{ ...S.btnPrimary, opacity: picked.length === 0 ? 0.5 : 1 }}
+              disabled={picked.length === 0}
+              onClick={() => { onAdd(picked); setPicked([]); }}
+            >
+              Add{picked.length ? ` ${picked.length}` : ''}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 // ── main Chat component ───────────────────────────────────────────────────────
 export default function Chat({ user, adminMode }) {
   const [tab, setTab]         = useState('global');
@@ -277,6 +403,11 @@ export default function Chat({ user, adminMode }) {
   const [activeDM, setActiveDM] = useState(null);
   const [dmMsgs, setDmMsgs]   = useState([]);
   const [globalUnread, setGlobalUnread] = useState(0);   // unread count for Global tab
+  const [groups, setGroups]   = useState([]);            // group chats I'm a member of
+  const [activeGroup, setActiveGroup] = useState(null);  // group thread currently open
+  const [groupMsgs, setGroupMsgs] = useState([]);
+  const [showNewGroup, setShowNewGroup] = useState(false);   // create-group modal
+  const [showManage, setShowManage]     = useState(false);   // manage-members modal
   const uid     = user.uid;
   const isAdmin = !!adminMode;
   const myName  = isAdmin ? 'THEONYX ADMIN' : nameOf(user);
@@ -344,6 +475,26 @@ export default function Chat({ user, adminMode }) {
       setThreads(list);
     });
   }, [uid]);
+  // group chats I belong to (query by members field so the list query is allowed)
+  useEffect(() => {
+    const q = query(collection(db, 'groups'), where('members', 'array-contains', uid));
+    return onSnapshot(q, snap => {
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      list.sort((a, b) => {
+        const ua = (a.unreadFor?.[uid] || 0) > 0 ? 1 : 0;
+        const ub = (b.unreadFor?.[uid] || 0) > 0 ? 1 : 0;
+        if (ua !== ub) return ub - ua;
+        return (b.updatedAt?.seconds || 0) - (a.updatedAt?.seconds || 0);
+      });
+      setGroups(list);
+    }, err => console.error('[Chat] groups listener:', err));
+  }, [uid]);
+  // group messages for the open group
+  useEffect(() => {
+    if (!activeGroup) return;
+    const q = query(collection(db, 'groups', activeGroup.id, 'messages'), orderBy('createdAt', 'asc'), limit(200));
+    return onSnapshot(q, snap => setGroupMsgs(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+  }, [activeGroup]);
   // user directory
   useEffect(() => {
     return onSnapshot(collection(db, 'chatUsers'), snap =>
@@ -354,8 +505,10 @@ export default function Chat({ user, adminMode }) {
       )
     );
   }, [uid]);
-  // total unread DMs across all threads (used for the Messages tab badge + title)
-  const dmUnreadTotal = threads.reduce((s, t) => s + (t.unreadFor?.[uid] || 0), 0);
+  // total unread across DMs + groups (used for the Messages tab badge + title)
+  const dmUnreadTotal    = threads.reduce((s, t) => s + (t.unreadFor?.[uid] || 0), 0);
+  const groupUnreadTotal = groups.reduce((s, g) => s + (g.unreadFor?.[uid] || 0), 0);
+  const messagesUnread   = dmUnreadTotal + groupUnreadTotal;
 
   // unread count keyed by the *other* person's uid — lets the People list show
   // bold + a dot for anyone who has unread messages waiting for you.
@@ -373,10 +526,10 @@ export default function Chat({ user, adminMode }) {
   const baseTitle = useRef(typeof document !== 'undefined' ? document.title : '');
   useEffect(() => {
     if (typeof document === 'undefined') return;
-    const total = globalUnread + dmUnreadTotal;
+    const total = globalUnread + messagesUnread;
     document.title = total > 0 ? `(${total}) ${baseTitle.current}` : baseTitle.current;
     return () => { document.title = baseTitle.current; };
-  }, [globalUnread, dmUnreadTotal]);
+  }, [globalUnread, messagesUnread]);
 
   // DM messages
   useEffect(() => {
@@ -423,6 +576,101 @@ export default function Chat({ user, adminMode }) {
     updateDoc(doc(db, 'dms', tId), { [`unreadFor.${uid}`]: 0 })
       .catch(e => { if (e?.code !== 'not-found') console.error('[Chat] clear unread failed:', e); });
   };
+
+  // ── group chat actions ──────────────────────────────────────────────────────
+  // Always read the freshest copy of the open group from the live `groups` list
+  // (so member changes / new last message reflect immediately in the header).
+  const liveGroup = activeGroup ? (groups.find(g => g.id === activeGroup.id) || activeGroup) : null;
+  const buildNames = (memberUids) => {
+    const names = { [uid]: myName };
+    memberUids.forEach(m => { const p = people.find(x => x.uid === m); if (p) names[m] = p.name; });
+    return names;
+  };
+  const openGroup = (g) => {
+    setGroupMsgs([]);
+    setActiveGroup(g);
+    updateDoc(doc(db, 'groups', g.id), { [`unreadFor.${uid}`]: 0 })
+      .catch(e => { if (e?.code !== 'not-found') console.error('[Chat] clear group unread:', e); });
+  };
+  const createGroup = async (name, memberUids) => {
+    const members = [...new Set([uid, ...memberUids])];
+    try {
+      const ref = await addDoc(collection(db, 'groups'), {
+        name: (name || '').trim() || 'New Group',
+        createdBy: uid,
+        members,
+        memberNames: buildNames(members),
+        lastMessage: '', lastSender: '',
+        unreadFor: {},
+        createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+      });
+      setShowNewGroup(false);
+      openGroup({ id: ref.id, name: (name || '').trim() || 'New Group', members, memberNames: buildNames(members), createdBy: uid });
+    } catch (e) {
+      console.error('[Chat] createGroup failed:', e);
+    }
+  };
+  const sendGroup = useCallback(async (text) => {
+    const g = activeGroup;
+    if (!g) return;
+    try {
+      await addDoc(collection(db, 'groups', g.id, 'messages'), {
+        uid, name: myName, text, admin: isAdmin, createdAt: serverTimestamp(),
+      });
+      const others = ((groups.find(x => x.id === g.id) || g).members || []).filter(m => m !== uid);
+      const bump = {};
+      others.forEach(m => { bump[`unreadFor.${m}`] = increment(1); });
+      await updateDoc(doc(db, 'groups', g.id), {
+        lastMessage: text, lastSender: uid, updatedAt: serverTimestamp(), ...bump,
+      });
+    } catch (e) {
+      console.error('[Chat] sendGroup failed:', e);
+    }
+  }, [activeGroup, groups, uid, myName, isAdmin]);
+  const addGroupMembers = async (g, memberUids) => {
+    const merged = [...new Set([...(g.members || []), ...memberUids])];
+    try {
+      await updateDoc(doc(db, 'groups', g.id), { members: merged, memberNames: { ...(g.memberNames || {}), ...buildNames(merged) } });
+    } catch (e) { console.error('[Chat] addGroupMembers failed:', e); }
+  };
+  const removeGroupMember = async (g, m) => {
+    try {
+      await updateDoc(doc(db, 'groups', g.id), { members: (g.members || []).filter(x => x !== m) });
+    } catch (e) { console.error('[Chat] removeGroupMember failed:', e); }
+  };
+
+  // ── group thread view ─────────────────────────────────────────────────────────
+  if (activeGroup && liveGroup) {
+    const memberCount = (liveGroup.members || []).length;
+    const isCreator = liveGroup.createdBy === uid;
+    return (
+      <div style={S.wrap}>
+        {GlowStyles}
+        {showManage && (
+          <ManageGroupModal
+            group={liveGroup} people={people} myUid={uid}
+            onAdd={(ids) => addGroupMembers(liveGroup, ids)}
+            onRemove={(m) => removeGroupMember(liveGroup, m)}
+            onClose={() => setShowManage(false)}
+          />
+        )}
+        <div style={S.header}>
+          <button style={S.backBtn} onClick={() => { setActiveGroup(null); setShowManage(false); }}>‹</button>
+          <div style={{ ...S.groupAvatar, width: 34, height: 34, fontSize: 15 }}>#</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ ...S.title, flex: 'none' }}>{liveGroup.name}</div>
+            <div style={{ fontSize: 11, color: C.muted }}>{memberCount} member{memberCount !== 1 ? 's' : ''}</div>
+          </div>
+          {isCreator && (
+            <button style={S.manageBtn} onClick={() => setShowManage(true)}>Manage</button>
+          )}
+        </div>
+        <MessageThread messages={groupMsgs} uid={uid} myName={myName} />
+        <InputBar onSend={sendGroup} chatUsers={people} myName={myName} />
+      </div>
+    );
+  }
+
   // ── DM thread view ──────────────────────────────────────────────────────────
   if (activeDM) {
     return (
@@ -448,6 +696,13 @@ export default function Chat({ user, adminMode }) {
   return (
     <div style={S.wrap}>
       {GlowStyles}
+      {showNewGroup && (
+        <NewGroupModal
+          people={people}
+          onCreate={createGroup}
+          onClose={() => setShowNewGroup(false)}
+        />
+      )}
       {/* tabs */}
       <div style={S.tabs}>
         <button style={S.tab(tab === 'global')} onClick={() => setTab('global')}>
@@ -456,7 +711,7 @@ export default function Chat({ user, adminMode }) {
         </button>
         <button style={S.tab(tab === 'dms')}    onClick={() => setTab('dms')}>
           Messages
-          {dmUnreadTotal > 0 && <span style={S.tabBadge}>{dmUnreadTotal > 99 ? '99+' : dmUnreadTotal}</span>}
+          {messagesUnread > 0 && <span style={S.tabBadge}>{messagesUnread > 99 ? '99+' : messagesUnread}</span>}
         </button>
       </div>
       {/* global chat */}
@@ -474,6 +729,37 @@ export default function Chat({ user, adminMode }) {
       {/* messages / people */}
       {tab === 'dms' && (
         <div style={S.listScroll}>
+          {/* group chats */}
+          <div style={S.sectionRow}>
+            <span style={{ fontSize: 11, color: C.muted, letterSpacing: 1.5, textTransform: 'uppercase', fontWeight: 700 }}>Groups</span>
+            <button style={S.newGroupBtn} onClick={() => setShowNewGroup(true)}>+ New group</button>
+          </div>
+          {groups.length === 0 && (
+            <div style={{ ...S.rowSub, padding: '2px 16px 10px', maxWidth: 'none' }}>No groups yet — create one to chat with several people at once.</div>
+          )}
+          {groups.map(g => {
+            const unread    = g.unreadFor?.[uid] || 0;
+            const hasUnread = unread > 0;
+            const count     = (g.members || []).length;
+            return (
+              <div key={g.id} className="chat-row" style={S.row} onClick={() => openGroup(g)}>
+                <div style={S.groupAvatar}>#</div>
+                <div style={{ flex: 1, overflow: 'hidden' }}>
+                  <div style={{ ...S.rowName, fontWeight: hasUnread ? 800 : 700, color: hasUnread ? '#1a0800' : '#3a2010' }}>
+                    {g.name}
+                  </div>
+                  <div style={{ ...S.rowSub, color: hasUnread ? '#1a0800' : C.muted, fontWeight: hasUnread ? 700 : 400 }}>
+                    {hasUnread
+                      ? `${unread} new message${unread > 1 ? 's' : ''}`
+                      : (g.lastMessage ? `${g.lastSender === uid ? 'You: ' : ''}${g.lastMessage}` : `${count} member${count !== 1 ? 's' : ''}`)}
+                  </div>
+                </div>
+                {hasUnread && (
+                  unread === 1 ? <div style={S.dmDot} /> : <div style={S.dmBadge}>{unread > 99 ? '99+' : unread}</div>
+                )}
+              </div>
+            );
+          })}
           {threads.length > 0 && <div style={S.sectionLabel}>Conversations</div>}
           {threads.map(t => {
             const otherUid  = (t.participants || []).find(p => p !== uid);
