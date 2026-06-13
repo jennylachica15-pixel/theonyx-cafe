@@ -378,12 +378,14 @@ export default function Chat({ user, adminMode }) {
     if (!activeDM) return;
     const otherUid = activeDM.id.split('_').find(p => p !== uid);
     await addDoc(collection(db, 'dms', activeDM.id, 'messages'), { uid, name: myName, text, admin: isAdmin, createdAt: serverTimestamp() });
+    // setDoc creates/updates thread metadata
     await setDoc(doc(db, 'dms', activeDM.id), {
       participants: activeDM.id.split('_'),
       names: { ...(activeDM.names || {}), [uid]: myName },
       lastMessage: text, lastSender: uid, updatedAt: serverTimestamp(),
-      [`unreadFor.${otherUid}`]: increment(1),
     }, { merge: true });
+    // updateDoc uses dotted key as a true nested field path (setDoc does not)
+    await updateDoc(doc(db, 'dms', activeDM.id), { [`unreadFor.${otherUid}`]: increment(1) });
     await notifyMentions(text, uid, myName, 'dm', activeDM.id, people);
   }, [activeDM, uid, myName, isAdmin, people]);
 
