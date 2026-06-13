@@ -50,8 +50,14 @@ const GAME_LIST = [
 const LEADERBOARD_GAMES = GAME_LIST.filter(g => g.id !== 'cafemystery' && g.id !== 'fairyq' && g.id !== 'zombie');
 
 const fmtScore = (gameId, score) => {
-  const n = (Number(score) || 0).toLocaleString();
-  if (gameId === 'zombie') return `${n} ${Number(score) === 1 ? 'day' : 'days'}`;
+  const v = Number(score) || 0;
+  if (gameId === 'snake') {
+    const lvl = Math.floor(v / 1000000);
+    const pts = v % 1000000;
+    return lvl > 0 ? `Lv ${lvl} · ${pts.toLocaleString()}` : pts.toLocaleString();
+  }
+  const n = v.toLocaleString();
+  if (gameId === 'zombie') return `${n} ${v === 1 ? 'day' : 'days'}`;
   return n;
 };
 
@@ -216,133 +222,234 @@ function LeaderboardModal({ onClose, username }) {
 // ─── SNAKE GAME ───────────────────────────────────────────────────────────────
 
 function SnakeGame({ playerName, onScore }) {
+  const wrapRef = useRef(null);
+  const areaRef = useRef(null);
   const canvasRef = useRef(null);
   const stateRef = useRef(null);
+  const moveRef = useRef(null);
+  const gridRef = useRef({ cols: 22, rows: 34, cell: 16 });
+  const jsRef = useRef({ cx: 70, cy: 430, r: 50, kR: 19, kx: 0, ky: 0, on: false, md: 28 });
+  const boostRef = useRef(false);
   const [score, setScore] = useState(0);
+  const [level, setLevel] = useState(1);
+  const [beansLeft, setBeansLeft] = useState(0);
+  const [exitOpen, setExitOpen] = useState(false);
   const [alive, setAlive] = useState(true);
-  const boostRef = useRef(false);            // hold the FAST button to speed up
   const [boosting, setBoosting] = useState(false);
-  const W = 340, H = 580, CELL = 12;
-  const COLS = Math.floor(W / CELL);
-  const ROWS = Math.floor(H / CELL);
-  const jsRef = useRef({ cx:70, cy:H-75, r:50, kR:19, kx:0, ky:0, on:false, md:28 });
-  const beansRef = useRef([]);
-  const spawnBean = () => ({ x:20+Math.random()*(W-40), y:20+Math.random()*(H-120), phase:Math.random()*Math.PI*2, size:3+Math.random()*2, id:Math.random() });
-  if (beansRef.current.length===0) for (let i=0;i<8;i++) beansRef.current.push(spawnBean());
-  const placeFood = (snake) => { let pos; do { pos={x:1+Math.floor(Math.random()*(COLS-2)),y:1+Math.floor(Math.random()*(ROWS-2))}; } while (snake.some(s=>s.x===pos.x&&s.y===pos.y)); return pos; };
+  const [ready, setReady] = useState(false);
+
+  // Fit the board to the available full-screen area.
+  const measure = useCallback(() => {
+    const area = areaRef.current; if (!area) return;
+    const availW = area.clientWidth, availH = area.clientHeight;
+    if (availW < 60 || availH < 60) return;
+    const cell = Math.max(13, Math.min(24, Math.floor(availW / 22)));
+    const cols = Math.max(12, Math.floor(availW / cell));
+    const rows = Math.max(16, Math.floor(availH / cell));
+    gridRef.current = { cols, rows, cell };
+    const c = canvasRef.current;
+    if (c) { c.width = cols * cell; c.height = rows * cell; }
+    const r = Math.min(58, Math.max(40, cell * 3));
+    jsRef.current = { ...jsRef.current, cx: r + 16, cy: rows * cell - r - 16, r, kR: Math.round(r * 0.38), md: Math.round(r * 0.55) };
+    setReady(true);
+  }, []);
+
+  // Build a level: walls (barriers), beans (food), and an exit on the right edge.
+  const buildLevel = useCallback((lvl) => {
+    const { cols, rows } = gridRef.current;
+    const walls = new Set();
+    const startRow = Math.floor(rows / 2);
+    const addBar = (x, y, w, h) => { for (let i = 0; i < w; i++) for (let j = 0; j < h; j++) { const cx = x + i, cy = y + j; if (cx > 0 && cx < cols - 1 && cy > 0 && cy < rows - 1) walls.add(cx + ',' + cy); } };
+    const barCount = 2 + Math.min(lvl, 9);
+    let made = 0, tries = 0;
+    while (made < barCount && tries < barCount * 25) {
+      tries++;
+      const horiz = Math.random() < 0.5;
+      const maxLen = Math.max(3, Math.floor((horiz ? cols : rows) / 2));
+      const len = 3 + Math.floor(Math.random() * Math.min(5 + lvl, maxLen));
+      const bx = 2 + Math.floor(Math.random() * Math.max(1, cols - 4 - (horiz ? len : 0)));
+      const by = 2 + Math.floor(Math.random() * Math.max(1, rows - 4 - (horiz ? 0 : len)));
+      if (bx < 9 && Math.abs(by - startRow) < 2) continue;
+      addBar(bx, by, horiz ? len : 1, horiz ? 1 : len);
+      made++;
+    }
+    let exitY = startRow;
+    for (let t = 0; t < rows; t++) { const ey = 1 + ((startRow - 1 + t) % (rows - 2)); if (!walls.has((cols - 1) + ',' + ey) && !walls.has((cols - 2) + ',' + ey)) { exitY = ey; break; } }
+    const exit = { x: cols - 1, y: exitY };
+    walls.delete(exit.x + ',' + exit.y); walls.delete((exit.x - 1) + ',' + exit.y);
+    const sx = 4, sy = startRow;
+    const snake = [{ x: sx, y: sy }, { x: sx - 1, y: sy }, { x: sx - 2, y: sy }, { x: sx - 3, y: sy }];
+    for (let i = -3; i < 9; i++) walls.delete((sx + i) + ',' + sy);
+    const occ = new Set(walls); snake.forEach(s => occ.add(s.x + ',' + s.y)); occ.add(exit.x + ',' + exit.y);
+    const foodCount = 4 + lvl * 2;
+    const food = [];
+    let ft = 0;
+    while (food.length < foodCount && ft < foodCount * 50) {
+      ft++;
+      const fx = 1 + Math.floor(Math.random() * (cols - 2)), fy = 1 + Math.floor(Math.random() * (rows - 2));
+      const k = fx + ',' + fy; if (occ.has(k)) continue;
+      occ.add(k); food.push({ x: fx, y: fy });
+    }
+    return { snake, dir: { x: 1, y: 0 }, nextDir: { x: 1, y: 0 }, walls, food, exit, exitOpen: false, running: true, score: 0, level: lvl };
+  }, []);
+
   const startGame = useCallback(() => {
-    const cx=Math.floor(COLS/2), cy=Math.floor(ROWS/2);
-    stateRef.current = { snake:[{x:cx,y:cy},{x:cx-1,y:cy},{x:cx-2,y:cy},{x:cx-3,y:cy}], dir:{x:1,y:0}, nextDir:{x:1,y:0}, food:{x:cx+5,y:cy}, score:0, frame:0, running:true };
-    beansRef.current=[]; for(let i=0;i<8;i++) beansRef.current.push(spawnBean());
-    setScore(0); setAlive(true);
-  }, [COLS, ROWS]);
-  useEffect(() => { startGame(); }, [startGame]);
-  const turn = useCallback((dx,dy) => { const g=stateRef.current; if(!g) return; if(dx!== -g.dir.x||dy!== -g.dir.y) g.nextDir={x:dx,y:dy}; }, []);
-  const handleJsMove = useCallback((clientX,clientY) => {
-    const canvas=canvasRef.current; if(!canvas) return;
-    const rect=canvas.getBoundingClientRect();
-    const sx=W/rect.width, sy=H/rect.height;
-    const mx=(clientX-rect.left)*sx, my=(clientY-rect.top)*sy;
-    const js=jsRef.current;
-    let dx=mx-js.cx, dy=my-js.cy;
-    const dist=Math.sqrt(dx*dx+dy*dy);
-    if(dist>js.md){dx=dx/dist*js.md;dy=dy/dist*js.md;}
-    js.kx=dx; js.ky=dy;
-    const angle=Math.atan2(dy,dx)*180/Math.PI;
-    if(Math.abs(dx)>6||Math.abs(dy)>6){
-      if(angle>-45&&angle<=45&&stateRef.current?.dir.x!==-1) turn(1,0);
-      else if(angle>45&&angle<=135&&stateRef.current?.dir.y!==-1) turn(0,1);
-      else if((angle>135||angle<=-135)&&stateRef.current?.dir.x!==1) turn(-1,0);
-      else if(angle>-135&&angle<=-45&&stateRef.current?.dir.y!==1) turn(0,-1);
+    measure();
+    const st = buildLevel(1);
+    stateRef.current = st;
+    setScore(0); setLevel(1); setBeansLeft(st.food.length); setExitOpen(false); setAlive(true);
+  }, [measure, buildLevel]);
+
+  useEffect(() => {
+    measure();
+    const ro = new ResizeObserver(() => measure());
+    if (areaRef.current) ro.observe(areaRef.current);
+    return () => ro.disconnect();
+  }, [measure]);
+  useEffect(() => { if (ready && !stateRef.current) startGame(); }, [ready, startGame]);
+
+  const turn = useCallback((dx, dy) => { const g = stateRef.current; if (!g) return; if (dx !== -g.dir.x || dy !== -g.dir.y) g.nextDir = { x: dx, y: dy }; }, []);
+
+  const handleJsMove = useCallback((clientX, clientY) => {
+    const canvas = canvasRef.current; if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const sx = canvas.width / rect.width, sy = canvas.height / rect.height;
+    const mx = (clientX - rect.left) * sx, my = (clientY - rect.top) * sy;
+    const js = jsRef.current;
+    let dx = mx - js.cx, dy = my - js.cy;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist > js.md) { dx = dx / dist * js.md; dy = dy / dist * js.md; }
+    js.kx = dx; js.ky = dy;
+    const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+    if (Math.abs(dx) > 6 || Math.abs(dy) > 6) {
+      if (angle > -45 && angle <= 45) turn(1, 0);
+      else if (angle > 45 && angle <= 135) turn(0, 1);
+      else if (angle > 135 || angle <= -135) turn(-1, 0);
+      else turn(0, -1);
     }
   }, [turn]);
+
   useEffect(() => {
-    const canvas=canvasRef.current; if(!canvas) return;
-    const js=jsRef.current;
-    const onJS=(mx,my)=>Math.hypot(mx-js.cx,my-js.cy)<js.r*1.4;
-    const gp=(cx,cy)=>{const r=canvas.getBoundingClientRect();return[(cx-r.left)*(W/r.width),(cy-r.top)*(H/r.height)];};
-    const onTouchStart=e=>{const[mx,my]=gp(e.touches[0].clientX,e.touches[0].clientY);if(onJS(mx,my)){js.on=true;e.preventDefault();}};
-    const onTouchMove=e=>{if(js.on){handleJsMove(e.touches[0].clientX,e.touches[0].clientY);e.preventDefault();}};
-    const onTouchEnd=()=>{js.on=false;js.kx=0;js.ky=0;};
-    const onMouseDown=e=>{const[mx,my]=gp(e.clientX,e.clientY);if(onJS(mx,my))js.on=true;};
-    const onMouseMove=e=>{if(js.on)handleJsMove(e.clientX,e.clientY);};
-    const onMouseUp=()=>{js.on=false;js.kx=0;js.ky=0;};
-    canvas.addEventListener('touchstart',onTouchStart,{passive:false});
-    canvas.addEventListener('touchmove',onTouchMove,{passive:false});
-    canvas.addEventListener('touchend',onTouchEnd);
-    canvas.addEventListener('mousedown',onMouseDown);
-    window.addEventListener('mousemove',onMouseMove);
-    window.addEventListener('mouseup',onMouseUp);
-    return()=>{canvas.removeEventListener('touchstart',onTouchStart);canvas.removeEventListener('touchmove',onTouchMove);canvas.removeEventListener('touchend',onTouchEnd);canvas.removeEventListener('mousedown',onMouseDown);window.removeEventListener('mousemove',onMouseMove);window.removeEventListener('mouseup',onMouseUp);};
-  }, [handleJsMove]);
+    const canvas = canvasRef.current; if (!canvas) return;
+    const js = jsRef.current;
+    const onJS = (mx, my) => Math.hypot(mx - js.cx, my - js.cy) < js.r * 1.5;
+    const gp = (cx, cy) => { const r = canvas.getBoundingClientRect(); return [(cx - r.left) * (canvas.width / r.width), (cy - r.top) * (canvas.height / r.height)]; };
+    const ts = e => { const [mx, my] = gp(e.touches[0].clientX, e.touches[0].clientY); if (onJS(mx, my)) { js.on = true; e.preventDefault(); } };
+    const tm = e => { if (js.on) { handleJsMove(e.touches[0].clientX, e.touches[0].clientY); e.preventDefault(); } };
+    const te = () => { js.on = false; js.kx = 0; js.ky = 0; };
+    const md = e => { const [mx, my] = gp(e.clientX, e.clientY); if (onJS(mx, my)) js.on = true; };
+    const mm = e => { if (js.on) handleJsMove(e.clientX, e.clientY); };
+    const mu = () => { js.on = false; js.kx = 0; js.ky = 0; };
+    canvas.addEventListener('touchstart', ts, { passive: false });
+    canvas.addEventListener('touchmove', tm, { passive: false });
+    canvas.addEventListener('touchend', te);
+    canvas.addEventListener('mousedown', md);
+    window.addEventListener('mousemove', mm);
+    window.addEventListener('mouseup', mu);
+    return () => { canvas.removeEventListener('touchstart', ts); canvas.removeEventListener('touchmove', tm); canvas.removeEventListener('touchend', te); canvas.removeEventListener('mousedown', md); window.removeEventListener('mousemove', mm); window.removeEventListener('mouseup', mu); };
+  }, [handleJsMove, ready]);
+
   useEffect(() => {
-    const k=e=>{const m={ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0]};if(m[e.key]){e.preventDefault();turn(...m[e.key]);}};
-    window.addEventListener('keydown',k); return()=>window.removeEventListener('keydown',k);
+    const k = e => { const m = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] }; if (m[e.key]) { e.preventDefault(); turn(m[e.key][0], m[e.key][1]); } };
+    window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);
   }, [turn]);
+
+  // Movement loop (self-scheduling so FAST + per-level speed can change live).
   useEffect(() => {
-    if(!alive) return;
-    let timer;
-    const step=()=>{
-      const g=stateRef.current;
-      if(g&&g.running){
-        g.dir={...g.nextDir};
-        const head={x:g.snake[0].x+g.dir.x,y:g.snake[0].y+g.dir.y};
-        if(head.x<0||head.x>=COLS||head.y<0||head.y>=ROWS||g.snake.some(s=>s.x===head.x&&s.y===head.y)){g.running=false;onScore(g.score);setAlive(false);return;}
+    if (!alive || !ready) return;
+    let stop = false;
+    const endRun = (g) => { g.running = false; onScore(g.level * 1000000 + Math.min(g.score, 999999)); setAlive(false); };
+    const step = () => {
+      if (stop) return;
+      const g = stateRef.current;
+      if (g && g.running) {
+        g.dir = { ...g.nextDir };
+        const head = { x: g.snake[0].x + g.dir.x, y: g.snake[0].y + g.dir.y };
+        const { cols, rows } = gridRef.current;
+        if (g.exitOpen && head.x === g.exit.x && head.y === g.exit.y) {
+          const nl = g.level + 1;
+          const nxt = buildLevel(nl); nxt.score = g.score;
+          stateRef.current = nxt;
+          setLevel(nl); setScore(g.score); setBeansLeft(nxt.food.length); setExitOpen(false);
+          if (!stop) moveRef.current = setTimeout(step, 420);
+          return;
+        }
+        if (head.x < 0 || head.x >= cols || head.y < 0 || head.y >= rows) { endRun(g); return; }
+        if (g.walls.has(head.x + ',' + head.y)) { endRun(g); return; }
+        if (g.snake.some(s => s.x === head.x && s.y === head.y)) { endRun(g); return; }
         g.snake.unshift(head);
-        if(head.x===g.food.x&&head.y===g.food.y){g.score+=10;setScore(g.score);g.food=placeFood(g.snake);}else g.snake.pop();
+        const fi = g.food.findIndex(f => f.x === head.x && f.y === head.y);
+        if (fi >= 0) {
+          g.food.splice(fi, 1); g.score += 10;
+          setScore(g.score); setBeansLeft(g.food.length);
+          if (g.food.length === 0) { g.exitOpen = true; setExitOpen(true); }
+        } else { g.snake.pop(); }
       }
-      // base speed depends on score; holding FAST cuts the delay (min 45ms)
-      const base=Math.max(110,250-Math.floor((stateRef.current?.score||0)/40)*15);
-      const delay=boostRef.current?Math.max(45,Math.round(base*0.4)):base;
-      timer=setTimeout(step, delay);
+      const base = Math.max(70, 165 - (g ? g.level : 1) * 6);
+      const delay = boostRef.current ? Math.max(40, Math.round(base * 0.45)) : base;
+      if (!stop) moveRef.current = setTimeout(step, delay);
     };
-    timer=setTimeout(step, Math.max(110,250-Math.floor((stateRef.current?.score||0)/40)*15));
-    return()=>clearTimeout(timer);
-  }, [alive, COLS, ROWS, onScore]);
+    moveRef.current = setTimeout(step, 220);
+    return () => { stop = true; clearTimeout(moveRef.current); };
+  }, [alive, ready, buildLevel, onScore]);
+
+  // Draw loop.
   useEffect(() => {
-    const canvas=canvasRef.current; if(!canvas) return;
-    const ctx=canvas.getContext('2d'); let rafId, fn=0;
-    const bgC=document.createElement('canvas'); bgC.width=W; bgC.height=H;
-    const bc=bgC.getContext('2d'); bc.fillStyle='#111418'; bc.fillRect(0,0,W,H);
-    const hs=24,hh=hs*Math.sqrt(3); bc.strokeStyle='#1a2028'; bc.lineWidth=1;
-    for(let row=-1;row<H/hh+2;row++){for(let col=-1;col<W/(hs*1.5)+2;col++){const hcx=col*hs*1.5,hcy=row*hh+(col%2)*hh/2;bc.fillStyle='#131820';bc.beginPath();for(let a=0;a<6;a++){const ang=Math.PI/180*(60*a);bc.lineTo(hcx+hs*0.96*Math.cos(ang),hcy+hs*0.96*Math.sin(ang));}bc.closePath();bc.fill();bc.stroke();}}
-    const drawBean=(x,y,size,alpha,glow)=>{ctx.save();ctx.globalAlpha=alpha||1;ctx.shadowColor='#c8943a';ctx.shadowBlur=glow?18:5;const g=ctx.createRadialGradient(x-size*.25,y-size*.25,0,x,y,size);g.addColorStop(0,'#e8b84b');g.addColorStop(.45,'#a06828');g.addColorStop(1,'#3a1a00');ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(x,y,size,size*.78,.4,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;ctx.strokeStyle='rgba(0,0,0,.5)';ctx.lineWidth=size*.2;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(x-size*.32,y-size*.25);ctx.bezierCurveTo(x+size*.08,y,x-size*.08,y,x+size*.32,y+size*.25);ctx.stroke();ctx.restore();};
-    const drawJS=()=>{const js=jsRef.current;ctx.save();ctx.globalAlpha=js.on?.8:.45;ctx.fillStyle='rgba(30,15,0,.88)';ctx.shadowColor='rgba(0,0,0,.5)';ctx.shadowBlur=10;ctx.beginPath();ctx.arc(js.cx,js.cy,js.r,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;ctx.strokeStyle=`rgba(212,168,83,${js.on?.6:.28})`;ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(js.cx,js.cy,js.r,0,Math.PI*2);ctx.stroke();[[0,-1],[0,1],[-1,0],[1,0]].forEach(([dx,dy])=>{const ax=js.cx+dx*(js.r-11),ay=js.cy+dy*(js.r-11);ctx.fillStyle='rgba(212,168,83,.15)';ctx.save();ctx.translate(ax,ay);ctx.rotate(Math.atan2(dy,dx));ctx.beginPath();ctx.moveTo(5,0);ctx.lineTo(-4,-4);ctx.lineTo(-4,4);ctx.closePath();ctx.fill();ctx.restore();});const kpx=js.cx+js.kx,kpy=js.cy+js.ky;const kg=ctx.createRadialGradient(kpx-js.kR*.25,kpy-js.kR*.3,0,kpx,kpy,js.kR);kg.addColorStop(0,'#e8c060');kg.addColorStop(.45,'#c8943a');kg.addColorStop(1,'#4a2800');ctx.fillStyle=kg;ctx.shadowColor='rgba(0,0,0,.6)';ctx.shadowBlur=7;ctx.beginPath();ctx.arc(kpx,kpy,js.kR,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;ctx.strokeStyle=`rgba(255,200,80,${js.on?.6:.35})`;ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(kpx,kpy,js.kR,0,Math.PI*2);ctx.stroke();ctx.globalAlpha=1;ctx.restore();};
-    const draw=()=>{fn++;const g=stateRef.current;const beans=beansRef.current;ctx.drawImage(bgC,0,0);for(let i=beans.length-1;i>=0;i--){const b=beans[i];if(g&&g.snake.length>0){const hx=g.snake[0].x*CELL+CELL/2,hy=g.snake[0].y*CELL+CELL/2;if(Math.hypot(b.x-hx,b.y-hy)<CELL*.9){g.score+=5;setScore(g.score);beans.splice(i,1);setTimeout(()=>beans.push(spawnBean()),700);continue;}}const p=.78+.18*Math.sin(fn*.05+b.phase);drawBean(b.x,b.y,b.size*p,.85);}if(g){const fp=.88+.12*Math.sin(fn*.1);drawBean(g.food.x*CELL+CELL/2,g.food.y*CELL+CELL/2,8*fp,1,true);if(g.snake.length>1){ctx.save();ctx.lineCap='round';ctx.lineJoin='round';for(let i=g.snake.length-1;i>0;i--){const s=g.snake[i],s2=g.snake[i-1],tt=i/g.snake.length;const tk=Math.max(2,(CELL*.32-tt*CELL*.08)*2);ctx.strokeStyle='rgba(0,0,0,.4)';ctx.lineWidth=tk+2.5;ctx.beginPath();ctx.moveTo(s.x*CELL+CELL/2,s.y*CELL+CELL/2);ctx.lineTo(s2.x*CELL+CELL/2,s2.y*CELL+CELL/2);ctx.stroke();ctx.strokeStyle=`hsl(120,${85-tt*10}%,${44+tt*5}%)`;ctx.lineWidth=tk;ctx.beginPath();ctx.moveTo(s.x*CELL+CELL/2,s.y*CELL+CELL/2);ctx.lineTo(s2.x*CELL+CELL/2,s2.y*CELL+CELL/2);ctx.stroke();ctx.strokeStyle='hsla(120,90%,70%,.35)';ctx.lineWidth=tk*.25;ctx.beginPath();ctx.moveTo(s.x*CELL+CELL/2,s.y*CELL+CELL/2);ctx.lineTo(s2.x*CELL+CELL/2,s2.y*CELL+CELL/2);ctx.stroke();}ctx.restore();}const h=g.snake[0],hpx=h.x*CELL+CELL/2,hpy=h.y*CELL+CELL/2,hr=CELL*.34;ctx.fillStyle='rgba(0,0,0,.3)';ctx.beginPath();ctx.arc(hpx+1,hpy+1,hr,0,Math.PI*2);ctx.fill();ctx.fillStyle='hsl(120,85%,42%)';ctx.beginPath();ctx.arc(hpx,hpy,hr,0,Math.PI*2);ctx.fill();ctx.fillStyle='hsla(120,90%,70%,.4)';ctx.beginPath();ctx.arc(hpx-hr*.2,hpy-hr*.22,hr*.45,0,Math.PI*2);ctx.fill();ctx.save();ctx.translate(hpx,hpy);ctx.rotate(Math.atan2(g.dir.y,g.dir.x));[-1,1].forEach(s=>{ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(hr*.35,s*hr*.42,hr*.28,0,Math.PI*2);ctx.fill();ctx.fillStyle='#222';ctx.beginPath();ctx.arc(hr*.42,s*hr*.42,hr*.15,0,Math.PI*2);ctx.fill();ctx.fillStyle='rgba(255,255,255,.8)';ctx.beginPath();ctx.arc(hr*.38,s*hr*.38,hr*.07,0,Math.PI*2);ctx.fill();});ctx.restore();}drawJS();ctx.fillStyle='rgba(0,0,0,.5)';ctx.beginPath();ctx.roundRect(8,8,120,28,8);ctx.fill();ctx.fillStyle='#ffd700';ctx.font='bold 13px Arial';ctx.textAlign='left';ctx.fillText('Score: '+(stateRef.current?.score||0),14,26);if(!alive&&g&&!g.running){ctx.fillStyle='rgba(0,0,0,.72)';ctx.fillRect(0,H/2-44,W,88);ctx.fillStyle='#ff4444';ctx.font='bold 22px Arial';ctx.textAlign='center';ctx.shadowColor='#ff0000';ctx.shadowBlur=20;ctx.fillText('GAME OVER',W/2,H/2-10);ctx.shadowBlur=0;ctx.fillStyle='#ffd700';ctx.font='14px Arial';ctx.fillText('Score: '+(g.score||0),W/2,H/2+18);}rafId=requestAnimationFrame(draw);};
-    rafId=requestAnimationFrame(draw); return()=>cancelAnimationFrame(rafId);
-  }, [alive, W, H, CELL]);
-  const startBoost = (e) => { if(e&&e.preventDefault) e.preventDefault(); boostRef.current = true; setBoosting(true); };
-  const endBoost   = () => { boostRef.current = false; setBoosting(false); };
+    if (!ready) return;
+    const canvas = canvasRef.current; if (!canvas) return;
+    const ctx = canvas.getContext('2d'); let rafId, fn = 0;
+    const draw = () => {
+      fn++;
+      const { cols, rows, cell } = gridRef.current;
+      const W = cols * cell, H = rows * cell;
+      const g = stateRef.current;
+      ctx.fillStyle = '#0f1318'; ctx.fillRect(0, 0, W, H);
+      ctx.strokeStyle = 'rgba(255,255,255,0.03)'; ctx.lineWidth = 1;
+      for (let x = 0; x <= cols; x++) { ctx.beginPath(); ctx.moveTo(x * cell, 0); ctx.lineTo(x * cell, H); ctx.stroke(); }
+      for (let y = 0; y <= rows; y++) { ctx.beginPath(); ctx.moveTo(0, y * cell); ctx.lineTo(W, y * cell); ctx.stroke(); }
+      ctx.strokeStyle = '#3a4250'; ctx.lineWidth = 4; ctx.strokeRect(2, 2, W - 4, H - 4);
+      if (g) {
+        g.walls.forEach(key => { const parts = key.split(','); const wx = +parts[0], wy = +parts[1]; ctx.fillStyle = '#6b3a1f'; ctx.fillRect(wx * cell + 1, wy * cell + 1, cell - 2, cell - 2); ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fillRect(wx * cell + 1, wy * cell + 1, cell - 2, 3); });
+        g.food.forEach(f => { const cx = f.x * cell + cell / 2, cy = f.y * cell + cell / 2, s = cell * 0.34 * (0.85 + 0.15 * Math.sin(fn * 0.1 + f.x)); ctx.save(); ctx.shadowColor = '#c8943a'; ctx.shadowBlur = 6; const grad = ctx.createRadialGradient(cx - s * 0.3, cy - s * 0.3, 0, cx, cy, s); grad.addColorStop(0, '#e8b84b'); grad.addColorStop(1, '#7a4a10'); ctx.fillStyle = grad; ctx.beginPath(); ctx.ellipse(cx, cy, s, s * 0.8, 0.4, 0, Math.PI * 2); ctx.fill(); ctx.restore(); });
+        const ex = g.exit.x * cell, ey = g.exit.y * cell;
+        if (g.exitOpen) { ctx.fillStyle = '#0f1318'; ctx.fillRect(ex, ey, cell, cell); ctx.strokeStyle = '#36c95a'; ctx.lineWidth = 3; ctx.strokeRect(ex + 1, ey + 1, cell - 2, cell - 2); ctx.fillStyle = '#36c95a'; ctx.font = 'bold ' + Math.round(cell * 0.7) + 'px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('>', ex + cell / 2, ey + cell / 2); }
+        else { ctx.fillStyle = '#5a1a1a'; ctx.fillRect(ex, ey, cell, cell); ctx.fillStyle = '#e05050'; for (let i = 0; i < 3; i++) ctx.fillRect(ex + 2, ey + 3 + i * (cell / 3), cell - 4, 2); }
+        const sn = g.snake;
+        for (let i = sn.length - 1; i >= 0; i--) {
+          const s = sn[i], head = i === 0;
+          const cx = s.x * cell + cell / 2, cy = s.y * cell + cell / 2, rr = cell * (head ? 0.42 : 0.38);
+          ctx.fillStyle = head ? '#36c95a' : 'hsl(120,70%,' + Math.round(40 + (i / sn.length) * 8) + '%)';
+          ctx.beginPath(); ctx.arc(cx, cy, rr, 0, Math.PI * 2); ctx.fill();
+        }
+        if (sn.length) { const h = sn[0], hx = h.x * cell + cell / 2, hy = h.y * cell + cell / 2, rr = cell * 0.42; ctx.save(); ctx.translate(hx, hy); ctx.rotate(Math.atan2(g.dir.y, g.dir.x)); [-1, 1].forEach(sgn => { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(rr * 0.3, sgn * rr * 0.4, rr * 0.26, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(rr * 0.38, sgn * rr * 0.4, rr * 0.13, 0, Math.PI * 2); ctx.fill(); }); ctx.restore(); }
+      }
+      const js = jsRef.current;
+      ctx.save(); ctx.globalAlpha = js.on ? 0.8 : 0.4; ctx.fillStyle = 'rgba(20,10,0,.8)'; ctx.beginPath(); ctx.arc(js.cx, js.cy, js.r, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = 'rgba(212,168,83,.5)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(js.cx, js.cy, js.r, 0, Math.PI * 2); ctx.stroke(); const kx = js.cx + js.kx, ky = js.cy + js.ky; ctx.fillStyle = '#c8943a'; ctx.beginPath(); ctx.arc(kx, ky, js.kR, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1; ctx.restore();
+      if (g && !g.running) { ctx.fillStyle = 'rgba(0,0,0,.72)'; ctx.fillRect(0, H / 2 - 60, W, 120); ctx.fillStyle = '#ff4444'; ctx.font = 'bold 26px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; ctx.fillText('GAME OVER', W / 2, H / 2 - 14); ctx.fillStyle = '#ffd700'; ctx.font = '15px Arial'; ctx.fillText('Level ' + g.level + ' · ' + g.score + ' pts', W / 2, H / 2 + 16); ctx.fillStyle = '#8bc34a'; ctx.font = '13px Arial'; ctx.fillText('Tap Restart to play again', W / 2, H / 2 + 40); }
+      rafId = requestAnimationFrame(draw);
+    };
+    rafId = requestAnimationFrame(draw);
+    return () => cancelAnimationFrame(rafId);
+  }, [ready]);
+
+  const startBoost = (e) => { if (e && e.preventDefault) e.preventDefault(); boostRef.current = true; setBoosting(true); };
+  const endBoost = () => { boostRef.current = false; setBoosting(false); };
+
   return (
-    <div style={{display:'flex',flexDirection:'column',flex:1,alignItems:'center',background:'#111418',position:'relative'}}>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 14px',background:'#0d1117',borderBottom:'1px solid #1e2530',width:'100%',boxSizing:'border-box',flexShrink:0}}>
-        <span style={{fontSize:13,color:'#ffd700',fontWeight:'bold'}}>Score: {score}</span>
-        <span style={{fontSize:11,color:'#888'}}>{playerName}</span>
-        <button style={{background:'rgba(212,168,83,0.15)',border:'1px solid #d4a85366',borderRadius:8,color:'#ffd700',fontSize:12,padding:'5px 12px',cursor:'pointer'}} onClick={startGame}>Restart</button>
+    <div ref={wrapRef} style={{ display: 'flex', flexDirection: 'column', flex: 1, background: '#0f1318', overflow: 'hidden' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 14px', background: '#0d1117', borderBottom: '1px solid #1e2530', flexShrink: 0 }}>
+        <span style={{ fontSize: 13, color: '#36c95a', fontWeight: 'bold' }}>Lv {level}</span>
+        <span style={{ fontSize: 13, color: '#ffd700', fontWeight: 'bold' }}>Score {score}</span>
+        <span style={{ fontSize: 12, color: exitOpen ? '#36c95a' : '#d4a853', fontWeight: 'bold' }}>{exitOpen ? 'EXIT OPEN →' : 'Beans ' + beansLeft}</span>
+        <button style={{ background: 'rgba(212,168,83,0.15)', border: '1px solid #d4a85366', borderRadius: 8, color: '#ffd700', fontSize: 12, padding: '5px 12px', cursor: 'pointer' }} onClick={startGame}>Restart</button>
       </div>
-      <canvas ref={canvasRef} width={W} height={H} style={{display:'block',maxWidth:'100%'}}/>
-      {/* FAST / turbo button — hold to speed up the snake */}
-      <button
-        onPointerDown={startBoost}
-        onPointerUp={endBoost}
-        onPointerLeave={endBoost}
-        onPointerCancel={endBoost}
-        onTouchStart={startBoost}
-        onTouchEnd={endBoost}
-        style={{
-          position:'absolute', right:18, bottom:90, width:74, height:74, borderRadius:'50%',
-          background: boosting ? 'radial-gradient(circle at 35% 30%, #ffe066, #e8a000)' : 'rgba(30,15,0,0.78)',
-          border: `2px solid ${boosting ? '#ffe066' : 'rgba(212,168,83,0.55)'}`,
-          color: boosting ? '#1a0a00' : '#ffd700', fontSize:13, fontWeight:'bold',
-          display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:2,
-          cursor:'pointer', userSelect:'none', WebkitUserSelect:'none', touchAction:'none',
-          boxShadow: boosting ? '0 0 18px rgba(255,200,60,0.8)' : '0 2px 8px rgba(0,0,0,0.5)',
-          transition:'background 0.1s, box-shadow 0.1s',
-        }}
-      >
-        <span style={{fontSize:24,lineHeight:1}}>⚡</span>
-        <span style={{fontSize:11,letterSpacing:1}}>FAST</span>
-      </button>
+      <div ref={areaRef} style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+        <canvas ref={canvasRef} style={{ display: 'block', touchAction: 'none' }} />
+        <button onPointerDown={startBoost} onPointerUp={endBoost} onPointerLeave={endBoost} onPointerCancel={endBoost} onTouchStart={startBoost} onTouchEnd={endBoost}
+          style={{ position: 'absolute', right: 18, bottom: 24, width: 72, height: 72, borderRadius: '50%', background: boosting ? 'radial-gradient(circle at 35% 30%, #ffe066, #e8a000)' : 'rgba(30,15,0,0.78)', border: '2px solid ' + (boosting ? '#ffe066' : 'rgba(212,168,83,0.55)'), color: boosting ? '#1a0a00' : '#ffd700', fontWeight: 'bold', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', userSelect: 'none', WebkitUserSelect: 'none', touchAction: 'none', boxShadow: boosting ? '0 0 18px rgba(255,200,60,0.8)' : '0 2px 8px rgba(0,0,0,0.5)' }}>
+          <span style={{ fontSize: 22, lineHeight: 1 }}>⚡</span><span style={{ fontSize: 10, letterSpacing: 1 }}>FAST</span>
+        </button>
+      </div>
     </div>
   );
 }
