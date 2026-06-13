@@ -498,29 +498,41 @@ export default function Chat({ user, adminMode }) {
       deleteDoc(doc(db, 'globalChat', m.id)).catch(() => {});
   }, []);
   const sendGlobal = useCallback(async (text) => {
-    await addDoc(collection(db, 'globalChat'), { uid, name: myName, text, admin: isAdmin, createdAt: serverTimestamp() });
-    await notifyMentions(text, uid, myName, 'global', null, people);
-  }, [uid, myName, isAdmin, people]);
+    try {
+      await addDoc(collection(db, 'globalChat'), { uid, name: myName, text, admin: isAdmin, createdAt: serverTimestamp() });
+      await notifyMentions(text, uid, myName, 'global', null, people);
+    } catch (e) {
+      console.error('[Chat] sendGlobal failed:', e);
+      pushToast('Message failed', e?.message || 'Could not send');
+    }
+  }, [uid, myName, isAdmin, people, pushToast]);
   const sendDM = useCallback(async (text) => {
     if (!activeDM) return;
     const otherUid = activeDM.id.split('_').find(p => p !== uid);
-    await addDoc(collection(db, 'dms', activeDM.id, 'messages'), { uid, name: myName, text, admin: isAdmin, createdAt: serverTimestamp() });
-    // setDoc creates/updates thread metadata
-    await setDoc(doc(db, 'dms', activeDM.id), {
-      participants: activeDM.id.split('_'),
-      names: { ...(activeDM.names || {}), [uid]: myName },
-      lastMessage: text, lastSender: uid, updatedAt: serverTimestamp(),
-    }, { merge: true });
-    // updateDoc uses dotted key as a true nested field path (setDoc does not)
-    await updateDoc(doc(db, 'dms', activeDM.id), { [`unreadFor.${otherUid}`]: increment(1) });
-    await notifyMentions(text, uid, myName, 'dm', activeDM.id, people);
-  }, [activeDM, uid, myName, isAdmin, people]);
+    try {
+      await addDoc(collection(db, 'dms', activeDM.id, 'messages'), { uid, name: myName, text, admin: isAdmin, createdAt: serverTimestamp() });
+      // setDoc creates/updates thread metadata
+      await setDoc(doc(db, 'dms', activeDM.id), {
+        participants: activeDM.id.split('_'),
+        names: { ...(activeDM.names || {}), [uid]: myName },
+        lastMessage: text, lastSender: uid, updatedAt: serverTimestamp(),
+      }, { merge: true });
+      // updateDoc uses dotted key as a true nested field path (setDoc does not)
+      await updateDoc(doc(db, 'dms', activeDM.id), { [`unreadFor.${otherUid}`]: increment(1) });
+      await notifyMentions(text, uid, myName, 'dm', activeDM.id, people);
+    } catch (e) {
+      // Surface the real reason (very often Firestore security rules).
+      console.error('[Chat] sendDM failed:', e);
+      pushToast('DM failed to send', e?.message || 'Check Firestore rules');
+    }
+  }, [activeDM, uid, myName, isAdmin, people, pushToast]);
   const openDM = (otherUid, otherName, names) => {
     setDmMsgs([]);
     const tId = threadIdFor(uid, otherUid);
     setActiveDM({ id: tId, otherName, names: names || { [uid]: myName, [otherUid]: otherName } });
-    // clear unread count for this user
-    updateDoc(doc(db, 'dms', tId), { [`unreadFor.${uid}`]: 0 }).catch(() => {});
+    // clear unread count for this user (ignore "not-found" before any message exists)
+    updateDoc(doc(db, 'dms', tId), { [`unreadFor.${uid}`]: 0 })
+      .catch(e => { if (e?.code !== 'not-found') console.error('[Chat] clear unread failed:', e); });
   };
   // in-app toast overlay (rendered in both views)
   const toastOverlay = toasts.length > 0 && (
