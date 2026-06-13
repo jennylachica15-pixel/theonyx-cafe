@@ -220,6 +220,8 @@ function SnakeGame({ playerName, onScore }) {
   const stateRef = useRef(null);
   const [score, setScore] = useState(0);
   const [alive, setAlive] = useState(true);
+  const boostRef = useRef(false);            // hold the FAST button to speed up
+  const [boosting, setBoosting] = useState(false);
   const W = 340, H = 580, CELL = 12;
   const COLS = Math.floor(W / CELL);
   const ROWS = Math.floor(H / CELL);
@@ -279,15 +281,23 @@ function SnakeGame({ playerName, onScore }) {
   }, [turn]);
   useEffect(() => {
     if(!alive) return;
-    const interval=setInterval(()=>{
-      const g=stateRef.current; if(!g||!g.running) return;
-      g.dir={...g.nextDir};
-      const head={x:g.snake[0].x+g.dir.x,y:g.snake[0].y+g.dir.y};
-      if(head.x<0||head.x>=COLS||head.y<0||head.y>=ROWS||g.snake.some(s=>s.x===head.x&&s.y===head.y)){g.running=false;onScore(g.score);setAlive(false);return;}
-      g.snake.unshift(head);
-      if(head.x===g.food.x&&head.y===g.food.y){g.score+=10;setScore(g.score);g.food=placeFood(g.snake);}else g.snake.pop();
-    }, Math.max(110,250-Math.floor((stateRef.current?.score||0)/40)*15));
-    return()=>clearInterval(interval);
+    let timer;
+    const step=()=>{
+      const g=stateRef.current;
+      if(g&&g.running){
+        g.dir={...g.nextDir};
+        const head={x:g.snake[0].x+g.dir.x,y:g.snake[0].y+g.dir.y};
+        if(head.x<0||head.x>=COLS||head.y<0||head.y>=ROWS||g.snake.some(s=>s.x===head.x&&s.y===head.y)){g.running=false;onScore(g.score);setAlive(false);return;}
+        g.snake.unshift(head);
+        if(head.x===g.food.x&&head.y===g.food.y){g.score+=10;setScore(g.score);g.food=placeFood(g.snake);}else g.snake.pop();
+      }
+      // base speed depends on score; holding FAST cuts the delay (min 45ms)
+      const base=Math.max(110,250-Math.floor((stateRef.current?.score||0)/40)*15);
+      const delay=boostRef.current?Math.max(45,Math.round(base*0.4)):base;
+      timer=setTimeout(step, delay);
+    };
+    timer=setTimeout(step, Math.max(110,250-Math.floor((stateRef.current?.score||0)/40)*15));
+    return()=>clearTimeout(timer);
   }, [alive, COLS, ROWS, onScore]);
   useEffect(() => {
     const canvas=canvasRef.current; if(!canvas) return;
@@ -301,14 +311,38 @@ function SnakeGame({ playerName, onScore }) {
     const draw=()=>{fn++;const g=stateRef.current;const beans=beansRef.current;ctx.drawImage(bgC,0,0);for(let i=beans.length-1;i>=0;i--){const b=beans[i];if(g&&g.snake.length>0){const hx=g.snake[0].x*CELL+CELL/2,hy=g.snake[0].y*CELL+CELL/2;if(Math.hypot(b.x-hx,b.y-hy)<CELL*.9){g.score+=5;setScore(g.score);beans.splice(i,1);setTimeout(()=>beans.push(spawnBean()),700);continue;}}const p=.78+.18*Math.sin(fn*.05+b.phase);drawBean(b.x,b.y,b.size*p,.85);}if(g){const fp=.88+.12*Math.sin(fn*.1);drawBean(g.food.x*CELL+CELL/2,g.food.y*CELL+CELL/2,8*fp,1,true);if(g.snake.length>1){ctx.save();ctx.lineCap='round';ctx.lineJoin='round';for(let i=g.snake.length-1;i>0;i--){const s=g.snake[i],s2=g.snake[i-1],tt=i/g.snake.length;const tk=Math.max(2,(CELL*.32-tt*CELL*.08)*2);ctx.strokeStyle='rgba(0,0,0,.4)';ctx.lineWidth=tk+2.5;ctx.beginPath();ctx.moveTo(s.x*CELL+CELL/2,s.y*CELL+CELL/2);ctx.lineTo(s2.x*CELL+CELL/2,s2.y*CELL+CELL/2);ctx.stroke();ctx.strokeStyle=`hsl(120,${85-tt*10}%,${44+tt*5}%)`;ctx.lineWidth=tk;ctx.beginPath();ctx.moveTo(s.x*CELL+CELL/2,s.y*CELL+CELL/2);ctx.lineTo(s2.x*CELL+CELL/2,s2.y*CELL+CELL/2);ctx.stroke();ctx.strokeStyle='hsla(120,90%,70%,.35)';ctx.lineWidth=tk*.25;ctx.beginPath();ctx.moveTo(s.x*CELL+CELL/2,s.y*CELL+CELL/2);ctx.lineTo(s2.x*CELL+CELL/2,s2.y*CELL+CELL/2);ctx.stroke();}ctx.restore();}const h=g.snake[0],hpx=h.x*CELL+CELL/2,hpy=h.y*CELL+CELL/2,hr=CELL*.34;ctx.fillStyle='rgba(0,0,0,.3)';ctx.beginPath();ctx.arc(hpx+1,hpy+1,hr,0,Math.PI*2);ctx.fill();ctx.fillStyle='hsl(120,85%,42%)';ctx.beginPath();ctx.arc(hpx,hpy,hr,0,Math.PI*2);ctx.fill();ctx.fillStyle='hsla(120,90%,70%,.4)';ctx.beginPath();ctx.arc(hpx-hr*.2,hpy-hr*.22,hr*.45,0,Math.PI*2);ctx.fill();ctx.save();ctx.translate(hpx,hpy);ctx.rotate(Math.atan2(g.dir.y,g.dir.x));[-1,1].forEach(s=>{ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(hr*.35,s*hr*.42,hr*.28,0,Math.PI*2);ctx.fill();ctx.fillStyle='#222';ctx.beginPath();ctx.arc(hr*.42,s*hr*.42,hr*.15,0,Math.PI*2);ctx.fill();ctx.fillStyle='rgba(255,255,255,.8)';ctx.beginPath();ctx.arc(hr*.38,s*hr*.38,hr*.07,0,Math.PI*2);ctx.fill();});ctx.restore();}drawJS();ctx.fillStyle='rgba(0,0,0,.5)';ctx.beginPath();ctx.roundRect(8,8,120,28,8);ctx.fill();ctx.fillStyle='#ffd700';ctx.font='bold 13px Arial';ctx.textAlign='left';ctx.fillText('Score: '+(stateRef.current?.score||0),14,26);if(!alive&&g&&!g.running){ctx.fillStyle='rgba(0,0,0,.72)';ctx.fillRect(0,H/2-44,W,88);ctx.fillStyle='#ff4444';ctx.font='bold 22px Arial';ctx.textAlign='center';ctx.shadowColor='#ff0000';ctx.shadowBlur=20;ctx.fillText('GAME OVER',W/2,H/2-10);ctx.shadowBlur=0;ctx.fillStyle='#ffd700';ctx.font='14px Arial';ctx.fillText('Score: '+(g.score||0),W/2,H/2+18);}rafId=requestAnimationFrame(draw);};
     rafId=requestAnimationFrame(draw); return()=>cancelAnimationFrame(rafId);
   }, [alive, W, H, CELL]);
+  const startBoost = (e) => { if(e&&e.preventDefault) e.preventDefault(); boostRef.current = true; setBoosting(true); };
+  const endBoost   = () => { boostRef.current = false; setBoosting(false); };
   return (
-    <div style={{display:'flex',flexDirection:'column',flex:1,alignItems:'center',background:'#111418'}}>
+    <div style={{display:'flex',flexDirection:'column',flex:1,alignItems:'center',background:'#111418',position:'relative'}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 14px',background:'#0d1117',borderBottom:'1px solid #1e2530',width:'100%',boxSizing:'border-box',flexShrink:0}}>
         <span style={{fontSize:13,color:'#ffd700',fontWeight:'bold'}}>Score: {score}</span>
         <span style={{fontSize:11,color:'#888'}}>{playerName}</span>
         <button style={{background:'rgba(212,168,83,0.15)',border:'1px solid #d4a85366',borderRadius:8,color:'#ffd700',fontSize:12,padding:'5px 12px',cursor:'pointer'}} onClick={startGame}>Restart</button>
       </div>
       <canvas ref={canvasRef} width={W} height={H} style={{display:'block',maxWidth:'100%'}}/>
+      {/* FAST / turbo button — hold to speed up the snake */}
+      <button
+        onPointerDown={startBoost}
+        onPointerUp={endBoost}
+        onPointerLeave={endBoost}
+        onPointerCancel={endBoost}
+        onTouchStart={startBoost}
+        onTouchEnd={endBoost}
+        style={{
+          position:'absolute', right:18, bottom:90, width:74, height:74, borderRadius:'50%',
+          background: boosting ? 'radial-gradient(circle at 35% 30%, #ffe066, #e8a000)' : 'rgba(30,15,0,0.78)',
+          border: `2px solid ${boosting ? '#ffe066' : 'rgba(212,168,83,0.55)'}`,
+          color: boosting ? '#1a0a00' : '#ffd700', fontSize:13, fontWeight:'bold',
+          display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:2,
+          cursor:'pointer', userSelect:'none', WebkitUserSelect:'none', touchAction:'none',
+          boxShadow: boosting ? '0 0 18px rgba(255,200,60,0.8)' : '0 2px 8px rgba(0,0,0,0.5)',
+          transition:'background 0.1s, box-shadow 0.1s',
+        }}
+      >
+        <span style={{fontSize:24,lineHeight:1}}>⚡</span>
+        <span style={{fontSize:11,letterSpacing:1}}>FAST</span>
+      </button>
     </div>
   );
 }
