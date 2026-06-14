@@ -67,6 +67,19 @@ function getCostFrom(map, name) {
   const c = map[normalizeMenu(name)];
   return (c === undefined || c === null) ? null : Number(c);
 }
+// Group a sold product into a reporting category (Drinks combines all beverages)
+function catOf(name) {
+  const n = normalizeMenu(name);
+  if (n === 'RICE' || n === 'PEARL' || n === 'ESPRESSO SHOT') return 'Add-ons';
+  if (n.startsWith('M.T.') || n.startsWith('SODA') || n.startsWith('TEA') || n.startsWith('FRAPPE')) return 'Drinks';
+  if (/LATTE|AMERICANO|BREWED|MOCHA|CAPUCCINO|MACCHIATO|MATCHA|MILK CHOCOLATE|CHOCOMILK|RHUMPUCCINO|DIRTY|SPANISH|SEA SALT|COFFEE MINT/.test(n)) return 'Drinks';
+  if (n.startsWith('PASTA')) return 'Pasta';
+  if (/FRIES|BURGER|NACHOS|SIOMAI/.test(n)) return 'Snacks';
+  if (/SILOG|RICE MEAL|PORK|LUMPIA|PORKCHOP|CHICKEN|INASAL|TAPA|EMBOTIDO|SISIG/.test(n)) return 'Rice meals';
+  if (/WAFFLE|COOKIE|SWEET BITES|GRILLED CHEESE|PASTRY/.test(n)) return 'Pastries';
+  return 'Other';
+}
+const REPORT_CAT_ORDER = ['Drinks', 'Pasta', 'Rice meals', 'Snacks', 'Pastries', 'Add-ons', 'Other'];
 function computeProfit(list, map) {
   let sales = 0, cost = 0, matched = 0;
   const uncosted = {};
@@ -427,6 +440,20 @@ export default function Reports({ role = 'staff', userName = '' }) {
   });
   const totalSales = Object.values(productMap).reduce((a, b) => a + b, 0);
   const top10 = Object.entries(productMap).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  // Best sellers per category — Drinks top 10, every other category top 5
+  const catProducts = {};
+  Object.entries(productMap).forEach(([name, sales]) => {
+    const c = catOf(name);
+    (catProducts[c] = catProducts[c] || []).push([name, sales]);
+  });
+  Object.keys(catProducts).forEach(c => catProducts[c].sort((a, b) => b[1] - a[1]));
+  const catSections = REPORT_CAT_ORDER
+    .filter(c => catProducts[c] && catProducts[c].length)
+    .map(c => ({
+      cat: c,
+      total: catProducts[c].reduce((sm, [, v]) => sm + v, 0),
+      items: catProducts[c].slice(0, c === 'Drinks' ? 10 : 5),
+    }));
   // Summary stats
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const todayTotal = orders
@@ -501,53 +528,62 @@ export default function Reports({ role = 'staff', userName = '' }) {
           <div style={s.statLabel}>Total Orders</div>
         </div>
       </div>
-      {/* Revenue (Sales − Capital Cost) */}
+      {/* Profit this month — after overhead (hero) */}
       <div style={s.card}>
-        <div style={s.cardTitle}>Revenue · Sales − Capital Cost</div>
+        <div style={s.cardTitle}>Profit this month · after overhead{overhead == null ? ' (default)' : ''}</div>
+        {/* Big net-after-overhead number */}
+        <div style={{ fontSize: 11, color: 'var(--brown-light)' }}>Net profit this month</div>
+        <div style={{ fontSize: 32, fontWeight: 800, letterSpacing: '-1px', color: netAfterOverhead >= 0 ? 'var(--green-ok)' : '#a3402d', margin: '2px 0 12px' }}>{peso(netAfterOverhead)}</div>
+        {/* Computation */}
+        <div style={{ background: 'var(--cream)', borderRadius: 12, padding: '12px 14px', marginBottom: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--brown-dark)', padding: '4px 0' }}><span>Sales (this month)</span><span style={{ fontWeight: 600 }}>{peso(monthCalRev.sales)}</span></div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--brown-mid)', padding: '4px 0' }}><span>− Capital cost</span><span style={{ fontWeight: 600 }}>{peso(monthCalRev.cost)}</span></div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--brown-mid)', padding: '4px 0 8px', borderBottom: '1px dashed #e3d0b4' }}><span>− Overhead (monthly)</span><span style={{ fontWeight: 600 }}>{peso(overheadVal)}</span></div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 800, color: netAfterOverhead >= 0 ? 'var(--green-ok)' : '#a3402d', padding: '8px 0 2px' }}><span>= Net profit</span><span>{peso(netAfterOverhead)}</span></div>
+        </div>
+        {/* Projection */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: projProfit >= 0 ? 'var(--cream)' : '#fbeeea', border: `0.5px solid ${projProfit >= 0 ? '#e6d6c0' : '#eccfc7'}`, borderRadius: 10, padding: '9px 12px', marginBottom: 14 }}>
+          <div style={{ flex: 1, fontSize: 12, color: 'var(--brown-dark)', lineHeight: 1.4 }}>
+            Projected month-end: <b>{peso(projProfit)}</b>
+            <div style={{ fontSize: 11, color: 'var(--brown-light)' }}>{projProfit >= 0 ? 'On track to cover overhead' : `Short by ${peso(-projProfit)} · projected sales ${peso(projSales)}`}</div>
+          </div>
+        </div>
+        {/* Key metrics */}
         <div style={s.statGrid}>
           <div style={s.statBox}>
-            <div style={s.statNum('var(--brown-dark)')}>{peso(profitAll.sales)}</div>
-            <div style={s.statLabel}>Total Sales</div>
+            <div style={s.statNum('var(--green-ok)')}>{peso(monthCalRev.net)}</div>
+            <div style={s.statLabel}>Gross profit</div>
+            <div style={{ fontSize: 10, color: 'var(--brown-light)', marginTop: 1 }}>Sales − capital cost</div>
           </div>
           <div style={s.statBox}>
-            <div style={s.statNum('var(--brown-mid)')}>{peso(profitAll.cost)}</div>
-            <div style={s.statLabel}>Capital Cost</div>
-          </div>
-          <div style={s.statBox}>
-            <div style={s.statNum('var(--green-ok)')}>{peso(profitAll.net)}</div>
-            <div style={s.statLabel}>Net Revenue</div>
-          </div>
-          <div style={s.statBox}>
-            <div style={s.statNum('var(--gold)')}>{marginAll}%</div>
-            <div style={s.statLabel}>Gross Margin</div>
+            <div style={s.statNum('var(--gold)')}>{marginOf(monthCalRev)}%</div>
+            <div style={s.statLabel}>Gross margin</div>
+            <div style={{ fontSize: 10, color: 'var(--brown-light)', marginTop: 1 }}>Profit per ₱1 of sales</div>
           </div>
         </div>
-        <div style={{ fontSize: 11, color: 'var(--brown-light)', lineHeight: 1.5, marginBottom: 8 }}>
-          Net Revenue = sales of items that have a capital cost ({peso(profitAll.matched)}) minus their capital cost.
-          {' '}{coverageAll}% of total sales currently has a cost set.
+        {/* Break-even */}
+        <div style={s.productRow}>
+          <div style={{ flex: 1, fontSize: 12, fontWeight: 600, color: 'var(--brown-dark)' }}>Break-even sales<div style={{ fontSize: 10, color: 'var(--brown-light)', fontWeight: 400 }}>to cover {peso(overheadVal)} overhead</div></div>
+          <div style={{ fontSize: 11, color: 'var(--brown-light)', marginRight: 10 }}>Daily {peso(dailyTargetSales)}</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--brown-dark)' }}>{peso(breakEvenSales)}</div>
         </div>
-        {/* Per-period net revenue */}
-        {[['Today', profitToday], ['This Week', profitWeek], ['This Month', profitMonth]].map(([lbl, p]) => (
-          <div key={lbl} style={s.productRow}>
-            <div style={{ flex: 1, fontSize: 12, fontWeight: 600, color: 'var(--brown-dark)' }}>{lbl}</div>
-            <div style={{ fontSize: 11, color: 'var(--brown-light)', marginRight: 10 }}>Sales {peso(p.sales)}</div>
-            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--green-ok)' }}>Net {peso(p.net)}</div>
-          </div>
-        ))}
-        {/* Items without a capital cost yet */}
+        {/* Coverage + uncosted */}
+        <div style={{ fontSize: 11, color: 'var(--brown-light)', lineHeight: 1.5, marginTop: 10 }}>
+          {coverageAll}% of sales has a capital cost set — profit is approximate while {uncostedAll.length} item{uncostedAll.length !== 1 ? 's have' : ' has'} no cost yet.
+        </div>
         {uncostedAll.length > 0 && (
-          <div style={{ marginTop: 12 }}>
+          <div style={{ marginTop: 8 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--brown-light)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
               No capital cost yet ({uncostedAll.length})
             </div>
-            {uncostedAll.slice(0, 8).map(([name, sales]) => (
+            {uncostedAll.slice(0, 6).map(([name, sales]) => (
               <div key={name} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--brown-light)', padding: '3px 0' }}>
                 <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
                 <span style={{ flexShrink: 0, marginLeft: 8 }}>{peso(sales)} sales</span>
               </div>
             ))}
             <div style={{ fontSize: 10, color: 'var(--brown-light)', marginTop: 6, fontStyle: 'italic' }}>
-              Add their cost in the "Capital Cost" tab — it updates automatically when you Sync.
+              Add their cost in the "Capital Cost" tab — updates automatically when you Sync.
             </div>
           </div>
         )}
@@ -771,27 +807,31 @@ export default function Reports({ role = 'staff', userName = '' }) {
           </div>
         </div>
       )}
-      {/* Top 10 Products */}
-      {top10.length > 0 && (
-        <div style={s.card}>
-          <div style={s.cardTitle}>Top 10 Products</div>
-          {top10.map(([name, sales], i) => (
-            <div key={name} style={s.productRow}>
-              <div style={s.rank}>{i + 1}</div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--brown-dark)' }}>{name}</div>
-                <div style={{ height: 4, background: '#f0e4d8', borderRadius: 2, marginTop: 4 }}>
-                  <div style={{ height: '100%', background: 'var(--brown-mid)', borderRadius: 2, width: `${(sales / top10[0][1]) * 100}%` }} />
+      {/* Best sellers per category — Drinks top 10, others top 5 */}
+      {catSections.map(sec => {
+        const maxVal = sec.items[0] ? sec.items[0][1] : 1;
+        const limit = sec.cat === 'Drinks' ? 10 : 5;
+        return (
+          <div key={sec.cat} style={s.card}>
+            <div style={s.cardTitle}>Top {limit} {sec.cat}</div>
+            {sec.items.map(([name, sales], i) => (
+              <div key={name} style={s.productRow}>
+                <div style={s.rank}>{i + 1}</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--brown-dark)' }}>{name}</div>
+                  <div style={{ height: 4, background: '#f0e4d8', borderRadius: 2, marginTop: 4 }}>
+                    <div style={{ height: '100%', background: 'var(--brown-mid)', borderRadius: 2, width: `${(sales / maxVal) * 100}%` }} />
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--brown-dark)' }}>P{sales.toLocaleString()}</div>
+                  <div style={{ fontSize: 10, color: 'var(--brown-light)' }}>{totalSales > 0 ? ((sales / totalSales) * 100).toFixed(1) : 0}%</div>
                 </div>
               </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--brown-dark)' }}>P{sales.toLocaleString()}</div>
-                <div style={{ fontSize: 10, color: 'var(--brown-light)' }}>{totalSales > 0 ? ((sales / totalSales) * 100).toFixed(1) : 0}%</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        );
+      })}
       <div style={{ height: 80 }} />
     </div>
   );
