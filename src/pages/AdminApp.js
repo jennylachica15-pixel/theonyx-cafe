@@ -10,7 +10,6 @@ import Reports from './Reports';
 import MenuManager from './MenuManager';
 import Approvals from './Approvals';
 import FeedbackPanel from './FeedbackPanel';
-
 const CHECKLIST_ITEMS = [
   { id: 'tables',   label: 'Tables & Chairs' },
   { id: 'counter',  label: 'Counter Area' },
@@ -21,22 +20,18 @@ const CHECKLIST_ITEMS = [
   { id: 'trash',    label: 'Trash Bins' },
   { id: 'entrance', label: 'Entrance / Exit' },
 ];
-
 // ── Daily cleanliness reminder hook ──────────────────────────────────────────
 // Fires a browser notification once per day per staff member.
 // Automatically stops notifying after they submit their check for the day.
 function useDailyCleanlinessReminder(userName) {
   useEffect(() => {
     if (!userName) return;
-
     // Ask for permission the first time
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission();
     }
-
     const checkAndNotify = async () => {
       if (!('Notification' in window) || Notification.permission !== 'granted') return;
-
       const today = new Date().toDateString();
       try {
         const snap = await getDocs(
@@ -58,17 +53,14 @@ function useDailyCleanlinessReminder(userName) {
         // silently ignore — notification is non-critical
       }
     };
-
     // Fire once on mount / login
     checkAndNotify();
-
     // Re-check every hour so notification won't re-appear after they've submitted
     const interval = setInterval(checkAndNotify, 60 * 60 * 1000);
     return () => clearInterval(interval);
   }, [userName]);
 }
 // ─────────────────────────────────────────────────────────────────────────────
-
 function CleanlinessCheck({ userName }) {
   const [checks, setChecks] = React.useState({});
   const [photos, setPhotos] = React.useState({});
@@ -78,15 +70,12 @@ function CleanlinessCheck({ userName }) {
   const [error, setError] = React.useState('');
   const fileRefs = React.useRef({});
   const now = new Date();
-
   const toggle = (id) => setChecks(prev => ({ ...prev, [id]: !prev[id] }));
-
   const handlePhotoCapture = (itemId, e) => {
     const file = e.target.files[0];
     if (!file) return;
     setPhotos(prev => ({ ...prev, [itemId]: { file, url: URL.createObjectURL(file) } }));
   };
-
   // Photos are stored as base64 directly in the Firestore doc, and one check can hold
   // up to 8 of them. Firestore caps a document at ~1 MB, so each image is kept under
   // ~115 KB (quality steps down only when needed) so all 8 fit safely.
@@ -121,7 +110,6 @@ function CleanlinessCheck({ userName }) {
     reader.onerror = () => resolve(null);
     reader.readAsDataURL(file);
   });
-
   const handleSubmit = async () => {
     const checked = CHECKLIST_ITEMS.filter(i => checks[i.id]);
     if (checked.length === 0) { setError('Please check at least one item.'); return; }
@@ -146,11 +134,9 @@ function CleanlinessCheck({ userName }) {
     } catch (e) { setError('Failed to submit. Please try again.'); }
     setUploading(false);
   };
-
   const formatDate = now.toLocaleDateString('en-PH', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
   const formatTime = now.toLocaleTimeString('en-PH', { hour:'2-digit', minute:'2-digit' });
   const doneCount = Object.values(checks).filter(Boolean).length;
-
   if (submitted) {
     return (
       <div style={{ padding: 28, textAlign: 'center' }}>
@@ -165,7 +151,6 @@ function CleanlinessCheck({ userName }) {
       </div>
     );
   }
-
   return (
     <div style={{ padding: '16px 16px 32px' }}>
       <div style={{ marginBottom: 4 }}>
@@ -230,14 +215,12 @@ function CleanlinessCheck({ userName }) {
     </div>
   );
 }
-
 function CleanlinessReviews({ role, userName }) {
   const [list, setList] = React.useState([]);
   const [draft, setDraft] = React.useState({});
   const [savingId, setSavingId] = React.useState(null);
   const [lightbox, setLightbox] = React.useState(null);
   const [confirmDelId, setConfirmDelId] = React.useState(null);
-
   React.useEffect(() => {
     const unsub = onSnapshot(
       query(collection(db, 'cleanlinessChecks'), orderBy('submittedAt', 'desc'), limit(40)),
@@ -245,7 +228,6 @@ function CleanlinessReviews({ role, userName }) {
     );
     return () => unsub();
   }, []);
-
   React.useEffect(() => {
     if (role === 'manager') return;
     list.forEach(c => {
@@ -254,12 +236,10 @@ function CleanlinessReviews({ role, userName }) {
       }
     });
   }, [list, role, userName]);
-
   const visible = role === 'manager' ? list : list.filter(c => c.staff === userName);
   const labelFor = (id) => (CHECKLIST_ITEMS.find(i => i.id === id) || {}).label || id;
   const draftFor = (c) => (draft[c.id] !== undefined ? draft[c.id] : { verdict: c.verdict || '', comment: c.managerComment || '' });
   const setDraftField = (c, patch) => setDraft(prev => ({ ...prev, [c.id]: { ...draftFor(c), ...patch } }));
-
   const saveReview = async (c) => {
     const d = draftFor(c);
     setSavingId(c.id);
@@ -274,20 +254,16 @@ function CleanlinessReviews({ role, userName }) {
     } catch (e) {}
     setSavingId(null);
   };
-
   const deleteCheck = async (id) => {
     try { await deleteDoc(doc(db, 'cleanlinessChecks', id)); } catch (e) {}
     setConfirmDelId(null);
   };
-
   const verdictPill = (v) => v === 'clean'
     ? { label: 'Clean', bg: '#f0fce8', bd: '#cfe0b0', fg: '#2a6000' }
     : { label: 'Needs work', bg: '#ffece9', bd: '#f0c8c0', fg: '#b5482e' };
-
   if (visible.length === 0) {
     return <div style={{ padding: 28, textAlign: 'center', fontSize: 13, color: '#a07850' }}>No cleanliness checks yet.</div>;
   }
-
   return (
     <div style={{ padding: '14px 16px 32px' }}>
       {visible.map(c => {
@@ -385,7 +361,6 @@ function CleanlinessReviews({ role, userName }) {
     </div>
   );
 }
-
 function CleanlinessPanel({ role, userName }) {
   const [sub, setSub] = React.useState('new');
   const tabBtn = (on) => ({ flex: 1, border: 'none', background: on ? '#c8943a' : 'transparent', color: on ? '#fff' : '#a07850', fontSize: 12.5, fontWeight: on ? 700 : 600, padding: '9px 4px', borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit' });
@@ -401,7 +376,6 @@ function CleanlinessPanel({ role, userName }) {
     </div>
   );
 }
-
 const VERSES = [
   { text: "I can do all this through him who gives me strength.", ref: "Philippians 4:13" },
   { text: "The Lord is my shepherd, I lack nothing.", ref: "Psalm 23:1" },
@@ -435,12 +409,10 @@ const VERSES = [
   { text: "I sought the Lord, and he answered me; he delivered me from all my fears.", ref: "Psalm 34:4" },
   { text: "The joy of the Lord is your strength.", ref: "Nehemiah 8:10" },
 ];
-
 function getDailyVerse() {
   const day = Math.floor(Date.now() / 86400000);
   return VERSES[day % VERSES.length];
 }
-
 export default function AdminApp({ user, onSignOut }) {
   const [activeTab, setActiveTab] = useState(null);
   const [role, setRole] = useState('staff');
@@ -449,15 +421,12 @@ export default function AdminApp({ user, onSignOut }) {
   const [pendingPhotos, setPendingPhotos] = useState(0);
   const [cleanlinessAlert, setCleanlinessAlert] = useState(false);
   const [cleanFeedback, setCleanFeedback] = useState(0);
-
   const verse = getDailyVerse();
-
   // ── Daily cleanliness notification ────────────────────────────────────────
   // Called once userName is known. Fires a browser push notification every day
   // until the staff member submits their cleanliness check. Re-checks every hour.
   useDailyCleanlinessReminder(userName);
   // ──────────────────────────────────────────────────────────────────────────
-
   useEffect(() => {
     const fetchUser = async () => {
       try {
@@ -478,12 +447,10 @@ export default function AdminApp({ user, onSignOut }) {
     };
     fetchUser();
   }, [user]);
-
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
-
   useEffect(() => {
     const unsubPhotos = onSnapshot(
       query(collection(db, 'guestPhotos'), where('public', '==', true)),
@@ -504,7 +471,6 @@ export default function AdminApp({ user, onSignOut }) {
     const cleanTimer = setInterval(checkCleanliness, 60000);
     return () => { unsubPhotos(); clearInterval(cleanTimer); };
   }, []);
-
   useEffect(() => {
     if (!userName) return;
     const unsub = onSnapshot(
@@ -513,29 +479,25 @@ export default function AdminApp({ user, onSignOut }) {
     );
     return () => unsub();
   }, [userName]);
-
   const handleSignOut = async () => { await signOut(auth); onSignOut(); };
-
   const formatTime = (d) => {
     const h = d.getHours() % 12 || 12;
     const m = String(d.getMinutes()).padStart(2, '0');
     return `${h}:${m} ${d.getHours() >= 12 ? 'PM' : 'AM'}`;
   };
   const formatDate = (d) => d.toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
-
   const S = {
     container: { display: 'flex', flexDirection: 'column', height: '100vh', background: '#1a0e00', maxWidth: 480, margin: '0 auto' },
     topbar: { padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, background: '#2a1800', borderBottom: '1px solid #3d2200' },
     content: { flex: 1, overflowY: 'auto', background: 'rgba(253,246,238,0.97)', borderRadius: activeTab ? '0' : '16px 16px 0 0', marginTop: activeTab ? 0 : 4 },
   };
-
   const mainPanels = [
     { id: 'attendance', label: 'Clock In',  desc: 'Staff attendance', icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#c8943a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> },
     { id: 'orders',     label: 'Orders',    desc: 'Take & manage',    icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#c8943a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> },
     { id: 'inventory',  label: 'Stocks',    desc: 'Inventory',        icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#c8943a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg> },
-    { id: 'reports',    label: 'Reports',   desc: 'Sales & analytics', icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#c8943a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> },
+    // Reports is manager-only — staff won't see this card
+    ...(role === 'manager' ? [{ id: 'reports', label: 'Reports', desc: 'Sales & analytics', icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#c8943a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> }] : []),
   ];
-
   const morePanels = [
     { id: 'cleanliness', label: 'Cleanliness', desc: 'Daily check', icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#c8943a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> },
     { id: 'feedback',    label: 'Feedback',    desc: 'Customer reviews', icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#c8943a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> },
@@ -543,7 +505,6 @@ export default function AdminApp({ user, onSignOut }) {
     ...(role === 'manager' ? [{ id: 'menu', label: 'Menu', desc: 'Edit items', icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#c8943a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg> }] : []),
     { id: 'approvals',   label: 'Approvals',   desc: 'Guest photos', icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#c8943a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> },
   ];
-
   return (
     <div style={S.container}>
       <div style={S.topbar}>
@@ -560,7 +521,6 @@ export default function AdminApp({ user, onSignOut }) {
           Exit
         </button>
       </div>
-
       <div style={S.content}>
         {!activeTab ? (
           <div style={{ paddingBottom: 32 }}>
@@ -584,7 +544,6 @@ export default function AdminApp({ user, onSignOut }) {
                 <div style={{ fontSize: 11, color: '#a07850', marginTop: 5 }}>{verse.ref} &middot; NIV</div>
               </div>
             </div>
-
             <div style={{ padding: '16px 16px 8px' }}>
               <div style={{ fontSize: 10, color: '#a07850', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>Panels</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
@@ -602,7 +561,6 @@ export default function AdminApp({ user, onSignOut }) {
                 ))}
               </div>
             </div>
-
             <div style={{ padding: '4px 16px 8px' }}>
               <div style={{ fontSize: 10, color: '#a07850', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>More</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
@@ -633,7 +591,6 @@ export default function AdminApp({ user, onSignOut }) {
                 })}
               </div>
             </div>
-
             <div style={{ padding: '8px 16px' }}>
               <button onClick={handleSignOut} style={{ width: '100%', background: 'transparent', border: '1px solid #f0e8d8', borderRadius: 10, color: '#a07850', padding: 12, fontSize: 13, cursor: 'pointer' }}>
                 Log out
@@ -655,7 +612,7 @@ export default function AdminApp({ user, onSignOut }) {
               {activeTab === 'orders'      && <Orders userName={userName} />}
               {activeTab === 'inventory'   && <Inventory role={role} userName={userName} />}
               {activeTab === 'approvals'   && <Approvals role={role} />}
-              {activeTab === 'reports'     && <Reports />}
+              {activeTab === 'reports'     && role === 'manager' && <Reports role={role} userName={userName} />}
               {activeTab === 'menu'        && role === 'manager' && <MenuManager />}
               {activeTab === 'chat'        && role === 'manager' && <Chat user={user} adminMode />}
               {activeTab === 'cleanliness' && <CleanlinessPanel role={role} userName={userName} />}
