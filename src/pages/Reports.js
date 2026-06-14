@@ -257,6 +257,8 @@ export default function Reports({ role = 'staff', userName = '' }) {
   const [dailyTooltip, setDailyTooltip] = useState(null);
   const [weeklyTooltip, setWeeklyTooltip] = useState(null);
   const [openCat, setOpenCat] = useState('Drinks');   // which best-seller category is expanded
+  const [showDailyRev, setShowDailyRev] = useState(false);   // collapse "Net revenue by day"
+  const [showWeeklyRev, setShowWeeklyRev] = useState(false); // collapse "Net revenue by week"
   const tokenClientRef = React.useRef(null);
   const syncedRef = React.useRef(false);
   // Firestore fallback (used until connected to Google)
@@ -658,10 +660,13 @@ export default function Reports({ role = 'staff', userName = '' }) {
               ))}
             </div>
           </div>
-          {/* Net revenue by day */}
+          {/* Net revenue by day (collapsible) */}
           <div style={{ marginTop: 14, borderTop: '1px solid #f0e4d8', paddingTop: 10 }}>
-            <div style={s.cardTitle}>Net revenue by day</div>
-            {dailyRev.filter(d => !d.disabled).map(d => (
+            <div onClick={() => setShowDailyRev(v => !v)} style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', marginBottom: showDailyRev ? 10 : 0 }}>
+              <div style={{ ...s.cardTitle, marginBottom: 0, flex: 1 }}>Net revenue by day</div>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: showDailyRev ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}><polyline points="6 9 12 15 18 9" /></svg>
+            </div>
+            {showDailyRev && dailyRev.filter(d => !d.disabled).map(d => (
               <div key={d.label} style={s.productRow}>
                 <div style={{ flex: 1, fontSize: 12, fontWeight: 600, color: 'var(--brown-dark)' }}>{d.label}</div>
                 <div style={{ fontSize: 10.5, color: 'var(--brown-light)', textAlign: 'right', marginRight: 10, lineHeight: 1.4 }}>S {peso(d.sales)}<br />C {peso(d.cost)}</div>
@@ -732,10 +737,13 @@ export default function Reports({ role = 'staff', userName = '' }) {
               ))}
             </div>
           </div>
-          {/* Net revenue by week */}
+          {/* Net revenue by week (collapsible) */}
           <div style={{ marginTop: 14, borderTop: '1px solid #f0e4d8', paddingTop: 10 }}>
-            <div style={s.cardTitle}>Net revenue by week</div>
-            {weeklyRev.map((w, i) => (
+            <div onClick={() => setShowWeeklyRev(v => !v)} style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', marginBottom: showWeeklyRev ? 10 : 0 }}>
+              <div style={{ ...s.cardTitle, marginBottom: 0, flex: 1 }}>Net revenue by week</div>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: showWeeklyRev ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}><polyline points="6 9 12 15 18 9" /></svg>
+            </div>
+            {showWeeklyRev && weeklyRev.map((w, i) => (
               <div key={w.label} style={s.productRow}>
                 <div style={{ flex: 1, fontSize: 12, fontWeight: 600, color: 'var(--brown-dark)' }}>{w.label}<span style={{ fontSize: 9, color: 'var(--brown-light)', fontWeight: 400, marginLeft: 6 }}>{weeklyData[i]?.dateRange}</span></div>
                 <div style={{ fontSize: 10.5, color: 'var(--brown-light)', textAlign: 'right', marginRight: 10, lineHeight: 1.4 }}>S {peso(w.sales)}<br />C {peso(w.cost)}</div>
