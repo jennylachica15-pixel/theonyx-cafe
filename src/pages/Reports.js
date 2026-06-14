@@ -12,7 +12,7 @@ const TAB_CAPITAL      = 'Capital Cost';
 const SHEET_ID_ORDERS  = '1yadv9UgY8mFQzSwLsw3Qk3EepZeLL8dNl3YRtYsGZQU';   // Order Summary (sales)
 const TAB_ORDERS       = 'Sheet1';                                          // same tab the Orders app writes to
 const OVERHEAD_GID     = 695906692;                                         // tab in Stock Checks that holds the monthly operating cost
-const OVERHEAD_FALLBACK = 29000;                                            // used if the sheet can't be read
+const OVERHEAD_FALLBACK = 40100;                                            // used if the sheet can't be read (Rent+staff+utilities+…)
 const GOOGLE_CLIENT_ID = '596322682185-n5hm66hvol3nnqqllnuop995kcnefbgu.apps.googleusercontent.com';
 const SCOPES           = 'https://www.googleapis.com/auth/spreadsheets.readonly';
 
@@ -101,9 +101,30 @@ async function sheetMeta(token, sheetId) {
   if (!r.ok) throw new Error('Meta ' + r.status);
   return (await r.json()).sheets || [];
 }
-// Find the monthly operating cost / overhead figure in a tab's rows
+// Find the monthly overhead from a tab's rows.
+// Handles a "Monthly Cost | Amount" breakdown (sums the Amount column),
+// or a single "Operating cost / Overhead" labelled cell.
 function parseOverhead(rows) {
-  for (const row of (rows || [])) {
+  if (!rows || !rows.length) return null;
+  // Case A — a breakdown table: header has "Amount" (+ a cost label) → sum that column
+  let amtCol = -1, headerRow = -1;
+  for (let i = 0; i < rows.length; i++) {
+    const cells = (rows[i] || []).map(c => String(c || '').toLowerCase().trim());
+    const ai = cells.findIndex(c => c === 'amount' || c.includes('amount'));
+    const hasCostLabel = cells.some(c => c.includes('cost') || c.includes('monthly'));
+    if (ai !== -1 && hasCostLabel) { amtCol = ai; headerRow = i; break; }
+  }
+  if (amtCol !== -1) {
+    let sum = 0, found = false;
+    for (let i = headerRow + 1; i < rows.length; i++) {
+      const v = (rows[i] || [])[amtCol];
+      const n = parseFloat(String(v == null ? '' : v).replace(/[^0-9.]/g, ''));
+      if (!isNaN(n)) { sum += n; found = true; }
+    }
+    if (found) return sum;
+  }
+  // Case B — a single labelled cell
+  for (const row of rows) {
     const cells = (row || []).map(x => String(x || ''));
     const labelIdx = cells.findIndex(c => /operating cost|overhead|op cost/i.test(c));
     if (labelIdx !== -1) {
