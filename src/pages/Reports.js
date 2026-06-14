@@ -564,15 +564,21 @@ export default function Reports({ role = 'staff', userName = '' }) {
             <div style={{ fontSize: 10, color: 'var(--brown-light)', marginTop: 1 }}>Profit per ₱1 of sales</div>
           </div>
         </div>
-        {/* Break-even */}
-        <div style={s.productRow}>
-          <div style={{ flex: 1, fontSize: 12, fontWeight: 600, color: 'var(--brown-dark)' }}>Break-even sales<div style={{ fontSize: 10, color: 'var(--brown-light)', fontWeight: 400 }}>to cover {peso(overheadVal)} overhead</div></div>
-          <div style={{ fontSize: 11, color: 'var(--brown-light)', marginRight: 10 }}>Daily {peso(dailyTargetSales)}</div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--brown-dark)' }}>{peso(breakEvenSales)}</div>
+        {/* Break-even (card with target icon) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'var(--cream)', border: '0.5px solid #e6d6c0', borderRadius: 12, padding: '12px 14px', marginTop: 12 }}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1" /></svg>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--brown-dark)' }}>Break-even sales</div>
+            <div style={{ fontSize: 10.5, color: 'var(--brown-light)' }}>to cover {peso(overheadVal)} overhead</div>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--brown-dark)' }}>{peso(breakEvenSales)}<span style={{ fontSize: 10, color: 'var(--brown-light)' }}>/mo</span></div>
+            <div style={{ fontSize: 10.5, color: 'var(--brown-light)' }}>Daily target {peso(dailyTargetSales)}</div>
+          </div>
         </div>
         {/* Coverage + uncosted */}
-        <div style={{ fontSize: 11, color: 'var(--brown-light)', lineHeight: 1.5, marginTop: 10 }}>
-          {coverageAll}% of sales has a capital cost set — profit is approximate while {uncostedAll.length} item{uncostedAll.length !== 1 ? 's have' : ' has'} no cost yet.
+        <div style={{ fontSize: 11, color: 'var(--brown-light)', lineHeight: 1.5, marginTop: 12 }}>
+          {coverageAll}% of sales has a capital cost set — profit is approximate while {uncostedAll.length} item{uncostedAll.length !== 1 ? 's have' : ' has'} no cost yet. Overhead is read live from the sheet ({peso(overheadVal)}).
         </div>
         {uncostedAll.length > 0 && (
           <div style={{ marginTop: 8 }}>
