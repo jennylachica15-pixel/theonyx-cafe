@@ -256,6 +256,7 @@ export default function Reports({ role = 'staff', userName = '' }) {
   const [activeTab, setActiveTab] = useState('daily');
   const [dailyTooltip, setDailyTooltip] = useState(null);
   const [weeklyTooltip, setWeeklyTooltip] = useState(null);
+  const [openCat, setOpenCat] = useState('Drinks');   // which best-seller category is expanded
   const tokenClientRef = React.useRef(null);
   const syncedRef = React.useRef(false);
   // Firestore fallback (used until connected to Google)
@@ -807,31 +808,48 @@ export default function Reports({ role = 'staff', userName = '' }) {
           </div>
         </div>
       )}
-      {/* Best sellers per category — Drinks top 10, others top 5 */}
-      {catSections.map(sec => {
-        const maxVal = sec.items[0] ? sec.items[0][1] : 1;
-        const limit = sec.cat === 'Drinks' ? 10 : 5;
-        return (
-          <div key={sec.cat} style={s.card}>
-            <div style={s.cardTitle}>Top {limit} {sec.cat}</div>
-            {sec.items.map(([name, sales], i) => (
-              <div key={name} style={s.productRow}>
-                <div style={s.rank}>{i + 1}</div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--brown-dark)' }}>{name}</div>
-                  <div style={{ height: 4, background: '#f0e4d8', borderRadius: 2, marginTop: 4 }}>
-                    <div style={{ height: '100%', background: 'var(--brown-mid)', borderRadius: 2, width: `${(sales / maxVal) * 100}%` }} />
+      {/* Best sellers — one card, tap a category to expand (Drinks top 10, others top 5) */}
+      {catSections.length > 0 && (
+        <div style={s.card}>
+          <div style={s.cardTitle}>Best sellers</div>
+          {catSections.map((sec, si) => {
+            const limit = sec.cat === 'Drinks' ? 10 : 5;
+            const open = openCat === sec.cat;
+            const maxVal = sec.items[0] ? sec.items[0][1] : 1;
+            return (
+              <div key={sec.cat} style={{ borderTop: si === 0 ? 'none' : '1px solid #f0e4d8' }}>
+                <div onClick={() => setOpenCat(open ? null : sec.cat)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '11px 0', cursor: 'pointer' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--brown-dark)' }}>{sec.cat}</div>
+                    <div style={{ fontSize: 10.5, color: 'var(--brown-light)' }}>Top {limit} · {sec.items.length} item{sec.items.length !== 1 ? 's' : ''}</div>
                   </div>
+                  <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--brown-dark)', marginRight: 8 }}>P{Math.round(sec.total).toLocaleString()}</div>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', flexShrink: 0 }}><polyline points="6 9 12 15 18 9" /></svg>
                 </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--brown-dark)' }}>P{sales.toLocaleString()}</div>
-                  <div style={{ fontSize: 10, color: 'var(--brown-light)' }}>{totalSales > 0 ? ((sales / totalSales) * 100).toFixed(1) : 0}%</div>
-                </div>
+                {open && (
+                  <div style={{ paddingBottom: 8 }}>
+                    {sec.items.map(([name, sales], i) => (
+                      <div key={name} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0' }}>
+                        <div style={s.rank}>{i + 1}</div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--brown-dark)' }}>{name}</div>
+                          <div style={{ height: 4, background: '#f0e4d8', borderRadius: 2, marginTop: 4 }}>
+                            <div style={{ height: '100%', background: 'var(--brown-mid)', borderRadius: 2, width: `${(sales / maxVal) * 100}%` }} />
+                          </div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--brown-dark)' }}>P{sales.toLocaleString()}</div>
+                          <div style={{ fontSize: 10, color: 'var(--brown-light)' }}>{totalSales > 0 ? ((sales / totalSales) * 100).toFixed(1) : 0}%</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-            ))}
-          </div>
-        );
-      })}
+            );
+          })}
+        </div>
+      )}
       <div style={{ height: 80 }} />
     </div>
   );
