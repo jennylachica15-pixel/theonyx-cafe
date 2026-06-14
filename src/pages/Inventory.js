@@ -73,6 +73,7 @@ const IC = {
   receipt: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 2v20l2.5-1.5L10 22l2-1.5L14 22l2.5-1.5L19 22V2l-2.5 1.5L14 2l-2 1.5L10 2 7.5 3.5 5 2Z"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="9" y1="12" x2="15" y2="12"/></svg>,
   x:       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
   lock:    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>,
+  refresh: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>,
 };
 const CAT_SVG = {
   'Beans & Coffee':  { icon:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M17 8h1a4 4 0 0 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/><line x1="14" y1="2" x2="14" y2="4"/></svg>, bg:'#fbeede', color:C.warn },
@@ -93,7 +94,8 @@ const s = {
   statNum:    (c)=>({ fontSize:24, fontWeight:700, letterSpacing:'-1px', color:c }),
   statLabel:  { fontSize:11, color:C.muted, marginTop:2, fontWeight:500, textTransform:'uppercase', letterSpacing:'0.5px' },
   connBtn:    { width:'100%', padding:'12px', borderRadius:13, background:C.gold, color:C.white, fontSize:13, fontWeight:600, marginBottom:10, display:'flex', alignItems:'center', justifyContent:'center', gap:7, border:'none', cursor:'pointer' },
-  connBadge:  { background:C.greenBg, color:C.green, borderRadius:10, padding:'9px 14px', fontSize:12, fontWeight:600, marginBottom:12, display:'flex', alignItems:'center', gap:7, border:`1px solid ${C.greenBd}` },
+  connBadge:  { background:C.greenBg, color:C.green, borderRadius:10, padding:'9px 14px', fontSize:12, fontWeight:600, marginBottom:8, display:'flex', alignItems:'center', gap:7, border:`1px solid ${C.greenBd}` },
+  syncBtn:    { width:'100%', padding:'10px', borderRadius:11, background:C.soft, color:C.terra, fontSize:13, fontWeight:600, marginBottom:12, display:'flex', alignItems:'center', justifyContent:'center', gap:7, border:`1.5px solid ${C.border}`, cursor:'pointer' },
   btnRow:     { display:'flex', gap:8, marginBottom:10 },
   // active buttons (connected)
   addBtn:     { flex:1, padding:'14px', borderRadius:14, background:'#e8d5bc', color:'#5a3010', fontSize:14, fontWeight:600, display:'flex', alignItems:'center', justifyContent:'center', gap:8, border:`1.5px solid #c8a878`, cursor:'pointer' },
@@ -333,6 +335,7 @@ export default function Inventory({ role='staff', userName='' }) {
   const [loading,       setLoading]       = useState(true);
   const [accessToken,   setAccessToken]   = useState(null);
   const [syncing,       setSyncing]       = useState(false);
+  const [pulling,       setPulling]       = useState(false);
   const [receipts,      setReceipts]      = useState([]);
   const [showReceipt,   setShowReceipt]   = useState(false);
   const [showReceipts,  setShowReceipts]  = useState(false);
@@ -380,54 +383,64 @@ export default function Inventory({ role='staff', userName='' }) {
       }
     })();
   },[items,loading]);
-  // Two-way sync: pull changes FROM the Sheet INTO the app, once per app open
-  // (after Google is connected and the first Firestore snapshot has loaded)
+  // Two-way sync: read the Sheet and upsert into the app (Firestore).
+  // Called automatically once per app open, and manually via "Sync from Sheet".
+  const pullFromSheet = async ({ notify=false } = {}) => {
+    if(!accessToken){ if(notify) alert('Connect Google muna.'); return; }
+    setPulling(true);
+    let updated=0, added=0;
+    try{
+      const rows = await fetchAvailableRows(accessToken);
+      const byCode = {};
+      items.forEach(it=>{ if(it.code) byCode[String(it.code)] = it; });
+      for(const r of rows){
+        const qty  = Number(r.quantity);
+        const thr  = Number(r.threshold);
+        const cat  = CATEGORIES.includes(r.category) ? r.category : 'Other';
+        const existing = byCode[r.code];
+        if(existing){
+          // Update existing item only when the Sheet differs
+          const changes = {};
+          if(!isNaN(qty) && qty !== existing.quantity)      changes.quantity  = qty;
+          if(!isNaN(thr) && thr !== existing.threshold)     changes.threshold = thr;
+          if(r.name && r.name !== existing.name)            changes.name      = r.name;
+          if(cat && cat !== existing.category)              changes.category  = cat;
+          if(r.unit && r.unit !== existing.unit)            changes.unit      = r.unit;
+          if(Object.keys(changes).length){
+            changes.updatedAt = serverTimestamp();
+            try{ await updateDoc(doc(db,'inventory',existing.id), changes); updated++; }
+            catch(e){ console.error('pull update:',e); }
+          }
+        }else{
+          // New row found in the Sheet → add it to the app
+          const data={
+            name: r.name || ('Item '+r.code),
+            category: cat,
+            quantity: isNaN(qty)?0:qty,
+            unit: r.unit || 'pcs',
+            threshold: isNaN(thr)?5:thr,
+            notes: r.notes || '',
+            code: r.code,
+            lastRestock:null, lastRestockNote:'',
+            addedBy:'Sheet', editedBy:null,
+            createdAt:serverTimestamp(), updatedAt:serverTimestamp(),
+          };
+          try{ await addDoc(collection(db,'inventory'), data); added++; }
+          catch(e){ console.error('pull add:',e); }
+        }
+      }
+      if(notify) alert(`Sync tapos!\n${updated} na-update · ${added} bagong item mula sa Sheet.`);
+    }catch(e){
+      console.error('pullFromSheet:', e);
+      if(notify) alert('Hindi ma-sync ang Sheet. Subukan ulit.');
+    }
+    setPulling(false);
+  };
+  // Auto pull once per app open (after Google connect + first Firestore load)
   useEffect(()=>{
     if(!accessToken || loading || pulledRef.current) return;
     pulledRef.current = true;
-    (async()=>{
-      try{
-        const rows = await fetchAvailableRows(accessToken);
-        const byCode = {};
-        items.forEach(it=>{ if(it.code) byCode[String(it.code)] = it; });
-        for(const r of rows){
-          const qty  = Number(r.quantity);
-          const thr  = Number(r.threshold);
-          const cat  = CATEGORIES.includes(r.category) ? r.category : 'Other';
-          const existing = byCode[r.code];
-          if(existing){
-            // Update existing item only when the Sheet differs
-            const changes = {};
-            if(!isNaN(qty) && qty !== existing.quantity)      changes.quantity  = qty;
-            if(!isNaN(thr) && thr !== existing.threshold)     changes.threshold = thr;
-            if(r.name && r.name !== existing.name)            changes.name      = r.name;
-            if(cat && cat !== existing.category)              changes.category  = cat;
-            if(r.unit && r.unit !== existing.unit)            changes.unit      = r.unit;
-            if(Object.keys(changes).length){
-              changes.updatedAt = serverTimestamp();
-              try{ await updateDoc(doc(db,'inventory',existing.id), changes); }
-              catch(e){ console.error('pull update:',e); }
-            }
-          }else{
-            // New row found in the Sheet → add it to the app
-            const data={
-              name: r.name || ('Item '+r.code),
-              category: cat,
-              quantity: isNaN(qty)?0:qty,
-              unit: r.unit || 'pcs',
-              threshold: isNaN(thr)?5:thr,
-              notes: r.notes || '',
-              code: r.code,
-              lastRestock:null, lastRestockNote:'',
-              addedBy:'Sheet', editedBy:null,
-              createdAt:serverTimestamp(), updatedAt:serverTimestamp(),
-            };
-            try{ await addDoc(collection(db,'inventory'), data); }
-            catch(e){ console.error('pull add:',e); }
-          }
-        }
-      }catch(e){ console.error('pullFromSheet:', e); }
-    })();
+    pullFromSheet();
   },[accessToken, loading, items]);
   // Sync to Tab 1 (Available Items) — upsert by code
   const syncAvailable=async(item, encodedBy)=>{
@@ -594,6 +607,12 @@ export default function Inventory({ role='staff', userName='' }) {
         ? <button style={s.connBtn} onClick={()=>tokenClientRef.current?.requestAccessToken()}>{IC.link} Connect before proceeding…</button>
         : <div style={s.connBadge}>{IC.check} Connected to Google Sheets &amp; Drive</div>
       }
+      {/* Manual two-way sync: pull latest changes from the Sheet */}
+      {accessToken && (
+        <button style={{...s.syncBtn,...(pulling?{opacity:0.6,cursor:'wait'}:{})}} onClick={()=>pullFromSheet({notify:true})} disabled={pulling}>
+          {IC.refresh} {pulling?'Sync from Sheet…':'Sync from Sheet'}
+        </button>
+      )}
       {/* Add + Receipt — disabled when not connected */}
       <div style={s.btnRow}>
         <button
