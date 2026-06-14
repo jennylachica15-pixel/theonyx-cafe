@@ -92,6 +92,7 @@ const MENU_CATEGORIES = [
   { id: 'snacks', label: 'Snacks',
     items: [
       { name: 'Cheese Burger', regular: 50 },
+      { name: 'Siomai', regular: 50 },
       { name: 'Onyx Burger', regular: 150 },
       { name: 'Onyx Nachos', regular: 130 },
       { name: 'Fries - BBQ', regular: 30 },
