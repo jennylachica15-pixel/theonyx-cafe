@@ -193,6 +193,27 @@ async function sheetUpdateRow(token, tab, rowNum, row) {
     method:'PUT', headers:a.headers, body:JSON.stringify({ values:[row] })
   });
 }
+// Read all rows from the Available Items tab (two-way sync: Sheet → app)
+// Columns: Code ID | Item | Category | Available Stock | Unit | Status | Threshold | Supplier/Notes | Encoded By | Date Encoded
+async function fetchAvailableRows(token) {
+  const vals = await sheetGetTab(token, TAB_ITEMS);
+  const rows = [];
+  for(let i=1;i<vals.length;i++){
+    const v = vals[i] || [];
+    const code = String(v[0]||'').trim();
+    if(!code) continue;
+    rows.push({
+      code,
+      name:     String(v[1]||'').trim(),
+      category: String(v[2]||'').trim(),
+      quantity: v[3],
+      unit:     String(v[4]||'').trim(),
+      threshold:v[6],
+      notes:    String(v[7]||'').trim(),
+    });
+  }
+  return rows;
+}
 // Tab 1 — Available Items: upsert by Code ID (update in place or append new)
 // Columns: Code ID | Item | Category | Available Stock | Unit | Status | Threshold | Supplier | Encoded By | Date Encoded
 async function syncAvailableItem(token, item, encodedBy) {
@@ -323,6 +344,7 @@ export default function Inventory({ role='staff', userName='' }) {
   const [uploadingReceipt,setUploadingReceipt]=useState(false);
   const tokenClientRef  = React.useRef(null);
   const backfilledRef   = React.useRef(false);
+  const pulledRef       = React.useRef(false);
   const fileInputRef    = React.useRef(null);
   useEffect(() => {
     const script=document.createElement('script');
@@ -358,6 +380,55 @@ export default function Inventory({ role='staff', userName='' }) {
       }
     })();
   },[items,loading]);
+  // Two-way sync: pull changes FROM the Sheet INTO the app, once per app open
+  // (after Google is connected and the first Firestore snapshot has loaded)
+  useEffect(()=>{
+    if(!accessToken || loading || pulledRef.current) return;
+    pulledRef.current = true;
+    (async()=>{
+      try{
+        const rows = await fetchAvailableRows(accessToken);
+        const byCode = {};
+        items.forEach(it=>{ if(it.code) byCode[String(it.code)] = it; });
+        for(const r of rows){
+          const qty  = Number(r.quantity);
+          const thr  = Number(r.threshold);
+          const cat  = CATEGORIES.includes(r.category) ? r.category : 'Other';
+          const existing = byCode[r.code];
+          if(existing){
+            // Update existing item only when the Sheet differs
+            const changes = {};
+            if(!isNaN(qty) && qty !== existing.quantity)      changes.quantity  = qty;
+            if(!isNaN(thr) && thr !== existing.threshold)     changes.threshold = thr;
+            if(r.name && r.name !== existing.name)            changes.name      = r.name;
+            if(cat && cat !== existing.category)              changes.category  = cat;
+            if(r.unit && r.unit !== existing.unit)            changes.unit      = r.unit;
+            if(Object.keys(changes).length){
+              changes.updatedAt = serverTimestamp();
+              try{ await updateDoc(doc(db,'inventory',existing.id), changes); }
+              catch(e){ console.error('pull update:',e); }
+            }
+          }else{
+            // New row found in the Sheet → add it to the app
+            const data={
+              name: r.name || ('Item '+r.code),
+              category: cat,
+              quantity: isNaN(qty)?0:qty,
+              unit: r.unit || 'pcs',
+              threshold: isNaN(thr)?5:thr,
+              notes: r.notes || '',
+              code: r.code,
+              lastRestock:null, lastRestockNote:'',
+              addedBy:'Sheet', editedBy:null,
+              createdAt:serverTimestamp(), updatedAt:serverTimestamp(),
+            };
+            try{ await addDoc(collection(db,'inventory'), data); }
+            catch(e){ console.error('pull add:',e); }
+          }
+        }
+      }catch(e){ console.error('pullFromSheet:', e); }
+    })();
+  },[accessToken, loading, items]);
   // Sync to Tab 1 (Available Items) — upsert by code
   const syncAvailable=async(item, encodedBy)=>{
     if(!accessToken) return;
