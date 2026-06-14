@@ -74,6 +74,7 @@ const IC = {
   x:       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
   lock:    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>,
   refresh: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>,
+  alert:   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>,
 };
 const CAT_SVG = {
   'Beans & Coffee':  { icon:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M17 8h1a4 4 0 0 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/><line x1="14" y1="2" x2="14" y2="4"/></svg>, bg:'#fbeede', color:C.warn },
@@ -96,6 +97,8 @@ const s = {
   connBtn:    { width:'100%', padding:'12px', borderRadius:13, background:C.gold, color:C.white, fontSize:13, fontWeight:600, marginBottom:10, display:'flex', alignItems:'center', justifyContent:'center', gap:7, border:'none', cursor:'pointer' },
   connBadge:  { background:C.greenBg, color:C.green, borderRadius:10, padding:'9px 14px', fontSize:12, fontWeight:600, marginBottom:8, display:'flex', alignItems:'center', gap:7, border:`1px solid ${C.greenBd}` },
   syncBtn:    { width:'100%', padding:'10px', borderRadius:11, background:C.soft, color:C.terra, fontSize:13, fontWeight:600, marginBottom:12, display:'flex', alignItems:'center', justifyContent:'center', gap:7, border:`1.5px solid ${C.border}`, cursor:'pointer' },
+  summaryBtn: { width:'100%', padding:'12px', borderRadius:12, background:C.errBg, color:C.err, fontSize:13.5, fontWeight:700, marginBottom:12, display:'flex', alignItems:'center', justifyContent:'center', gap:8, border:`1.5px solid ${C.errBd}`, cursor:'pointer' },
+  sumCount:   { background:C.err, color:C.white, borderRadius:10, minWidth:18, height:18, padding:'0 6px', fontSize:11, fontWeight:700, display:'inline-flex', alignItems:'center', justifyContent:'center' },
   btnRow:     { display:'flex', gap:8, marginBottom:10 },
   // active buttons (connected)
   addBtn:     { flex:1, padding:'14px', borderRadius:14, background:'#e8d5bc', color:'#5a3010', fontSize:14, fontWeight:600, display:'flex', alignItems:'center', justifyContent:'center', gap:8, border:`1.5px solid #c8a878`, cursor:'pointer' },
@@ -339,6 +342,7 @@ export default function Inventory({ role='staff', userName='' }) {
   const [receipts,      setReceipts]      = useState([]);
   const [showReceipt,   setShowReceipt]   = useState(false);
   const [showReceipts,  setShowReceipts]  = useState(false);
+  const [showSummary,   setShowSummary]   = useState(false);
   const [receiptFile,   setReceiptFile]   = useState(null);
   const [receiptPreview,setReceiptPreview]= useState('');
   const [receiptNote,   setReceiptNote]   = useState('');
@@ -590,6 +594,9 @@ export default function Inventory({ role='staff', userName='' }) {
   });
   const lowCount=items.filter(i=>getStatus(i.quantity,i.threshold)!=='ok').length;
   const outCount=items.filter(i=>i.quantity<=0).length;
+  // Critical items for the in-app summary (status 'low' = Critical, 'out' = Out)
+  const criticalItems=items.filter(i=>CRITICAL_STATUSES.includes(getStatus(i.quantity,i.threshold)));
+  const criticalCount=criticalItems.length;
   const criticalCats=new Set(items.filter(i=>CRITICAL_STATUSES.includes(getStatus(i.quantity,i.threshold))).map(i=>i.category));
   const pendingCount=receipts.filter(r=>r.status==='pending').length;
   return (
@@ -646,6 +653,11 @@ export default function Inventory({ role='staff', userName='' }) {
           {IC.lock} Connect to Google above to add items or submit receipts.
         </div>
       )}
+      {/* Critical Summary — always available (uses app data) */}
+      <button style={s.summaryBtn} onClick={()=>setShowSummary(true)}>
+        {IC.alert} Critical Summary
+        {criticalCount>0 && <span style={s.sumCount}>{criticalCount}</span>}
+      </button>
       {/* Review receipts — Manager only */}
       {isManager && (
         <button style={s.reviewBtn(pendingCount>0)} onClick={()=>setShowReceipts(true)}>
@@ -918,6 +930,54 @@ export default function Inventory({ role='staff', userName='' }) {
               );
             })}
             <button style={s.cancelBtn} onClick={()=>setShowReceipts(false)}>Close</button>
+          </div>
+        </div>
+      )}
+      {/* CRITICAL SUMMARY MODAL */}
+      {showSummary&&(
+        <div style={s.modal} onClick={()=>setShowSummary(false)}>
+          <div style={s.modalCard} onClick={e=>e.stopPropagation()}>
+            <div style={s.modalTitle}>{IC.alert} Critical Summary <span style={{fontSize:13,color:C.muted,fontWeight:500}}>{criticalCount} item{criticalCount!==1?'s':''}</span></div>
+            {criticalCount===0
+              ? <div style={s.empty}>Walang critical na item ngayon. 🎉</div>
+              : (()=>{
+                  const groups={};
+                  criticalItems.forEach(i=>{ (groups[i.category]=groups[i.category]||[]).push(i); });
+                  const order=CATEGORIES.filter(c=>groups[c]);
+                  Object.keys(groups).forEach(c=>{ if(order.indexOf(c)===-1) order.push(c); });
+                  return order.map(cat=>{
+                    const arr=groups[cat].slice().sort((a,b)=>{
+                      const ra=(a.quantity||0)/((a.threshold||1)), rb=(b.quantity||0)/((b.threshold||1));
+                      return ra-rb;
+                    });
+                    return (
+                      <div key={cat} style={{marginBottom:14}}>
+                        <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:0.5,fontWeight:700,marginBottom:8,display:'flex',alignItems:'center',gap:8}}>
+                          {cat} <span style={{background:C.errBg,color:C.err,borderRadius:20,padding:'1px 8px',fontSize:10,fontWeight:700}}>{arr.length}</span>
+                        </div>
+                        {arr.map(item=>{
+                          const st=getStatus(item.quantity,item.threshold);
+                          return (
+                            <div key={item.id} style={s.rcptCard}>
+                              <div style={{display:'flex',alignItems:'center',gap:12}}>
+                                <div style={{flex:1,minWidth:0}}>
+                                  <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                                    <span style={{fontSize:14,fontWeight:600,color:C.ink}}>{item.name}</span>
+                                    {item.code&&<span style={s.codePill}>#{item.code}</span>}
+                                  </div>
+                                  <div style={{fontSize:12,color:C.muted,marginTop:3}}>{item.quantity} {item.unit} · threshold {item.threshold} {item.unit}</div>
+                                </div>
+                                <span style={s.badge(st)}>{STATUS_CONFIG[st].label}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  });
+                })()
+            }
+            <button style={s.cancelBtn} onClick={()=>setShowSummary(false)}>Close</button>
           </div>
         </div>
       )}
