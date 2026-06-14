@@ -545,7 +545,8 @@ export default function Reports({ role = 'staff', userName = '' }) {
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 800, color: netAfterOverhead >= 0 ? 'var(--green-ok)' : '#a3402d', padding: '8px 0 2px' }}><span>= Net profit</span><span>{peso(netAfterOverhead)}</span></div>
         </div>
         {/* Projection */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: projProfit >= 0 ? 'var(--cream)' : '#fbeeea', border: `0.5px solid ${projProfit >= 0 ? '#e6d6c0' : '#eccfc7'}`, borderRadius: 10, padding: '9px 12px', marginBottom: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: projProfit >= 0 ? 'var(--cream)' : '#fbeeea', border: `0.5px solid ${projProfit >= 0 ? '#e6d6c0' : '#eccfc7'}`, borderRadius: 10, padding: '9px 12px', marginBottom: 14 }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={projProfit >= 0 ? 'var(--green-ok)' : '#a3402d'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><polyline points="23 6 13.5 15.5 8.5 10.5 1 18" /><polyline points="17 6 23 6 23 12" /></svg>
           <div style={{ flex: 1, fontSize: 12, color: 'var(--brown-dark)', lineHeight: 1.4 }}>
             Projected month-end: <b>{peso(projProfit)}</b>
             <div style={{ fontSize: 11, color: 'var(--brown-light)' }}>{projProfit >= 0 ? 'On track to cover overhead' : `Short by ${peso(-projProfit)} · projected sales ${peso(projSales)}`}</div>
