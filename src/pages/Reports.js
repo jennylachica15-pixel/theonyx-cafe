@@ -12,7 +12,7 @@ const TAB_CAPITAL      = 'Capital Cost';
 const SHEET_ID_ORDERS  = '1yadv9UgY8mFQzSwLsw3Qk3EepZeLL8dNl3YRtYsGZQU';   // Order Summary (sales)
 const TAB_ORDERS       = 'Sheet1';                                          // same tab the Orders app writes to
 const OVERHEAD_GID     = 695906692;                                         // tab in Stock Checks that holds the monthly operating cost
-const OVERHEAD_FALLBACK = 40100;                                            // used if the sheet can't be read (Rent+staff+utilities+…)
+const OVERHEAD_FALLBACK = 32300;                                            // used if the sheet can't be read (Rent+staff+utilities+…)
 const GOOGLE_CLIENT_ID = '596322682185-n5hm66hvol3nnqqllnuop995kcnefbgu.apps.googleusercontent.com';
 const SCOPES           = 'https://www.googleapis.com/auth/spreadsheets.readonly';
 
