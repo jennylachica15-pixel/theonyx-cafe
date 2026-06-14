@@ -324,6 +324,28 @@ export default function Reports({ role = 'staff', userName = '' }) {
     return { label: d.getDate(), total, disabled: false };
   });
   const maxMonthly = Math.max(...monthlyData.map(d => d.total), 1);
+  // ── Revenue (Sales − Capital Cost) per period, for the Daily/Weekly/Monthly tabs ──
+  const profitInRange = (start, end) => computeProfit(
+    orders.filter(o => { const d = o.createdAt?.toDate && o.createdAt.toDate(); return d && d >= start && (!end || d < end); }),
+    costMap
+  );
+  const dailyRev = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(now); d.setDate(d.getDate() - (6 - i));
+    const start = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const end = new Date(start); end.setDate(start.getDate() + 1);
+    const disabled = d < REPORT_START;
+    const p = disabled ? { sales: 0, cost: 0, net: 0, matched: 0 } : profitInRange(start, end);
+    return { label: DAYS[d.getDay()], disabled, ...p };
+  });
+  const weeklyRev = Array.from({ length: 4 }, (_, i) => {
+    const mon = new Date(now); const dow = mon.getDay(); const diff = dow === 0 ? 6 : dow - 1;
+    mon.setDate(mon.getDate() - diff - (3 - i) * 7); mon.setHours(0, 0, 0, 0);
+    const end = new Date(mon); end.setDate(mon.getDate() + 7);
+    return { label: `W${i + 1}`, ...profitInRange(mon, end) };
+  });
+  const m30start = new Date(now); m30start.setDate(now.getDate() - 29); m30start.setHours(0, 0, 0, 0);
+  const monthlyRev = profitInRange(m30start, null);
+  const marginOf = (p) => (p.matched > 0 ? Math.round((p.net / p.matched) * 100) : 0);
   // Top 10 products
   const productMap = {};
   orders.forEach(order => {
@@ -528,6 +550,20 @@ export default function Reports({ role = 'staff', userName = '' }) {
               ))}
             </div>
           </div>
+          {/* Net revenue by day */}
+          <div style={{ marginTop: 14, borderTop: '1px solid #f0e4d8', paddingTop: 10 }}>
+            <div style={s.cardTitle}>Net revenue by day</div>
+            {dailyRev.filter(d => !d.disabled).map(d => (
+              <div key={d.label} style={s.productRow}>
+                <div style={{ flex: 1, fontSize: 12, fontWeight: 600, color: 'var(--brown-dark)' }}>{d.label}</div>
+                <div style={{ fontSize: 10.5, color: 'var(--brown-light)', textAlign: 'right', marginRight: 10, lineHeight: 1.4 }}>S {peso(d.sales)}<br />C {peso(d.cost)}</div>
+                <div style={{ textAlign: 'right', minWidth: 66 }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--green-ok)' }}>{peso(d.net)}</div>
+                  <div style={{ fontSize: 10, color: 'var(--gold)' }}>{marginOf(d)}%</div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
       {/* Weekly Chart */}
@@ -588,6 +624,20 @@ export default function Reports({ role = 'staff', userName = '' }) {
               ))}
             </div>
           </div>
+          {/* Net revenue by week */}
+          <div style={{ marginTop: 14, borderTop: '1px solid #f0e4d8', paddingTop: 10 }}>
+            <div style={s.cardTitle}>Net revenue by week</div>
+            {weeklyRev.map((w, i) => (
+              <div key={w.label} style={s.productRow}>
+                <div style={{ flex: 1, fontSize: 12, fontWeight: 600, color: 'var(--brown-dark)' }}>{w.label}<span style={{ fontSize: 9, color: 'var(--brown-light)', fontWeight: 400, marginLeft: 6 }}>{weeklyData[i]?.dateRange}</span></div>
+                <div style={{ fontSize: 10.5, color: 'var(--brown-light)', textAlign: 'right', marginRight: 10, lineHeight: 1.4 }}>S {peso(w.sales)}<br />C {peso(w.cost)}</div>
+                <div style={{ textAlign: 'right', minWidth: 66 }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--green-ok)' }}>{peso(w.net)}</div>
+                  <div style={{ fontSize: 10, color: 'var(--gold)' }}>{marginOf(w)}%</div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
       {/* Monthly Chart */}
@@ -609,6 +659,16 @@ export default function Reports({ role = 'staff', userName = '' }) {
             <span>{monthlyData[0]?.label}</span>
             <span>{monthlyData[14]?.label}</span>
             <span>{monthlyData[29]?.label}</span>
+          </div>
+          {/* Net revenue — last 30 days */}
+          <div style={{ marginTop: 14, borderTop: '1px solid #f0e4d8', paddingTop: 10 }}>
+            <div style={s.cardTitle}>Net revenue — last 30 days</div>
+            <div style={s.statGrid}>
+              <div style={s.statBox}><div style={s.statNum('var(--brown-dark)')}>{peso(monthlyRev.sales)}</div><div style={s.statLabel}>Total Sales</div></div>
+              <div style={s.statBox}><div style={s.statNum('var(--brown-mid)')}>{peso(monthlyRev.cost)}</div><div style={s.statLabel}>Capital Cost</div></div>
+              <div style={s.statBox}><div style={s.statNum('var(--green-ok)')}>{peso(monthlyRev.net)}</div><div style={s.statLabel}>Net Revenue</div></div>
+              <div style={s.statBox}><div style={s.statNum('var(--gold)')}>{marginOf(monthlyRev)}%</div><div style={s.statLabel}>Gross Margin</div></div>
+            </div>
           </div>
         </div>
       )}
