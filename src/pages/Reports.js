@@ -259,6 +259,8 @@ export default function Reports({ role = 'staff', userName = '' }) {
   const [openCat, setOpenCat] = useState('Drinks');   // which best-seller category is expanded
   const [showDailyRev, setShowDailyRev] = useState(false);   // collapse "Net revenue by day"
   const [showWeeklyRev, setShowWeeklyRev] = useState(false); // collapse "Net revenue by week"
+  const [showUncosted, setShowUncosted] = useState(false);   // collapse "No capital cost yet"
+  const [showComputation, setShowComputation] = useState(false); // collapse the profit breakdown
   const tokenClientRef = React.useRef(null);
   const syncedRef = React.useRef(false);
   // Firestore fallback (used until connected to Google)
@@ -537,13 +539,19 @@ export default function Reports({ role = 'staff', userName = '' }) {
         {/* Big net-after-overhead number */}
         <div style={{ fontSize: 11, color: 'var(--brown-light)' }}>Net profit this month</div>
         <div style={{ fontSize: 32, fontWeight: 800, letterSpacing: '-1px', color: netAfterOverhead >= 0 ? 'var(--green-ok)' : '#a3402d', margin: '2px 0 12px' }}>{peso(netAfterOverhead)}</div>
-        {/* Computation */}
-        <div style={{ background: 'var(--cream)', borderRadius: 12, padding: '12px 14px', marginBottom: 12 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--brown-dark)', padding: '4px 0' }}><span>Sales (this month)</span><span style={{ fontWeight: 600 }}>{peso(monthCalRev.sales)}</span></div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--brown-mid)', padding: '4px 0' }}><span>− Capital cost</span><span style={{ fontWeight: 600 }}>{peso(monthCalRev.cost)}</span></div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--brown-mid)', padding: '4px 0 8px', borderBottom: '1px dashed #e3d0b4' }}><span>− Overhead (monthly)</span><span style={{ fontWeight: 600 }}>{peso(overheadVal)}</span></div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 800, color: netAfterOverhead >= 0 ? 'var(--green-ok)' : '#a3402d', padding: '8px 0 2px' }}><span>= Net profit</span><span>{peso(netAfterOverhead)}</span></div>
+        {/* Computation (collapsible) */}
+        <div onClick={() => setShowComputation(v => !v)} style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', marginBottom: showComputation ? 8 : 12 }}>
+          <div style={{ flex: 1, fontSize: 11, fontWeight: 700, color: 'var(--brown-light)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Breakdown</div>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: showComputation ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}><polyline points="6 9 12 15 18 9" /></svg>
         </div>
+        {showComputation && (
+          <div style={{ background: 'var(--cream)', borderRadius: 12, padding: '12px 14px', marginBottom: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--brown-dark)', padding: '4px 0' }}><span>Sales (this month)</span><span style={{ fontWeight: 600 }}>{peso(monthCalRev.sales)}</span></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--brown-mid)', padding: '4px 0' }}><span>− Capital cost</span><span style={{ fontWeight: 600 }}>{peso(monthCalRev.cost)}</span></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--brown-mid)', padding: '4px 0 8px', borderBottom: '1px dashed #e3d0b4' }}><span>− Overhead (monthly)</span><span style={{ fontWeight: 600 }}>{peso(overheadVal)}</span></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 800, color: netAfterOverhead >= 0 ? 'var(--green-ok)' : '#a3402d', padding: '8px 0 2px' }}><span>= Net profit</span><span>{peso(netAfterOverhead)}</span></div>
+          </div>
+        )}
         {/* Projection */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: projProfit >= 0 ? 'var(--cream)' : '#fbeeea', border: `0.5px solid ${projProfit >= 0 ? '#e6d6c0' : '#eccfc7'}`, borderRadius: 10, padding: '9px 12px', marginBottom: 14 }}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={projProfit >= 0 ? 'var(--green-ok)' : '#a3402d'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><polyline points="23 6 13.5 15.5 8.5 10.5 1 18" /><polyline points="17 6 23 6 23 12" /></svg>
@@ -583,18 +591,25 @@ export default function Reports({ role = 'staff', userName = '' }) {
         </div>
         {uncostedAll.length > 0 && (
           <div style={{ marginTop: 8 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--brown-light)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
-              No capital cost yet ({uncostedAll.length})
-            </div>
-            {uncostedAll.slice(0, 6).map(([name, sales]) => (
-              <div key={name} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--brown-light)', padding: '3px 0' }}>
-                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
-                <span style={{ flexShrink: 0, marginLeft: 8 }}>{peso(sales)} sales</span>
+            <div onClick={() => setShowUncosted(v => !v)} style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', marginBottom: showUncosted ? 6 : 0 }}>
+              <div style={{ flex: 1, fontSize: 11, fontWeight: 700, color: 'var(--brown-light)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                No capital cost yet ({uncostedAll.length})
               </div>
-            ))}
-            <div style={{ fontSize: 10, color: 'var(--brown-light)', marginTop: 6, fontStyle: 'italic' }}>
-              Add their cost in the "Capital Cost" tab — updates automatically when you Sync.
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: showUncosted ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}><polyline points="6 9 12 15 18 9" /></svg>
             </div>
+            {showUncosted && (
+              <>
+                {uncostedAll.slice(0, 8).map(([name, sales]) => (
+                  <div key={name} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--brown-light)', padding: '3px 0' }}>
+                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
+                    <span style={{ flexShrink: 0, marginLeft: 8 }}>{peso(sales)} sales</span>
+                  </div>
+                ))}
+                <div style={{ fontSize: 10, color: 'var(--brown-light)', marginTop: 6, fontStyle: 'italic' }}>
+                  Add their cost in the "Capital Cost" tab — updates automatically when you Sync.
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>
