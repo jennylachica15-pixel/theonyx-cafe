@@ -101,6 +101,9 @@ const s = {
   // disabled buttons (not connected)
   addBtnOff:  { flex:1, padding:'14px', borderRadius:14, background:C.soft, color:C.disabled, fontSize:14, fontWeight:600, display:'flex', alignItems:'center', justifyContent:'center', gap:8, border:`1px solid ${C.border}`, cursor:'not-allowed' },
   receiptOff: { flex:1, padding:'14px', borderRadius:14, background:C.soft, color:C.disabled, fontSize:14, fontWeight:600, display:'flex', alignItems:'center', justifyContent:'center', gap:8, border:`1px solid ${C.border}`, cursor:'not-allowed' },
+  // top-level Restock button (gold, stands out from the two tan buttons)
+  restockTopBtn:{ flex:1, padding:'14px 6px', borderRadius:14, background:C.gold, color:C.white, fontSize:13, fontWeight:600, display:'flex', alignItems:'center', justifyContent:'center', gap:6, border:`1.5px solid ${C.goldDark}`, cursor:'pointer' },
+  restockTopOff:{ flex:1, padding:'14px 6px', borderRadius:14, background:C.soft, color:C.disabled, fontSize:13, fontWeight:600, display:'flex', alignItems:'center', justifyContent:'center', gap:6, border:`1px solid ${C.border}`, cursor:'not-allowed' },
   lockNote:   { background:C.errBg, border:`1px solid ${C.errBd}`, borderRadius:10, padding:'10px 13px', fontSize:12.5, color:C.err, display:'flex', alignItems:'center', gap:7, marginBottom:10, fontWeight:500 },
   reviewBtn:  (p)=>({ width:'100%', padding:'11px', borderRadius:12, background:p?'#fbeede':'#f5ede2', color:p?C.warn:C.terra, fontSize:13, fontWeight:600, marginBottom:14, display:'flex', alignItems:'center', justifyContent:'center', gap:8, border:'1.5px solid', borderColor:p?C.warnBd:C.border, cursor:'pointer' }),
   pendCount:  { background:C.gold, color:C.white, borderRadius:10, minWidth:18, height:18, padding:'0 5px', fontSize:11, fontWeight:700, display:'inline-flex', alignItems:'center', justifyContent:'center' },
@@ -412,6 +415,16 @@ export default function Inventory({ role='staff', userName='' }) {
     setRestockDate(todayISO());   // default to today; staff can change the date
     setShowRestock(true);
   };
+  // Top-level Restock button — no item chosen yet; staff picks from the dropdown
+  const openRestockPicker=()=>{
+    if(!accessToken) return;
+    setRestockItem(null);
+    setRestockQty('');
+    setRestockNote('');
+    setRestockPrice('');
+    setRestockDate(todayISO());
+    setShowRestock(true);
+  };
   const handleRestock=async()=>{
     if(!restockItem||!restockQty||Number(restockQty)<=0) return;
     if(!restockDate) return;
@@ -527,6 +540,14 @@ export default function Inventory({ role='staff', userName='' }) {
           title={!accessToken ? 'Connect Google first' : ''}
         >
           {!accessToken ? IC.lock : IC.camera} Receipt
+        </button>
+        <button
+          style={accessToken ? s.restockTopBtn : s.restockTopOff}
+          onClick={openRestockPicker}
+          disabled={!accessToken}
+          title={!accessToken ? 'Connect Google first' : ''}
+        >
+          {!accessToken ? IC.lock : IC.upload} Restock
         </button>
       </div>
       {/* Lock notice when not connected */}
@@ -683,49 +704,66 @@ export default function Inventory({ role='staff', userName='' }) {
         </div>
       )}
       {/* RESTOCK MODAL */}
-      {showRestock&&restockItem&&(
+      {showRestock&&(
         <div style={s.modal} onClick={()=>setShowRestock(false)}>
           <div style={s.modalCard} onClick={e=>e.stopPropagation()}>
             <div style={s.modalTitle}>{IC.restockLg} Restock Item</div>
-            {/* Auto-filled item info: Items, CODE, Group Category, Unit */}
-            <div style={s.infoBox}>
-              <div style={{fontSize:14,fontWeight:600,color:C.ink,marginBottom:6,display:'flex',alignItems:'center',gap:6}}>
-                {restockItem.name}{restockItem.code&&<span style={s.codePill}>#{restockItem.code}</span>}
-              </div>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                <span style={{fontSize:12,color:C.muted}}>Current: <b style={{color:C.ink}}>{restockItem.quantity} {restockItem.unit}</b></span>
-                <span style={s.badge(getStatus(restockItem.quantity,restockItem.threshold))}>{STATUS_CONFIG[getStatus(restockItem.quantity,restockItem.threshold)].label}</span>
-              </div>
-              <div style={{fontSize:11,color:C.muted,marginTop:6}}>
-                Category: <b style={{color:C.ink}}>{restockItem.category}</b> · Unit: <b style={{color:C.ink}}>{restockItem.unit}</b>
-              </div>
-            </div>
-            {/* Date Acquired — manual date picker */}
-            <label style={s.label}>Date Acquired</label>
-            <input style={s.input} type="date" value={restockDate} onChange={e=>setRestockDate(e.target.value)}/>
-            {/* Quantity + Retail Price */}
-            <div style={s.row2}>
-              <div>
-                <label style={s.label}>Quantity ({restockItem.unit})</label>
-                <input style={s.input} type="number" placeholder={`Add in ${restockItem.unit}`} value={restockQty} onChange={e=>setRestockQty(e.target.value)} autoFocus/>
-              </div>
-              <div>
-                <label style={s.label}>Retail Price (₱)</label>
-                <input style={s.input} type="number" placeholder="e.g. 1250" value={restockPrice} onChange={e=>setRestockPrice(e.target.value)}/>
-              </div>
-            </div>
-            {/* New total preview (stock will increase) */}
-            {restockQty&&Number(restockQty)>0&&(
-              <div style={s.prevBox}>{IC.check}<span style={{color:C.muted}}>New total:</span><b style={{color:C.green,fontSize:15}}>{(restockItem.quantity||0)+Number(restockQty)} {restockItem.unit}</b><span style={{color:C.muted,fontSize:11}}>(+{restockQty})</span></div>
+            {/* Item picker — choose by name only; code/category/unit auto-fill */}
+            <label style={s.label}>Select Item</label>
+            <select
+              style={s.input}
+              value={restockItem?.id||''}
+              onChange={e=>{ const it=items.find(i=>i.id===e.target.value)||null; setRestockItem(it); }}
+            >
+              <option value="" disabled>Select item name…</option>
+              {[...items].sort((a,b)=>(a.name||'').localeCompare(b.name||'')).map(i=>(
+                <option key={i.id} value={i.id}>{i.name}</option>
+              ))}
+            </select>
+            {!restockItem && (
+              <div style={{...s.notice}}>Pumili muna ng item sa taas. Auto-fill ang code, category, at unit.</div>
             )}
-            {/* Comments */}
-            <label style={s.label}>Comments (optional)</label>
-            <input style={s.input} placeholder="e.g. New delivery from supplier" value={restockNote} onChange={e=>setRestockNote(e.target.value)}/>
-            {/* Encoded By — auto-filled */}
-            <div style={{...s.infoBox,marginBottom:14}}>
-              <div style={{fontSize:11,color:C.muted}}>Encoded by: <b style={{color:C.terra}}>{resolvedName}</b> · Code: <b style={{color:C.ink}}>#{restockItem.code||'—'}</b></div>
-            </div>
-            <button style={s.saveBtn} onClick={handleRestock} disabled={syncing||!restockQty||Number(restockQty)<=0||!restockDate}>{syncing?'Saving…':'Confirm Restock'}</button>
+            {restockItem && (<>
+              {/* Auto-filled item info: Items, CODE, Group Category, Unit */}
+              <div style={s.infoBox}>
+                <div style={{fontSize:14,fontWeight:600,color:C.ink,marginBottom:6,display:'flex',alignItems:'center',gap:6}}>
+                  {restockItem.name}{restockItem.code&&<span style={s.codePill}>#{restockItem.code}</span>}
+                </div>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                  <span style={{fontSize:12,color:C.muted}}>Current: <b style={{color:C.ink}}>{restockItem.quantity} {restockItem.unit}</b></span>
+                  <span style={s.badge(getStatus(restockItem.quantity,restockItem.threshold))}>{STATUS_CONFIG[getStatus(restockItem.quantity,restockItem.threshold)].label}</span>
+                </div>
+                <div style={{fontSize:11,color:C.muted,marginTop:6}}>
+                  Category: <b style={{color:C.ink}}>{restockItem.category}</b> · Unit: <b style={{color:C.ink}}>{restockItem.unit}</b>
+                </div>
+              </div>
+              {/* Date Acquired — manual date picker */}
+              <label style={s.label}>Date Acquired</label>
+              <input style={s.input} type="date" value={restockDate} onChange={e=>setRestockDate(e.target.value)}/>
+              {/* Quantity + Retail Price */}
+              <div style={s.row2}>
+                <div>
+                  <label style={s.label}>Quantity ({restockItem.unit})</label>
+                  <input style={s.input} type="number" placeholder={`Add in ${restockItem.unit}`} value={restockQty} onChange={e=>setRestockQty(e.target.value)} autoFocus/>
+                </div>
+                <div>
+                  <label style={s.label}>Retail Price (₱)</label>
+                  <input style={s.input} type="number" placeholder="e.g. 1250" value={restockPrice} onChange={e=>setRestockPrice(e.target.value)}/>
+                </div>
+              </div>
+              {/* New total preview (stock will increase) */}
+              {restockQty&&Number(restockQty)>0&&(
+                <div style={s.prevBox}>{IC.check}<span style={{color:C.muted}}>New total:</span><b style={{color:C.green,fontSize:15}}>{(restockItem.quantity||0)+Number(restockQty)} {restockItem.unit}</b><span style={{color:C.muted,fontSize:11}}>(+{restockQty})</span></div>
+              )}
+              {/* Comments */}
+              <label style={s.label}>Comments (optional)</label>
+              <input style={s.input} placeholder="e.g. New delivery from supplier" value={restockNote} onChange={e=>setRestockNote(e.target.value)}/>
+              {/* Encoded By — auto-filled */}
+              <div style={{...s.infoBox,marginBottom:14}}>
+                <div style={{fontSize:11,color:C.muted}}>Encoded by: <b style={{color:C.terra}}>{resolvedName}</b> · Code: <b style={{color:C.ink}}>#{restockItem.code||'—'}</b></div>
+              </div>
+            </>)}
+            <button style={s.saveBtn} onClick={handleRestock} disabled={syncing||!restockItem||!restockQty||Number(restockQty)<=0||!restockDate}>{syncing?'Saving…':'Confirm Restock'}</button>
             <button style={s.cancelBtn} onClick={()=>setShowRestock(false)}>Cancel</button>
           </div>
         </div>
