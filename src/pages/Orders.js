@@ -87,6 +87,7 @@ const MENU_GROUPS = [
   ]},
   { id: 'snacks', label: 'Snacks', items: [
     { name: 'CHEESE BURGER',   regular: 50  },
+    { name: 'SIOMAI',   regular: 50  },
     { name: 'ONYX BURGER',     regular: 150 },
     { name: 'NACHOS',          regular: 130 },
     { name: 'FRIES - BBQ',     regular: 30  },
