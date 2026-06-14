@@ -10,6 +10,7 @@ const PRODUCT_COLORS = ['#e07b39','#6b3a1f','#d4a853','#c8956c','#1a0a00','#a052
 const SHEET_ID_STOCK   = '1Gnr_6SBcUBY4GcDqvGpTUZgE8NI3OIZAzlusG5YPfQg';   // Stock Checks (has "Capital Cost" tab)
 const TAB_CAPITAL      = 'Capital Cost';
 const SHEET_ID_ORDERS  = '1yadv9UgY8mFQzSwLsw3Qk3EepZeLL8dNl3YRtYsGZQU';   // Order Summary (sales)
+const TAB_ORDERS       = 'Sheet1';                                          // same tab the Orders app writes to
 const GOOGLE_CLIENT_ID = '596322682185-n5hm66hvol3nnqqllnuop995kcnefbgu.apps.googleusercontent.com';
 const SCOPES           = 'https://www.googleapis.com/auth/spreadsheets.readonly';
 
@@ -226,17 +227,26 @@ export default function Reports({ role = 'staff', userName = '' }) {
   const doSync = async () => {
     if (!accessToken) return;
     setSyncing(true);
+    let okCost = false, okOrders = false;
+    // Capital Cost (independent — a failure here must not block sales)
     try {
-      const [capRows, ordRows] = await Promise.all([
-        sheetValues(accessToken, SHEET_ID_STOCK, `${TAB_CAPITAL}!A:G`),
-        sheetValues(accessToken, SHEET_ID_ORDERS, 'A:J'),
-      ]);
+      const capRows = await sheetValues(accessToken, SHEET_ID_STOCK, `${TAB_CAPITAL}!A:G`);
       setSheetCost(parseCapitalCost(capRows));
+      okCost = true;
+    } catch (e) { console.error('Reports capital-cost sync:', e); }
+    // Sales from Order Summary (independent)
+    try {
+      const ordRows = await sheetValues(accessToken, SHEET_ID_ORDERS, `${TAB_ORDERS}!A:J`);
       const parsed = parseOrders(ordRows).filter(o => o.createdAt.toDate() >= REPORT_START);
       setSheetOrders(parsed);
-    } catch (e) {
-      console.error('Reports sync:', e);
+      okOrders = true;
+    } catch (e) { console.error('Reports sales sync:', e); }
+    if (!okOrders && !okCost) {
       alert('Could not sync the sheets. Make sure you are connected to Google, then try again.');
+    } else if (!okOrders) {
+      alert('Capital Cost synced, but could not read the Order Summary (sales) sheet. Check access to that sheet, then Sync again.');
+    } else if (!okCost) {
+      alert('Sales synced, but could not read the Capital Cost tab. Check the "Capital Cost" tab, then Sync again.');
     }
     setSyncing(false);
   };
