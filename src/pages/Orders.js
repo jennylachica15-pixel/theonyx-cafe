@@ -1,16 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../firebase/config';
 import { collection, onSnapshot, addDoc, serverTimestamp, query, orderBy, updateDoc, doc } from 'firebase/firestore';
-
 const GOOGLE_CLIENT_ID = '596322682185-n5hm66hvol3nnqqllnuop995kcnefbgu.apps.googleusercontent.com';
 const SALES_SHEET_ID = '1yadv9UgY8mFQzSwLsw3Qk3EepZeLL8dNl3YRtYsGZQU';
+const SALES_SHEET_TAB = 'Sheet1';
 const RECEIPT_FOLDER_ID = '16FGEhlHtHObYC0pBg0jfphsNxksdWF1m';
 const SCOPES = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file';
-
 const PAYMENT_METHODS = ['Cash', 'GCash', 'Maya', 'Card'];
 const SIZES = ['mini', 'classic', 'upgrade', 'regular'];
 const SIZE_LABELS = { mini: 'Mini', classic: 'Classic', upgrade: 'Upgrade', regular: 'Regular' };
-
 const MENU_GROUPS = [
   { id: 'espresso', label: 'Espresso based', items: [
     { name: 'COFFEE LATTE',          mini: 75,  classic: 85,  upgrade: 95  },
@@ -100,7 +98,6 @@ const MENU_GROUPS = [
     { name: 'RICE',         regular: 15 },
   ]},
 ];
-
 const C = {
   ink: '#3a2613', gold: '#b07d35', goldDeep: '#8a6320', muted: '#9c7f5e',
   cream: '#fbf6ef', card: '#f4e9d8', cardBorder: '#e6d6c0',
@@ -111,7 +108,6 @@ const C = {
   white: '#fff', input: '#fbf6ef', inputBorder: '#e3d0b4',
   selectedBg: '#edf7e4', selectedBorder: '#8bc34a',
 };
-
 const s = {
   page: { padding: '16px 16px 0', animation: 'fadeIn 0.3s ease' },
   title: { fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: C.ink, marginBottom: 4 },
@@ -151,6 +147,7 @@ const s = {
   total: { display: 'flex', justifyContent: 'space-between', padding: '11px 0 4px', fontWeight: 700, fontSize: 17, color: C.ink },
   primaryBtn: { width: '100%', padding: '13px', borderRadius: 11, background: C.gold, color: '#fff', fontSize: 14, fontWeight: 700, border: 'none', cursor: 'pointer', marginTop: 10 },
   darkBtn: { width: '100%', padding: '13px', borderRadius: 11, background: C.darker, color: C.goldBright, fontSize: 14, fontWeight: 700, border: 'none', cursor: 'pointer', marginTop: 8 },
+  syncMissingBtn: { width: '100%', padding: '10px', borderRadius: 10, background: C.pill, color: C.goldDeep, fontSize: 12.5, fontWeight: 700, border: `0.5px solid ${C.pillBorder}`, cursor: 'pointer', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 },
   modal: { position: 'fixed', inset: 0, background: 'rgba(26,10,0,0.6)', zIndex: 300, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' },
   modalCard: { background: C.cream, borderRadius: '20px 20px 0 0', padding: '26px 22px 38px', width: '100%', maxWidth: 480, animation: 'slideUp 0.3s ease', maxHeight: '90vh', overflowY: 'auto' },
   modalTitle: { fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700, color: C.ink, marginBottom: 16, textAlign: 'center' },
@@ -179,7 +176,6 @@ const s = {
   completeOverlay: { position: 'fixed', inset: 0, background: 'rgba(26,10,0,0.65)', zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center' },
   completeCard: { background: C.cream, borderRadius: 24, padding: '36px 28px 28px', textAlign: 'center', width: 280, animation: 'popIn 0.4s cubic-bezier(.34,1.56,.64,1)' },
 };
-
 const Chev = ({ open }) => (
   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={C.gold} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}><polyline points="6 9 12 15 18 9" /></svg>
 );
@@ -201,11 +197,19 @@ const TrashIcon = () => (
 const LinkIcon = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={C.goldBright} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
 );
-
 const tsToDate = (ts) => (ts && ts.toDate ? ts.toDate() : (ts instanceof Date ? ts : null));
 const fmtTime12 = (d) => (d ? d.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' }) : '—');
 const fmtDateLabel = (d) => (d ? d.toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric' }) : 'Today');
-
+// Parse a sheet row's date + time back into a JS Date (for the backfill "last synced" check)
+const parseSheetDateTime = (dateStr, timeStr) => {
+  const dm = String(dateStr || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  if (!dm) return null;
+  let yr = Number(dm[3]); if (yr < 100) yr += 2000;
+  let h = 0, mi = 0;
+  const tm = String(timeStr || '').match(/(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(am|pm)?/i);
+  if (tm) { h = Number(tm[1]) % 12; if (tm[4] && /pm/i.test(tm[4])) h += 12; mi = Number(tm[2]); }
+  return new Date(yr, Number(dm[1]) - 1, Number(dm[2]), h, mi);
+};
 export default function Orders({ userName }) {
   const [tab, setTab] = useState(1);
   const [openGroup, setOpenGroup] = useState(null);
@@ -219,7 +223,6 @@ export default function Orders({ userName }) {
   const [completedOrder, setCompletedOrder] = useState(null);
   const [accessToken, setAccessToken] = useState(null);
   const tokenClientRef = React.useRef(null);
-
   const [allOrders, setAllOrders] = useState([]);
   const [expandedId, setExpandedId] = useState(null);
   const [editingKey, setEditingKey] = useState(null);
@@ -230,7 +233,7 @@ export default function Orders({ userName }) {
   const [removingId, setRemovingId] = useState(null);
   const [removeReason, setRemoveReason] = useState('');
   const [removeSaving, setRemoveSaving] = useState(false);
-
+  const [backfilling, setBackfilling] = useState(false);
   // inject keyframe animation once
   useEffect(() => {
     const id = 'order-complete-keyframes';
@@ -247,7 +250,6 @@ export default function Orders({ userName }) {
       document.head.appendChild(style);
     }
   }, []);
-
   useEffect(() => {
     const script = document.createElement('script');
     script.src = 'https://accounts.google.com/gsi/client';
@@ -262,20 +264,17 @@ export default function Orders({ userName }) {
     document.body.appendChild(script);
     return () => document.body.removeChild(script);
   }, []);
-
   useEffect(() => {
     const unsub = onSnapshot(query(collection(db, 'orders'), orderBy('createdAt', 'desc')), snap => {
       setAllOrders(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
     return () => unsub();
   }, []);
-
   const isSelected = (itemName, size) => order.some(o => o.key === `${itemName}_${size}`);
   const getQty = (itemName, size) => {
     const found = order.find(o => o.key === `${itemName}_${size}`);
     return found ? found.qty : 0;
   };
-
   const addToOrder = (item, size) => {
     const price = item[size];
     if (!price) return;
@@ -286,11 +285,9 @@ export default function Orders({ userName }) {
       return [...prev, { key, name: item.name, size: SIZE_LABELS[size], price, qty: 1 }];
     });
   };
-
   const handlePillTap = (item, size) => {
     addToOrder(item, size);
   };
-
   // (-) inside pill: decrement, removes from order panel too when hits 0
   const handlePillMinus = (e, item, size) => {
     e.stopPropagation();
@@ -300,7 +297,6 @@ export default function Orders({ userName }) {
       return updated.filter(o => o.qty > 0);
     });
   };
-
   const updateQty = (key, delta) => {
     setOrder(prev => {
       const updated = prev.map(o => o.key === key ? { ...o, qty: Math.max(0, o.qty + delta) } : o);
@@ -309,13 +305,11 @@ export default function Orders({ userName }) {
   };
   const removeItem = (key) => setOrder(prev => prev.filter(o => o.key !== key));
   const total = order.reduce((sum, o) => sum + o.price * o.qty, 0);
-
   const now = new Date();
   const cashier = userName || auth.currentUser?.email?.split('@')[0] || 'Staff';
   const dateStr = now.toLocaleDateString('en-PH', { month: '2-digit', day: '2-digit', year: '2-digit' });
   const timeStr = now.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' });
   const pdfName = `${dateStr.replace(/\//g, '-')}-${timeStr.replace(/:/g, '-')}-${cashier}`;
-
   const generateReceiptHTML = () => `
     <html><head><style>
       body { font-family: 'Times New Roman', serif; max-width: 320px; margin: 0 auto; padding: 20px; }
@@ -342,17 +336,17 @@ export default function Orders({ userName }) {
       <div class="footer">Thank you for visiting Theonyx Cafe!<br/>Follow us @theonyx.cafe</div>
     </body></html>
   `;
-
+  // Returns true only when the sheet actually accepted the rows
   const appendToSheet = async (rows) => {
-    if (!accessToken) return;
+    if (!accessToken) return false;
     try {
-      await fetch(
-        `https://sheets.googleapis.com/v4/spreadsheets/${SALES_SHEET_ID}/values/Sheet1!A:J:append?valueInputOption=USER_ENTERED`,
+      const res = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${SALES_SHEET_ID}/values/${SALES_SHEET_TAB}!A:J:append?valueInputOption=USER_ENTERED`,
         { method: 'POST', headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ values: rows }) }
       );
-    } catch (e) { console.error('Sheet append error:', e); }
+      return res.ok;
+    } catch (e) { console.error('Sheet append error:', e); return false; }
   };
-
   const saveOrder = async () => {
     setSaving(true);
     // snapshot before clearing
@@ -361,18 +355,28 @@ export default function Orders({ userName }) {
     const savedItemCount = order.reduce((sum, o) => sum + o.qty, 0);
     const savedCashier = cashier;
     try {
-      await addDoc(collection(db, 'orders'), {
+      // Always save to Firestore first (source of truth) with a sheet-sync flag
+      const ref = await addDoc(collection(db, 'orders'), {
         items: order, total, buyerName, paymentMethod, notes,
-        cashier, hidden: false, createdAt: serverTimestamp(),
+        cashier, hidden: false, syncedToSheet: false, createdAt: serverTimestamp(),
       });
+      let sheetOk = false;
       if (accessToken) {
         const rows = order.map(o => [dateStr, timeStr, buyerName || 'Walk-in', o.name, o.size, o.qty, o.price, o.price * o.qty, paymentMethod, cashier]);
-        await appendToSheet(rows);
-        const blob = new Blob([generateReceiptHTML()], { type: 'text/html' });
-        const form = new FormData();
-        form.append('metadata', new Blob([JSON.stringify({ name: `${pdfName}.html`, parents: [RECEIPT_FOLDER_ID], mimeType: 'text/html' })], { type: 'application/json' }));
-        form.append('file', blob);
-        await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', { method: 'POST', headers: { Authorization: `Bearer ${accessToken}` }, body: form });
+        sheetOk = await appendToSheet(rows);
+        try {
+          const blob = new Blob([generateReceiptHTML()], { type: 'text/html' });
+          const form = new FormData();
+          form.append('metadata', new Blob([JSON.stringify({ name: `${pdfName}.html`, parents: [RECEIPT_FOLDER_ID], mimeType: 'text/html' })], { type: 'application/json' }));
+          form.append('file', blob);
+          await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', { method: 'POST', headers: { Authorization: `Bearer ${accessToken}` }, body: form });
+        } catch (e) { console.error('Receipt upload error:', e); }
+      }
+      // Record whether the sheet actually got it; if not, the backfill button can recover it
+      try { await updateDoc(doc(db, 'orders', ref.id), { syncedToSheet: sheetOk }); } catch (e) {}
+      if (!sheetOk) {
+        // Let the cashier know it's safe in the app but not yet in the sheet
+        alert('Order saved in the app, but it did NOT reach the Google Sheet (connection/token issue). Use "Sync missing orders to Sheet" to recover it.');
       }
       // clear order first, then show the big popup
       setOrder([]); setBuyerName(''); setNotes(''); setShowPreview(false);
@@ -380,14 +384,70 @@ export default function Orders({ userName }) {
     } catch (e) { console.error(e); }
     setSaving(false);
   };
-
+  // ── Recover orders that are in the app but never reached the sheet ──
+  // Reads the sheet, finds the latest datetime present, and appends every
+  // non-hidden order created AFTER that — so nothing is duplicated.
+  const backfillMissing = async () => {
+    if (!accessToken) { alert('Connect Google first, then try again.'); return; }
+    setBackfilling(true);
+    try {
+      const res = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${SALES_SHEET_ID}/values/${SALES_SHEET_TAB}!A:J`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      if (!res.ok) throw new Error('read ' + res.status);
+      const data = await res.json();
+      const rows = data.values || [];
+      let header = -1, maxTime = 0;
+      for (let i = 0; i < rows.length; i++) {
+        const low = (rows[i] || []).map(x => String(x || '').trim().toLowerCase());
+        if (header === -1 && low.includes('date') && low.includes('item')) { header = i; continue; }
+        if (header === -1) continue;
+        const dt = parseSheetDateTime((rows[i] || [])[0], (rows[i] || [])[1]);
+        if (dt && !isNaN(dt.getTime())) maxTime = Math.max(maxTime, dt.getTime());
+      }
+      if (!maxTime) {
+        alert('Could not read the last recorded row from the sheet, so backfill was stopped to avoid duplicates. Please check the sheet and try again.');
+        setBackfilling(false); return;
+      }
+      const missing = allOrders
+        .filter(o => !o.hidden && o.createdAt?.toDate && o.createdAt.toDate().getTime() > maxTime)
+        .sort((a, b) => a.createdAt.toDate() - b.createdAt.toDate());
+      if (missing.length === 0) {
+        alert('No missing orders — the sheet is already up to date.');
+        setBackfilling(false); return;
+      }
+      const out = [];
+      missing.forEach(o => {
+        const d = o.createdAt.toDate();
+        const ds = d.toLocaleDateString('en-PH', { month: '2-digit', day: '2-digit', year: '2-digit' });
+        const ts = d.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' });
+        (o.items || []).forEach(it => out.push([
+          ds, ts, o.buyerName || 'Walk-in', it.name, it.size || '',
+          it.qty, it.price, (it.price || 0) * (it.qty || 0), o.paymentMethod || '', o.cashier || ''
+        ]));
+      });
+      const ok = await appendToSheet(out);
+      if (ok) {
+        for (const o of missing) { try { await updateDoc(doc(db, 'orders', o.id), { syncedToSheet: true }); } catch (e) {} }
+        alert(`Recovered ${missing.length} order(s) → ${out.length} row(s) added to the sheet.`);
+      } else {
+        alert('Could not write to the sheet. Please reconnect Google and try again.');
+      }
+    } catch (e) {
+      console.error('Backfill error:', e);
+      alert('Backfill failed. Please reconnect Google and try again.');
+    }
+    setBackfilling(false);
+  };
   const dismissComplete = () => setCompletedOrder(null);
-
   const startToday = new Date(); startToday.setHours(0, 0, 0, 0);
   const startYesterday = new Date(startToday); startYesterday.setDate(startToday.getDate() - 1);
   const inWindow = (o, start) => { const d = tsToDate(o.createdAt); return d ? d >= start : true; };
   const todayList = allOrders.filter(o => !o.hidden && inWindow(o, startYesterday));
   const summaryList = allOrders.filter(o => !o.hidden && inWindow(o, startToday));
+  // Count of orders saved in the app but not yet confirmed in the sheet
+  const unsyncedCount = allOrders.filter(o => !o.hidden && o.syncedToSheet === false).length;
   const groups = [];
   todayList.forEach(o => {
     const d = tsToDate(o.createdAt);
@@ -404,9 +464,7 @@ export default function Orders({ userName }) {
   const tallyArr = Object.entries(tally).map(([name, qty]) => ({ name, qty })).sort((a, b) => b.qty - a.qty);
   const maxQty = tallyArr.length ? tallyArr[0].qty : 1;
   const totalOrders = summaryList.length;
-
   const startEdit = (orderId, idx, qty) => { setRemovingId(null); setEditingKey(`${orderId}_${idx}`); setEditQty(String(qty)); setEditReason(''); setEditErr(false); };
-
   const saveEdit = async (orderId, idx) => {
     if (!editReason.trim()) { setEditErr(true); return; }
     setEditSaving(true);
@@ -437,7 +495,6 @@ export default function Orders({ userName }) {
     } catch (e) { console.error('Edit error:', e); }
     setEditSaving(false);
   };
-
   const removeOrder = async (orderId) => {
     setRemoveSaving(true);
     try {
@@ -454,7 +511,6 @@ export default function Orders({ userName }) {
     } catch (e) { console.error('Remove error:', e); }
     setRemoveSaving(false);
   };
-
   return (
     <div style={s.page}>
       <div style={s.title}>Orders</div>
@@ -468,7 +524,6 @@ export default function Orders({ userName }) {
         <button style={s.tab(tab === 2)} onClick={() => setTab(2)}>Today's orders</button>
         <button style={s.tab(tab === 3)} onClick={() => setTab(3)}>Summary</button>
       </div>
-
       {tab === 1 && (
         <>
           {!accessToken ? (
@@ -492,14 +547,16 @@ export default function Orders({ userName }) {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.green} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                 Connected — orders sync to Sheets & Drive
               </div>
-
+              {/* Recover orders saved in the app but missing from the sheet */}
+              <button style={s.syncMissingBtn} onClick={backfillMissing} disabled={backfilling}>
+                <LinkIcon /> {backfilling ? 'Syncing missing orders…' : `Sync missing orders to Sheet${unsyncedCount > 0 ? ` (${unsyncedCount})` : ''}`}
+              </button>
               <label style={s.label}>Buyer name (optional)</label>
               <input style={s.input} placeholder="Customer name..." value={buyerName} onChange={e => setBuyerName(e.target.value)} />
               <label style={s.label}>Payment method</label>
               <select style={s.input} value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)}>
                 {PAYMENT_METHODS.map(m => <option key={m}>{m}</option>)}
               </select>
-
               {MENU_GROUPS.map(group => (
                 <div key={group.id} style={s.groupCard}>
                   <div style={s.groupHeader} onClick={() => setOpenGroup(openGroup === group.id ? null : group.id)}>
@@ -555,7 +612,6 @@ export default function Orders({ userName }) {
                   })}
                 </div>
               ))}
-
               {order.length > 0 && (
                 <div style={s.orderPanel}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -587,7 +643,6 @@ export default function Orders({ userName }) {
           )}
         </>
       )}
-
       {tab === 2 && (
         <>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
@@ -607,7 +662,7 @@ export default function Orders({ userName }) {
                       <div style={s.ohead} onClick={() => { setExpandedId(expanded ? null : o.id); setEditingKey(null); setRemovingId(null); }}>
                         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
                           <div style={{ flex: 1 }}>
-                            <div style={s.custName}><UserIcon /> {o.buyerName || 'Walk-in'}</div>
+                            <div style={s.custName}><UserIcon /> {o.buyerName || 'Walk-in'}{o.syncedToSheet === false && <span style={{ fontSize: 9, color: C.red, background: C.redBg, border: `0.5px solid ${C.redBorder}`, borderRadius: 6, padding: '1px 6px', marginLeft: 4 }}>not in sheet</span>}</div>
                             <div style={s.metaLine}>{fmtDateLabel(o._date)} · {fmtTime12(o._date)} · Cashier: {o.cashier}</div>
                             <div style={s.metaLine}>{items.length} item{items.length !== 1 ? 's' : ''} · {summary}</div>
                           </div>
@@ -674,7 +729,6 @@ export default function Orders({ userName }) {
           }
         </>
       )}
-
       {tab === 3 && (
         <>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
@@ -702,7 +756,6 @@ export default function Orders({ userName }) {
           }
         </>
       )}
-
       {showPreview && (
         <div style={s.modal} onClick={() => setShowPreview(false)}>
           <div style={s.modalCard} onClick={e => e.stopPropagation()}>
@@ -733,7 +786,6 @@ export default function Orders({ userName }) {
           </div>
         </div>
       )}
-
       {/* ── ORDER COMPLETE POPUP ── */}
       {completedOrder && (
         <div style={s.completeOverlay} onClick={dismissComplete}>
@@ -756,7 +808,6 @@ export default function Orders({ userName }) {
           </div>
         </div>
       )}
-
       <div style={{ height: 100 }} />
     </div>
   );
