@@ -35,7 +35,7 @@ function isAfterReportStart(date) {
 // CAPITAL COST per menu item — DEFAULT/fallback values.
 // When connected to Google, the live "Capital Cost" tab is merged
 // over these (sheet wins). Items not found anywhere appear under
-// "Walang capital cost pa" so you can add them in the sheet.
+// "No capital cost yet" so you can add them in the sheet.
 // ─────────────────────────────────────────────────────────────
 const CAPITAL_COST = {
   'COFFEE LATTE': 30, 'AMERICANO': 14.28, 'BREWED': 14.28, 'ESPRESSO SHOT': 11.55,
@@ -167,7 +167,25 @@ const s = {
   rank: { width: 22, height: 22, borderRadius: '50%', background: 'var(--brown-dark)', color: 'var(--gold-light)', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   closeBtn: { width: 28, height: 28, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', fontSize: 16, fontWeight: 700, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' },
 };
-export default function Reports() {
+export default function Reports({ role = 'staff', userName = '' }) {
+  // Managers only — staff cannot see sales/revenue
+  const isManager = String(role || '').trim().toLowerCase() === 'manager';
+  if (!isManager) {
+    return (
+      <div style={s.page}>
+        <div style={s.title}>Reports</div>
+        <div style={s.sub}>Sales overview</div>
+        <div style={s.card}>
+          <div style={{ textAlign: 'center', padding: '28px 8px' }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--brown-dark)', marginBottom: 6 }}>Managers only</div>
+            <div style={{ fontSize: 13, lineHeight: 1.5, color: 'var(--brown-light)' }}>
+              This report (sales and revenue) is available to managers only. Please ask a manager for access.
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
   const [fsOrders, setFsOrders] = useState([]);       // fallback: Firestore orders
   const [sheetOrders, setSheetOrders] = useState(null); // live: Order Summary sheet
   const [sheetCost, setSheetCost] = useState(null);     // live: Capital Cost tab
@@ -218,7 +236,7 @@ export default function Reports() {
       setSheetOrders(parsed);
     } catch (e) {
       console.error('Reports sync:', e);
-      alert('Hindi ma-sync ang sheets. Tiyakin na naka-connect sa Google at subukan ulit.');
+      alert('Could not sync the sheets. Make sure you are connected to Google, then try again.');
     }
     setSyncing(false);
   };
@@ -402,8 +420,8 @@ export default function Reports() {
           </div>
         </div>
         <div style={{ fontSize: 11, color: 'var(--brown-light)', lineHeight: 1.5, marginBottom: 8 }}>
-          Net Revenue = benta ng mga item na may capital cost ({peso(profitAll.matched)}) minus ang capital cost nito.
-          {' '}{coverageAll}% ng kabuuang benta ang may nakatakdang cost.
+          Net Revenue = sales of items that have a capital cost ({peso(profitAll.matched)}) minus their capital cost.
+          {' '}{coverageAll}% of total sales currently has a cost set.
         </div>
         {/* Per-period net revenue */}
         {[['Today', profitToday], ['This Week', profitWeek], ['This Month', profitMonth]].map(([lbl, p]) => (
@@ -417,7 +435,7 @@ export default function Reports() {
         {uncostedAll.length > 0 && (
           <div style={{ marginTop: 12 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--brown-light)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
-              Walang capital cost pa ({uncostedAll.length})
+              No capital cost yet ({uncostedAll.length})
             </div>
             {uncostedAll.slice(0, 8).map(([name, sales]) => (
               <div key={name} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--brown-light)', padding: '3px 0' }}>
@@ -426,7 +444,7 @@ export default function Reports() {
               </div>
             ))}
             <div style={{ fontSize: 10, color: 'var(--brown-light)', marginTop: 6, fontStyle: 'italic' }}>
-              Idagdag ang cost ng mga ito sa "Capital Cost" tab — auto-update pagka-Sync.
+              Add their cost in the "Capital Cost" tab — it updates automatically when you Sync.
             </div>
           </div>
         )}
