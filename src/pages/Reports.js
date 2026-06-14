@@ -11,6 +11,8 @@ const SHEET_ID_STOCK   = '1Gnr_6SBcUBY4GcDqvGpTUZgE8NI3OIZAzlusG5YPfQg';   // St
 const TAB_CAPITAL      = 'Capital Cost';
 const SHEET_ID_ORDERS  = '1yadv9UgY8mFQzSwLsw3Qk3EepZeLL8dNl3YRtYsGZQU';   // Order Summary (sales)
 const TAB_ORDERS       = 'Sheet1';                                          // same tab the Orders app writes to
+const OVERHEAD_GID     = 695906692;                                         // tab in Stock Checks that holds the monthly operating cost
+const OVERHEAD_FALLBACK = 29000;                                            // used if the sheet can't be read
 const GOOGLE_CLIENT_ID = '596322682185-n5hm66hvol3nnqqllnuop995kcnefbgu.apps.googleusercontent.com';
 const SCOPES           = 'https://www.googleapis.com/auth/spreadsheets.readonly';
 
@@ -89,6 +91,30 @@ async function sheetValues(token, sheetId, range) {
   );
   if (!r.ok) throw new Error('Sheets ' + r.status);
   return (await r.json()).values || [];
+}
+// List a spreadsheet's tabs (to find a tab by its gid / sheetId)
+async function sheetMeta(token, sheetId) {
+  const r = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}?fields=sheets.properties(sheetId,title)`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  if (!r.ok) throw new Error('Meta ' + r.status);
+  return (await r.json()).sheets || [];
+}
+// Find the monthly operating cost / overhead figure in a tab's rows
+function parseOverhead(rows) {
+  for (const row of (rows || [])) {
+    const cells = (row || []).map(x => String(x || ''));
+    const labelIdx = cells.findIndex(c => /operating cost|overhead|op cost/i.test(c));
+    if (labelIdx !== -1) {
+      for (let j = 0; j < cells.length; j++) {
+        if (j === labelIdx) continue;
+        const n = parseFloat(cells[j].replace(/[^0-9.]/g, ''));
+        if (!isNaN(n) && n > 0) return n;
+      }
+    }
+  }
+  return null;
 }
 // Capital Cost tab → { NORMALIZED MENU: cost }
 function parseCapitalCost(rows) {
@@ -190,6 +216,7 @@ export default function Reports({ role = 'staff', userName = '' }) {
   const [fsOrders, setFsOrders] = useState([]);       // fallback: Firestore orders
   const [sheetOrders, setSheetOrders] = useState(null); // live: Order Summary sheet
   const [sheetCost, setSheetCost] = useState(null);     // live: Capital Cost tab
+  const [overhead, setOverhead] = useState(null);       // live: monthly operating cost
   const [accessToken, setAccessToken] = useState(null);
   const [syncing, setSyncing] = useState(false);
   const [activeTab, setActiveTab] = useState('daily');
@@ -241,6 +268,16 @@ export default function Reports({ role = 'staff', userName = '' }) {
       setSheetOrders(parsed);
       okOrders = true;
     } catch (e) { console.error('Reports sales sync:', e); }
+    // Monthly overhead / operating cost (independent; found by gid)
+    try {
+      const sheets = await sheetMeta(accessToken, SHEET_ID_STOCK);
+      const target = sheets.find(sh => sh.properties && sh.properties.sheetId === OVERHEAD_GID);
+      if (target) {
+        const ohRows = await sheetValues(accessToken, SHEET_ID_STOCK, `${target.properties.title}!A:Z`);
+        const oh = parseOverhead(ohRows);
+        if (oh != null) setOverhead(oh);
+      }
+    } catch (e) { console.error('Reports overhead sync:', e); }
     if (!okOrders && !okCost) {
       alert('Could not sync the sheets. Make sure you are connected to Google, then try again.');
     } else if (!okOrders) {
@@ -346,6 +383,19 @@ export default function Reports({ role = 'staff', userName = '' }) {
   const m30start = new Date(now); m30start.setDate(now.getDate() - 29); m30start.setHours(0, 0, 0, 0);
   const monthlyRev = profitInRange(m30start, null);
   const marginOf = (p) => (p.matched > 0 ? Math.round((p.net / p.matched) * 100) : 0);
+  // ── Overhead, break-even & month-end projection (calendar month to date) ──
+  const overheadVal = overhead != null ? overhead : OVERHEAD_FALLBACK;
+  const monthStartCal = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthCalRev = profitInRange(monthStartCal, null);
+  const daysElapsed = Math.max(1, now.getDate());
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const netAfterOverhead = monthCalRev.net - overheadVal;       // gross profit so far minus full month's overhead
+  const marginRatio = monthCalRev.sales > 0 ? monthCalRev.net / monthCalRev.sales : 0;
+  const breakEvenSales = marginRatio > 0 ? overheadVal / marginRatio : 0;
+  const dailyTargetSales = breakEvenSales / daysInMonth;
+  const projSales = monthCalRev.sales / daysElapsed * daysInMonth;
+  const projNet = monthCalRev.net / daysElapsed * daysInMonth;  // projected gross profit
+  const projProfit = projNet - overheadVal;                     // projected profit after overhead
   // Top 10 products
   const productMap = {};
   orders.forEach(order => {
@@ -668,6 +718,34 @@ export default function Reports({ role = 'staff', userName = '' }) {
               <div style={s.statBox}><div style={s.statNum('var(--brown-mid)')}>{peso(monthlyRev.cost)}</div><div style={s.statLabel}>Capital Cost</div></div>
               <div style={s.statBox}><div style={s.statNum('var(--green-ok)')}>{peso(monthlyRev.net)}</div><div style={s.statLabel}>Net Revenue</div></div>
               <div style={s.statBox}><div style={s.statNum('var(--gold)')}>{marginOf(monthlyRev)}%</div><div style={s.statLabel}>Gross Margin</div></div>
+            </div>
+          </div>
+          {/* After overhead · this calendar month */}
+          <div style={{ marginTop: 14, borderTop: '1px solid #f0e4d8', paddingTop: 10 }}>
+            <div style={s.cardTitle}>After overhead · this month{overhead == null ? ' (default)' : ''}</div>
+            <div style={s.statGrid}>
+              <div style={s.statBox}><div style={s.statNum('var(--brown-dark)')}>{peso(monthCalRev.sales)}</div><div style={s.statLabel}>Sales (MTD)</div></div>
+              <div style={s.statBox}><div style={s.statNum('var(--brown-mid)')}>{peso(overheadVal)}</div><div style={s.statLabel}>Overhead / mo</div></div>
+              <div style={s.statBox}><div style={s.statNum('var(--green-ok)')}>{peso(monthCalRev.net)}</div><div style={s.statLabel}>Gross profit</div></div>
+              <div style={s.statBox}><div style={s.statNum(netAfterOverhead >= 0 ? 'var(--green-ok)' : '#a3402d')}>{peso(netAfterOverhead)}</div><div style={s.statLabel}>Net after overhead</div></div>
+            </div>
+            {/* Break-even */}
+            <div style={s.productRow}>
+              <div style={{ flex: 1, fontSize: 12, fontWeight: 600, color: 'var(--brown-dark)' }}>Break-even sales</div>
+              <div style={{ fontSize: 11, color: 'var(--brown-light)', marginRight: 10 }}>Daily {peso(dailyTargetSales)}</div>
+              <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--brown-dark)' }}>{peso(breakEvenSales)}</div>
+            </div>
+            {/* Month-end projection */}
+            <div style={s.productRow}>
+              <div style={{ flex: 1, fontSize: 12, fontWeight: 600, color: 'var(--brown-dark)' }}>Projected month-end</div>
+              <div style={{ fontSize: 11, color: 'var(--brown-light)', marginRight: 10 }}>Sales {peso(projSales)}</div>
+              <div style={{ fontSize: 12.5, fontWeight: 700, color: projProfit >= 0 ? 'var(--green-ok)' : '#a3402d' }}>{peso(projProfit)}</div>
+            </div>
+            <div style={{ fontSize: 11, color: projProfit >= 0 ? 'var(--green-ok)' : '#a3402d', fontWeight: 600, marginTop: 6 }}>
+              {projProfit >= 0 ? `On track — projected profit after overhead` : `Short by ${peso(-projProfit)} of covering overhead`}
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--brown-light)', marginTop: 6, fontStyle: 'italic', lineHeight: 1.5 }}>
+              Projection = current daily average × {daysInMonth} days. Profit is approximate while some items still have no capital cost.
             </div>
           </div>
         </div>
