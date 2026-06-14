@@ -4,7 +4,6 @@ import {
   collection, addDoc, updateDoc, deleteDoc,
   doc, onSnapshot, serverTimestamp, query, orderBy
 } from 'firebase/firestore';
-
 const SHEET_ID        = '1Gnr_6SBcUBY4GcDqvGpTUZgE8NI3OIZAzlusG5YPfQg';
 const TAB_ITEMS       = 'Available Items';
 const TAB_RESTOCK     = 'Restocking Data';
@@ -14,12 +13,10 @@ const GOOGLE_CLIENT_ID= '596322682185-n5hm66hvol3nnqqllnuop995kcnefbgu.apps.goog
 const SCOPES =
   'https://www.googleapis.com/auth/spreadsheets ' +
   'https://www.googleapis.com/auth/drive.file';
-
 const CATEGORIES = ['Beans & Coffee','Milk & Cream','Syrups','Food & Pastries','Cups & Packaging','Equipment','Other'];
 const UNITS      = ['kg','g','liters','ml','pcs','bottles','boxes','bags'];
 const STAFF_NAMES= ['Kelly','Maryz','Jenny','Aaron'];
 const SHEET_HEADERS = ['Code','Item','Category','Quantity','Unit','Status','Threshold','Last Restocked','Updated','Notes'];
-
 // ── Brown palette ──
 const C = {
   ink:      '#2a1000',
@@ -42,7 +39,6 @@ const C = {
   errBd:    '#f0c8c0',
   disabled: '#d4c4b0',
 };
-
 function getStatus(qty, threshold) {
   if (qty <= 0)             return 'out';
   if (qty <= threshold)     return 'low';
@@ -62,7 +58,6 @@ const RECEIPT_STATUS = {
   rejected: { label:'Rejected', bg:C.errBg,  color:C.err   },
 };
 const DEFAULT_FORM = { name:'', category:'Beans & Coffee', quantity:'', unit:'kg', threshold:'', notes:'' };
-
 // ── Icons ──
 const IC = {
   check:   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>,
@@ -79,7 +74,6 @@ const IC = {
   x:       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
   lock:    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>,
 };
-
 const CAT_SVG = {
   'Beans & Coffee':  { icon:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M17 8h1a4 4 0 0 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/><line x1="14" y1="2" x2="14" y2="4"/></svg>, bg:'#fbeede', color:C.warn },
   'Milk & Cream':    { icon:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M8 2h8l2 6H6L8 2z"/><path d="M6 8c0 8 2 12 6 12s6-4 6-12"/></svg>, bg:'#f0ebe4', color:C.terra },
@@ -89,7 +83,6 @@ const CAT_SVG = {
   'Equipment':       { icon:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>, bg:'#f0ebe4', color:C.muted },
   'Other':           { icon:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>, bg:'#f5ede2', color:C.muted },
 };
-
 // ── Styles ──
 const s = {
   page:       { padding:'16px 16px 0', fontFamily:"-apple-system,'SF Pro Display','Helvetica Neue',sans-serif" },
@@ -156,11 +149,16 @@ const s = {
   rejectBtn:  { flex:1, padding:'9px', borderRadius:10, background:C.errBg,   color:C.err,   fontSize:12.5, fontWeight:700, border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:5 },
   rcptDelBtn: { width:28, height:28, borderRadius:8, background:C.soft, color:C.err, border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 },
 };
-
 // ── Helpers ──
 function fmtDate() {
   const n = new Date();
   return n.toLocaleDateString('en-PH',{month:'2-digit',day:'2-digit',year:'2-digit'}) + ' ' + n.toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'});
+}
+// Today's date as YYYY-MM-DD (for the native <input type="date"> default)
+function todayISO() {
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 function genCode(existingItems) {
   const used = new Set(existingItems.filter(i=>i.code).map(i=>String(i.code)));
@@ -168,27 +166,23 @@ function genCode(existingItems) {
   do { code=String(Math.floor(1000+Math.random()*9000)); tries++; } while(used.has(code)&&tries<80);
   return code;
 }
-
 // ── Sheet API — 3 separate tabs ──
 const API = (token, tab) => ({
   base: `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}`,
   headers: { Authorization:`Bearer ${token}`, 'Content-Type':'application/json' },
   tab: encodeURIComponent(tab),
 });
-
 async function sheetGetTab(token, tab) {
   const a = API(token, tab);
   const r = await fetch(`${a.base}/values/${a.tab}!A:Z`, { headers:{ Authorization:`Bearer ${token}` } });
   return (await r.json()).values || [];
 }
-
 async function sheetAppend(token, tab, row) {
   const a = API(token, tab);
   return fetch(`${a.base}/values/${a.tab}!A:Z:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, {
     method:'POST', headers:a.headers, body:JSON.stringify({ values:[row] })
   });
 }
-
 async function sheetUpdateRow(token, tab, rowNum, row) {
   const a = API(token, tab);
   const cols = String.fromCharCode(64 + row.length);
@@ -196,7 +190,6 @@ async function sheetUpdateRow(token, tab, rowNum, row) {
     method:'PUT', headers:a.headers, body:JSON.stringify({ values:[row] })
   });
 }
-
 // Tab 1 — Available Items: upsert by Code ID (update in place or append new)
 // Columns: Code ID | Item | Category | Available Stock | Unit | Status | Threshold | Supplier | Encoded By | Date Encoded
 async function syncAvailableItem(token, item, encodedBy) {
@@ -219,28 +212,22 @@ async function syncAvailableItem(token, item, encodedBy) {
   if(idx===-1) await sheetAppend(token, TAB_ITEMS, row);
   else          await sheetUpdateRow(token, TAB_ITEMS, idx+1, row);
 }
-
 // Tab 2 — Restocking Data: always APPEND a new row (full restock log)
-// Columns: Code ID | Item | Category | Available Stock (before) | Unit | Restock Stock | Unit | Status After Restock | Threshold | Supplier | Restock Encoded By | Restock Date Encoded
-async function logRestock(token, item, added, newQty, encodedBy) {
-  const statusAfter = getStatus(newQty, item.threshold);
+// Columns: Date Acquired | Items | Quantity | Unit (if applicable) | Retail Price | Group Category | Encoded By | Comments | CODE
+async function logRestock(token, entry) {
   const row = [
-    String(item.code||''),
-    item.name||'',
-    item.category||'',
-    item.quantity??'',
-    item.unit||'',
-    added,
-    item.unit||'',
-    STATUS_CONFIG[statusAfter]?.label||statusAfter,
-    item.threshold??'',
-    item.notes||'',
-    encodedBy||'',
-    fmtDate(),
+    entry.dateAcquired || '',           // Date Acquired
+    entry.name || '',                   // Items
+    entry.quantity ?? '',               // Quantity
+    entry.unit || '',                   // Unit (if applicable)
+    entry.price ?? '',                  // Retail Price
+    entry.category || '',               // Group Category
+    entry.encodedBy || '',              // Encoded By
+    entry.comments || '',               // Comments
+    String(entry.code || ''),           // CODE
   ];
   await sheetAppend(token, TAB_RESTOCK, row);
 }
-
 // Tab 3 — Editing Data: always APPEND a new row (full edit log)
 // Columns: Code ID | Item | Category | Available Stock | Unit | Status | Threshold | Supplier | Edited By | Date Edited
 async function logEdit(token, item, editedBy) {
@@ -259,7 +246,6 @@ async function logEdit(token, item, editedBy) {
   ];
   await sheetAppend(token, TAB_EDITS, row);
 }
-
 // Delete item row from Tab 1 by Code ID
 async function deleteAvailableItem(token, code) {
   const r = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}?fields=sheets.properties(sheetId,title)`,{headers:{Authorization:`Bearer ${token}`}});
@@ -275,7 +261,6 @@ async function deleteAvailableItem(token, code) {
     body:JSON.stringify({requests:[{deleteDimension:{range:{sheetId:gid,dimension:'ROWS',startIndex:idx,endIndex:idx+1}}}]})
   });
 }
-
 // ── Drive API ──
 async function uploadReceiptToDrive(token, file, filename) {
   const metadata={name:filename,parents:[DRIVE_FOLDER_ID],mimeType:file.type||'image/jpeg'};
@@ -290,7 +275,6 @@ async function deleteDriveFile(token,fileId) {
   if(!token||!fileId) return;
   await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`,{method:'DELETE',headers:{Authorization:`Bearer ${token}`}});
 }
-
 // ── Main Component ──
 export default function Inventory({ role='staff', userName='' }) {
   const isManager = String(role||'').trim().toLowerCase()==='manager';
@@ -308,13 +292,14 @@ export default function Inventory({ role='staff', userName='' }) {
     // Return raw as-is (e.g. "Jenny")
     return raw;
   })();
-
   const [items,         setItems]         = useState([]);
   const [showModal,     setShowModal]     = useState(false);
   const [showRestock,   setShowRestock]   = useState(false);
   const [restockItem,   setRestockItem]   = useState(null);
   const [restockQty,    setRestockQty]    = useState('');
-  const [restockNote,   setRestockNote]   = useState('');
+  const [restockNote,   setRestockNote]   = useState('');   // → Comments column
+  const [restockDate,   setRestockDate]   = useState('');   // → Date Acquired column
+  const [restockPrice,  setRestockPrice]  = useState('');   // → Retail Price column
   const [form,          setForm]          = useState(DEFAULT_FORM);
   const [editId,        setEditId]        = useState(null);
   const [expandedCat,   setExpandedCat]   = useState(null);   // which category is open
@@ -333,11 +318,9 @@ export default function Inventory({ role='staff', userName='' }) {
   const [receiptAmount, setReceiptAmount] = useState('');
   const [uploader,      setUploader]      = useState('');
   const [uploadingReceipt,setUploadingReceipt]=useState(false);
-
   const tokenClientRef  = React.useRef(null);
   const backfilledRef   = React.useRef(false);
   const fileInputRef    = React.useRef(null);
-
   useEffect(() => {
     const script=document.createElement('script');
     script.src='https://accounts.google.com/gsi/client'; script.async=true;
@@ -351,17 +334,14 @@ export default function Inventory({ role='staff', userName='' }) {
     document.body.appendChild(script);
     return ()=>document.body.removeChild(script);
   },[]);
-
   useEffect(()=>{
     const q=query(collection(db,'inventory'),orderBy('createdAt','desc'));
     return onSnapshot(q,(snap)=>{ setItems(snap.docs.map(d=>({id:d.id,...d.data()}))); setLoading(false); });
   },[]);
-
   useEffect(()=>{
     const q=query(collection(db,'receipts'),orderBy('createdAt','desc'));
     return onSnapshot(q,(snap)=>setReceipts(snap.docs.map(d=>({id:d.id,...d.data()}))),e=>console.error('receipts:',e));
   },[]);
-
   useEffect(()=>{
     if(loading||backfilledRef.current) return;
     const missing=items.filter(i=>!i.code); backfilledRef.current=true;
@@ -375,13 +355,11 @@ export default function Inventory({ role='staff', userName='' }) {
       }
     })();
   },[items,loading]);
-
   // Sync to Tab 1 (Available Items) — upsert by code
   const syncAvailable=async(item, encodedBy)=>{
     if(!accessToken) return;
     try{ await syncAvailableItem(accessToken, item, encodedBy); }catch(e){ console.error('Tab1 sync:',e); }
   };
-
   const openAdd=()=>{
     if(!accessToken) return;
     setForm(DEFAULT_FORM); setEditId(null); setShowModal(true);
@@ -390,7 +368,6 @@ export default function Inventory({ role='staff', userName='' }) {
     setForm({name:item.name,category:item.category,quantity:item.quantity,unit:item.unit,threshold:item.threshold,notes:item.notes||''});
     setEditId(item.id); setShowModal(true);
   };
-
   const handleSave=async()=>{
     if(!form.name||form.quantity==='') return;
     if(!editId && items.some(i=>i.name.trim().toLowerCase()===form.name.trim().toLowerCase())) return;
@@ -417,7 +394,6 @@ export default function Inventory({ role='staff', userName='' }) {
     }catch(e){console.error(e);}
     setSyncing(false); setShowModal(false);
   };
-
   const handleDelete=async(item)=>{
     if(!window.confirm(`Delete "${item.name}"?`)) return;
     setSyncing(true);
@@ -427,30 +403,49 @@ export default function Inventory({ role='staff', userName='' }) {
     }catch(e){console.error(e);}
     setSyncing(false);
   };
-
-  const openRestock=(item,e)=>{ e.stopPropagation(); setRestockItem(item);setRestockQty('');setRestockNote('');setShowRestock(true); };
-
+  const openRestock=(item,e)=>{
+    e.stopPropagation();
+    setRestockItem(item);
+    setRestockQty('');
+    setRestockNote('');
+    setRestockPrice('');
+    setRestockDate(todayISO());   // default to today; staff can change the date
+    setShowRestock(true);
+  };
   const handleRestock=async()=>{
     if(!restockItem||!restockQty||Number(restockQty)<=0) return;
+    if(!restockDate) return;
     setSyncing(true);
     const added=Number(restockQty), newQty=(restockItem.quantity||0)+added;
     const who=resolvedName;
     try{
+      // 1) Update the item's available stock (quantity goes up)
       const data={quantity:newQty,lastRestock:added,lastRestockNote:(restockNote||''),lastRestockAt:serverTimestamp(),editedBy:who,updatedAt:serverTimestamp()};
       await updateDoc(doc(db,'inventory',restockItem.id),data);
       const merged={...restockItem,...data};
-      await syncAvailable(merged, restockItem.addedBy||who);          // Tab 1: update qty + status
-      try{ await logRestock(accessToken, restockItem, added, newQty, who); }catch(e){ console.error('Tab2:',e); } // Tab 2: append restock log
+      await syncAvailable(merged, restockItem.addedBy||who);   // Tab 1: update qty + status
+      // 2) Log the restock entry to the Restocking Data sheet (Tab 2)
+      try{
+        await logRestock(accessToken, {
+          dateAcquired: restockDate,
+          name:         restockItem.name,
+          quantity:     added,
+          unit:         restockItem.unit,
+          price:        restockPrice!=='' ? Number(restockPrice) : '',
+          category:     restockItem.category,
+          encodedBy:    who,
+          comments:     restockNote||'',
+          code:         restockItem.code||'',
+        });
+      }catch(e){ console.error('Tab2:',e); }
     }catch(e){console.error(e);}
     setSyncing(false); setShowRestock(false); setExpandedId(null);
   };
-
   const openReceipt=()=>{
     if(!accessToken) return;
     setReceiptFile(null);setReceiptPreview('');setReceiptNote('');setReceiptAmount('');
     setUploader(resolvedName||''); setShowReceipt(true);
   };
-
   const onPickReceipt=(e)=>{
     const f=e.target.files?.[0]; if(!f) return;
     setReceiptFile(f);
@@ -459,7 +454,6 @@ export default function Inventory({ role='staff', userName='' }) {
     reader.readAsDataURL(f);
     e.target.value='';
   };
-
   const submitReceipt=async()=>{
     if(!accessToken){alert('Connect Google muna.');return;}
     if(!receiptFile){alert('Kumuha muna ng larawan ng resibo.');return;}
@@ -475,11 +469,9 @@ export default function Inventory({ role='staff', userName='' }) {
     }catch(e){ console.error(e); alert('Hindi na-upload. Subukan ulit.'); }
     setUploadingReceipt(false);
   };
-
   const reviewReceipt=async(r,status)=>{
     try{await updateDoc(doc(db,'receipts',r.id),{status,reviewedAt:serverTimestamp()});}catch(e){console.error(e);}
   };
-
   const deleteReceipt=async(r)=>{
     if(!isManager) return;
     if(!window.confirm('Delete this receipt?')) return;
@@ -488,7 +480,6 @@ export default function Inventory({ role='staff', userName='' }) {
       if(accessToken&&r.fileId) try{await deleteDriveFile(accessToken,r.fileId);}catch(err){console.error(err);}
     }catch(e){console.error(e);}
   };
-
   // Derived
   const term=search.trim().toLowerCase();
   // Duplicate check — item name already exists (case-insensitive), excluding the item being edited
@@ -504,25 +495,21 @@ export default function Inventory({ role='staff', userName='' }) {
   const outCount=items.filter(i=>i.quantity<=0).length;
   const criticalCats=new Set(items.filter(i=>CRITICAL_STATUSES.includes(getStatus(i.quantity,i.threshold))).map(i=>i.category));
   const pendingCount=receipts.filter(r=>r.status==='pending').length;
-
   return (
     <div style={s.page}>
       <div style={s.title}>Inventory</div>
       <div style={s.sub}>Theonyx Cafe · {items.length} items{syncing?' · syncing…':''}</div>
-
       {/* Stats */}
       <div style={s.statsRow}>
         <div style={s.statCard}><div style={s.statNum(C.ink)}>{items.length}</div><div style={s.statLabel}>Total</div></div>
         <div style={s.statCard}><div style={s.statNum(C.warn)}>{lowCount}</div><div style={s.statLabel}>Low</div></div>
         <div style={s.statCard}><div style={s.statNum(C.err)}>{outCount}</div><div style={s.statLabel}>Out</div></div>
       </div>
-
       {/* Google connect */}
       {!accessToken
         ? <button style={s.connBtn} onClick={()=>tokenClientRef.current?.requestAccessToken()}>{IC.link} Connect before proceeding…</button>
         : <div style={s.connBadge}>{IC.check} Connected to Google Sheets &amp; Drive</div>
       }
-
       {/* Add + Receipt — disabled when not connected */}
       <div style={s.btnRow}>
         <button
@@ -542,14 +529,12 @@ export default function Inventory({ role='staff', userName='' }) {
           {!accessToken ? IC.lock : IC.camera} Receipt
         </button>
       </div>
-
       {/* Lock notice when not connected */}
       {!accessToken && (
         <div style={s.lockNote}>
           {IC.lock} Connect to Google above to add items or submit receipts.
         </div>
       )}
-
       {/* Review receipts — Manager only */}
       {isManager && (
         <button style={s.reviewBtn(pendingCount>0)} onClick={()=>setShowReceipts(true)}>
@@ -557,13 +542,11 @@ export default function Inventory({ role='staff', userName='' }) {
           {pendingCount>0 && <span style={s.pendCount}>{pendingCount}</span>}
         </button>
       )}
-
       {/* Search */}
       <div style={s.searchWrap}>
         <span style={s.searchIcon}>{IC.search}</span>
         <input style={s.searchInput} placeholder="Search item name or code…" value={search} onChange={e=>setSearch(e.target.value)} />
       </div>
-
       {/* Category filter */}
       <div style={s.catFilter}>
         {['All',...CATEGORIES].map(c=>{
@@ -571,10 +554,8 @@ export default function Inventory({ role='staff', userName='' }) {
           return <div key={c} style={s.catChip(active,crit)} onClick={()=>setFilterCat(c)}>{c}{crit&&<span style={s.catDot(active)}/>}</div>;
         })}
       </div>
-
       {loading && <div style={s.empty}>Loading inventory…</div>}
       {!loading&&filtered.length===0 && <div style={s.empty}>{term||filterCat!=='All'?'Walang tugmang item.':'No items yet. Connect Google then tap "Add Item".'}</div>}
-
       {/* Category grid 3-per-row + expanded item list below */}
       {!loading && (() => {
         const groups = {};
@@ -613,7 +594,6 @@ export default function Inventory({ role='staff', userName='' }) {
                 );
               })}
             </div>
-
             {/* Expanded items for selected category */}
             {expandedCat && groups[expandedCat] && (
               <div style={{marginBottom:12}}>
@@ -640,7 +620,6 @@ export default function Inventory({ role='staff', userName='' }) {
                         </div>
                         <span style={s.badge(status)}>{STATUS_CONFIG[status].label}</span>
                       </div>
-
                       {isItemOpen && (
                         <div style={{marginTop:12,paddingTop:12,borderTop:`1px solid ${C.border}`}} onClick={e=>e.stopPropagation()}>
                           {item.notes&&<p style={{fontSize:12,color:C.muted,marginBottom:8}}>{item.notes}</p>}
@@ -675,9 +654,7 @@ export default function Inventory({ role='staff', userName='' }) {
           </>
         );
       })()}
-
       <input ref={fileInputRef} type="file" accept="image/*" capture="environment" style={{display:'none'}} onChange={onPickReceipt}/>
-
       {/* ADD / EDIT MODAL */}
       {showModal&&(
         <div style={s.modal} onClick={()=>setShowModal(false)}>
@@ -705,12 +682,12 @@ export default function Inventory({ role='staff', userName='' }) {
           </div>
         </div>
       )}
-
       {/* RESTOCK MODAL */}
       {showRestock&&restockItem&&(
         <div style={s.modal} onClick={()=>setShowRestock(false)}>
           <div style={s.modalCard} onClick={e=>e.stopPropagation()}>
             <div style={s.modalTitle}>{IC.restockLg} Restock Item</div>
+            {/* Auto-filled item info: Items, CODE, Group Category, Unit */}
             <div style={s.infoBox}>
               <div style={{fontSize:14,fontWeight:600,color:C.ink,marginBottom:6,display:'flex',alignItems:'center',gap:6}}>
                 {restockItem.name}{restockItem.code&&<span style={s.codePill}>#{restockItem.code}</span>}
@@ -719,20 +696,40 @@ export default function Inventory({ role='staff', userName='' }) {
                 <span style={{fontSize:12,color:C.muted}}>Current: <b style={{color:C.ink}}>{restockItem.quantity} {restockItem.unit}</b></span>
                 <span style={s.badge(getStatus(restockItem.quantity,restockItem.threshold))}>{STATUS_CONFIG[getStatus(restockItem.quantity,restockItem.threshold)].label}</span>
               </div>
+              <div style={{fontSize:11,color:C.muted,marginTop:6}}>
+                Category: <b style={{color:C.ink}}>{restockItem.category}</b> · Unit: <b style={{color:C.ink}}>{restockItem.unit}</b>
+              </div>
             </div>
-            <label style={s.label}>Add Quantity ({restockItem.unit})</label>
-            <input style={s.input} type="number" placeholder={`Amount to add in ${restockItem.unit}`} value={restockQty} onChange={e=>setRestockQty(e.target.value)} autoFocus/>
+            {/* Date Acquired — manual date picker */}
+            <label style={s.label}>Date Acquired</label>
+            <input style={s.input} type="date" value={restockDate} onChange={e=>setRestockDate(e.target.value)}/>
+            {/* Quantity + Retail Price */}
+            <div style={s.row2}>
+              <div>
+                <label style={s.label}>Quantity ({restockItem.unit})</label>
+                <input style={s.input} type="number" placeholder={`Add in ${restockItem.unit}`} value={restockQty} onChange={e=>setRestockQty(e.target.value)} autoFocus/>
+              </div>
+              <div>
+                <label style={s.label}>Retail Price (₱)</label>
+                <input style={s.input} type="number" placeholder="e.g. 1250" value={restockPrice} onChange={e=>setRestockPrice(e.target.value)}/>
+              </div>
+            </div>
+            {/* New total preview (stock will increase) */}
             {restockQty&&Number(restockQty)>0&&(
               <div style={s.prevBox}>{IC.check}<span style={{color:C.muted}}>New total:</span><b style={{color:C.green,fontSize:15}}>{(restockItem.quantity||0)+Number(restockQty)} {restockItem.unit}</b><span style={{color:C.muted,fontSize:11}}>(+{restockQty})</span></div>
             )}
-            <label style={s.label}>Restock Note (optional)</label>
+            {/* Comments */}
+            <label style={s.label}>Comments (optional)</label>
             <input style={s.input} placeholder="e.g. New delivery from supplier" value={restockNote} onChange={e=>setRestockNote(e.target.value)}/>
-            <button style={s.saveBtn} onClick={handleRestock} disabled={syncing||!restockQty||Number(restockQty)<=0}>{syncing?'Saving…':'Confirm Restock'}</button>
+            {/* Encoded By — auto-filled */}
+            <div style={{...s.infoBox,marginBottom:14}}>
+              <div style={{fontSize:11,color:C.muted}}>Encoded by: <b style={{color:C.terra}}>{resolvedName}</b> · Code: <b style={{color:C.ink}}>#{restockItem.code||'—'}</b></div>
+            </div>
+            <button style={s.saveBtn} onClick={handleRestock} disabled={syncing||!restockQty||Number(restockQty)<=0||!restockDate}>{syncing?'Saving…':'Confirm Restock'}</button>
             <button style={s.cancelBtn} onClick={()=>setShowRestock(false)}>Cancel</button>
           </div>
         </div>
       )}
-
       {/* RECEIPT CAPTURE MODAL */}
       {showReceipt&&(
         <div style={s.modal} onClick={()=>setShowReceipt(false)}>
@@ -756,7 +753,6 @@ export default function Inventory({ role='staff', userName='' }) {
           </div>
         </div>
       )}
-
       {/* RECEIPT REVIEW MODAL */}
       {showReceipts&&isManager&&(
         <div style={s.modal} onClick={()=>setShowReceipts(false)}>
@@ -797,7 +793,6 @@ export default function Inventory({ role='staff', userName='' }) {
           </div>
         </div>
       )}
-
       <div style={{height:80}}/>
     </div>
   );
