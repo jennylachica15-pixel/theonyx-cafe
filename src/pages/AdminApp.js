@@ -609,7 +609,7 @@ export default function AdminApp({ user, onSignOut }) {
             </div>
             <div style={{ flex: 1, overflowY: 'auto' }}>
               {activeTab === 'attendance'  && <Attendance role={role} userName={userName} />}
-              {activeTab === 'orders'      && <Orders userName={userName} />}
+              {activeTab === 'orders'      && <Orders userName={userName} role={role} />}
               {activeTab === 'inventory'   && <Inventory role={role} userName={userName} />}
               {activeTab === 'approvals'   && <Approvals role={role} />}
               {activeTab === 'reports'     && role === 'manager' && <Reports role={role} userName={userName} />}
