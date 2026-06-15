@@ -536,8 +536,9 @@ export default function Reports({ role = 'staff', userName = '' }) {
   const projItems = daysElapsed > 0 ? Math.round(itemsMTD / daysElapsed * daysInMonth) : 0;
   const addPerItemShortfall = (projProfit < 0 && projItems > 0) ? (-projProfit) / projItems : 0;
   const addPerItemOverhead = projItems > 0 ? overheadVal / projItems : 0;
-  // Flat amount to add per item to cover overhead (break-even); 0 if already profitable or overhead not synced
-  const flatAddPerItem = (overheadKnown && projProfit < 0) ? addPerItemShortfall : 0;
+  // Overhead share to add per item (full overhead ÷ projected items) — changes whenever overhead changes.
+  // 0 only when overhead isn't synced yet.
+  const flatAddPerItem = overheadKnown ? addPerItemOverhead : 0;
   // Top 10 products
   const productMap = {};
   const productQty = {};
@@ -1047,7 +1048,7 @@ export default function Reports({ role = 'staff', userName = '' }) {
           );
         })}
         <div style={{ fontSize: 10, color: 'var(--brown-light)', marginTop: 8, fontStyle: 'italic', lineHeight: 1.5 }}>
-          {overheadKnown ? `Default adds ${peso(flatAddPerItem)} per item to break even on overhead. ` : 'Overhead not synced — tap Sync to include the overhead add. '}Type a % to raise prices further. Round to your preferred price.
+          {overheadKnown ? `Default adds ${peso(flatAddPerItem)} per item — the overhead (${peso(overheadVal)}) shared across ~${projItems.toLocaleString()} projected items. Changes when overhead changes. ` : 'Overhead not synced — tap Sync to include the overhead add. '}Type a % to raise prices further. Round to your preferred price.
         </div>
       </div>
       <div style={{ height: 80 }} />
