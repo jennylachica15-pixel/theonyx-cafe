@@ -8,23 +8,26 @@ import Gallery from './Gallery';
 import Snapshots from './Snapshots';
 import GamesPage from './Games';
 import Chat from './Chat';
-
 const NAV_ICONS = {
-  home: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
+  // Menu — fork & knife (cutlery)
+  home: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h0a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg>,
+  // Snapshots — camera
   gallery: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>,
-  snapshots: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>,
-  games: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="20" height="12" rx="3"/><circle cx="8" cy="12" r="1.5" fill="currentColor"/><circle cx="16" cy="12" r="1.5" fill="currentColor"/><path d="M12 9v6M9 12h6" strokeLinecap="round"/></svg>,
-  chat: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z"/><path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1"/></svg>,
+  // Feedback — envelope
+  snapshots: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>,
+  // Games — game controller
+  games: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><line x1="6" y1="11" x2="10" y2="11"/><line x1="8" y1="9" x2="8" y2="13"/><line x1="15" y1="12" x2="15.01" y2="12"/><line x1="18" y1="10" x2="18.01" y2="10"/><rect x="2" y="6" width="20" height="12" rx="2"/></svg>,
+  // Chat — single chat bubble
+  chat: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8z"/><circle cx="8.5" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="15.5" cy="12" r="1" fill="currentColor" stroke="none"/></svg>,
 };
-
 const styles = {
   container: { display: 'flex', flexDirection: 'column', height: '100vh', background: 'linear-gradient(160deg, #140800 0%, #3d1f0a 50%, #6b3a1f 100%)', maxWidth: 480, margin: '0 auto' },
-  topbar: { padding: '10px 16px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, background: 'rgba(10,4,0,0.6)', backdropFilter: 'blur(10px)', borderBottom: '1px solid rgba(212,168,83,0.2)' },
+  topbar: { padding: '10px 16px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, background: 'rgba(61,31,10,0.55)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', borderBottom: '1px solid rgba(212,168,83,0.18)' },
   logoRow: { display: 'flex', alignItems: 'center', gap: 10 },
-  topTitle: { fontFamily: 'var(--font-display)', fontSize: 17, fontWeight: 700, color: '#f0d080' },
+  topTitle: { fontFamily: 'var(--font-display)', fontSize: 17, fontWeight: 700, color: '#f0d080', letterSpacing: 1.5 },
   content: { flex: 1, overflowY: 'auto' },
-  bottomNav: { display: 'flex', background: 'rgba(10,4,0,0.95)', borderTop: '1px solid rgba(212,168,83,0.2)', flexShrink: 0 },
-  navItem: (active) => ({ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '10px 4px 12px', cursor: 'pointer', borderTop: active ? '2px solid #d4a853' : '2px solid transparent', color: active ? '#d4a853' : 'rgba(255,255,255,0.35)', position: 'relative' }),
+  bottomNav: { display: 'flex', background: 'rgba(61,31,10,0.78)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', borderTop: '1px solid rgba(212,168,83,0.18)', flexShrink: 0 },
+  navItem: (active) => ({ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '10px 4px 12px', cursor: 'pointer', borderTop: active ? '2px solid #d4a853' : '2px solid transparent', color: active ? '#d4a853' : 'rgba(255,255,255,0.45)', position: 'relative' }),
   navLabel: (active) => ({ fontSize: 10, fontWeight: active ? 600 : 400, marginTop: 3 }),
   adminBtn: { background: 'rgba(212,168,83,0.15)', border: '1px solid rgba(212,168,83,0.4)', borderRadius: 8, color: '#d4a853', fontSize: 12, padding: '6px 14px', cursor: 'pointer', fontWeight: 500 },
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 },
@@ -38,26 +41,22 @@ const styles = {
   errorBox: { background: 'rgba(193,18,31,0.2)', color: '#ff6b6b', borderRadius: 8, padding: '9px 12px', fontSize: 13, marginBottom: 12, border: '1px solid rgba(193,18,31,0.3)' },
   chatGate: { height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 },
   switchLink: { background: 'none', border: 'none', color: '#d4a853', fontSize: 13, cursor: 'pointer', textDecoration: 'underline', marginTop: 12, width: '100%' },
-  badge: { position: 'absolute', top: 6, right: 8, minWidth: 16, height: 16, borderRadius: 8, background: '#ff4444', color: '#fff', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px', lineHeight: 1, border: '1.5px solid rgba(10,4,0,0.95)' },
+  badge: { position: 'absolute', top: 6, right: 8, minWidth: 16, height: 16, borderRadius: 8, background: '#ff4444', color: '#fff', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px', lineHeight: 1, border: '1.5px solid rgba(61,31,10,0.9)' },
 };
-
 const TABS = [
-  { id: 'home',      label: 'Home'      },
+  { id: 'home',      label: 'Menu'      },
   { id: 'gallery',   label: 'Snapshots' },
   { id: 'snapshots', label: 'Feedback'  },
   { id: 'games',     label: 'Games'     },
   { id: 'chat',      label: 'Chat'      },
 ];
-
 function ChatGate({ user }) {
   const [mode, setMode] = useState('signin');
   const [username, setUsername] = useState(() => { try { return localStorage.getItem('cafeGameUser') || ''; } catch { return ''; } });
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-
   if (user) return <Chat user={user} />;
-
   const submit = async (e) => {
     e.preventDefault();
     setError(''); setLoading(true);
@@ -69,7 +68,6 @@ function ChatGate({ user }) {
     }
     setLoading(false);
   };
-
   return (
     <div style={styles.chatGate}>
       <div style={{ ...styles.loginCard, animation: 'none' }}>
@@ -92,7 +90,6 @@ function ChatGate({ user }) {
     </div>
   );
 }
-
 export default function PublicApp({ onAdminLogin, user }) {
   const [activeTab, setActiveTab] = useState('home');
   const [showLogin, setShowLogin] = useState(false);
@@ -103,7 +100,6 @@ export default function PublicApp({ onAdminLogin, user }) {
   const [mentionBadge, setMentionBadge] = useState(0);
   const touchStartX = useRef(null);
   const touchStartY = useRef(null);
-
   // Listen for unread @mention notifications
   useEffect(() => {
     if (!user?.uid) { setMentionBadge(0); return; }
@@ -112,7 +108,6 @@ export default function PublicApp({ onAdminLogin, user }) {
       setMentionBadge(snap.docs.filter(d => !d.data().read).length);
     });
   }, [user?.uid]);
-
   const handleLogin = async (e) => {
     e.preventDefault();
     setError(''); setLoading(true);
@@ -125,12 +120,10 @@ export default function PublicApp({ onAdminLogin, user }) {
     }
     setLoading(false);
   };
-
   const handleTouchStart = (e) => {
     touchStartX.current = e.touches[0].clientX;
     touchStartY.current = e.touches[0].clientY;
   };
-
   const handleTouchEnd = (e) => {
     if (touchStartX.current === null) return;
     if (activeTab === 'chat' || activeTab === 'games') { touchStartX.current = null; touchStartY.current = null; return; }
@@ -144,20 +137,18 @@ export default function PublicApp({ onAdminLogin, user }) {
     touchStartX.current = null;
     touchStartY.current = null;
   };
-
   return (
     <div style={styles.container}>
       <div style={styles.topbar}>
         <div style={styles.logoRow}>
           <img src="/logo.jpg" alt="logo" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', border: '2px solid #d4a853' }} />
-          <div style={styles.topTitle}>Theonyx Cafe</div>
+          <div style={styles.topTitle}>THEONYX CAFE</div>
         </div>
         <button style={styles.adminBtn} onClick={() => setShowLogin(true)}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: 5, verticalAlign: 'middle' }}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
           Admin
         </button>
       </div>
-
       <div style={styles.content} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
         {activeTab === 'home'      && <GuestLanding />}
         {activeTab === 'gallery'   && <Gallery />}
@@ -165,7 +156,6 @@ export default function PublicApp({ onAdminLogin, user }) {
         {activeTab === 'games'     && <GamesPage user={user} />}
         {activeTab === 'chat'      && <ChatGate user={user} />}
       </div>
-
       <div style={styles.bottomNav}>
         {TABS.map(tab => (
           <div key={tab.id} style={styles.navItem(activeTab === tab.id)} onClick={() => setActiveTab(tab.id)}>
@@ -177,7 +167,6 @@ export default function PublicApp({ onAdminLogin, user }) {
           </div>
         ))}
       </div>
-
       {showLogin && (
         <div style={styles.overlay} onClick={() => setShowLogin(false)}>
           <div style={styles.loginCard} onClick={e => e.stopPropagation()}>
