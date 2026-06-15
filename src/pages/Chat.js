@@ -74,6 +74,8 @@ const S = {
   mentionItem:     { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', cursor: 'pointer', borderBottom: `1px solid ${C.borderLight}` },
   mentionAvatar:   { width: 32, height: 32, borderRadius: '50%', background: `linear-gradient(135deg, ${C.primaryDim}, ${C.primary})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#fff', flexShrink: 0 },
   listScroll:    { flex: 1, overflowY: 'auto', background: C.bg },
+  dmSearchWrap:  { padding: '10px 14px 6px', background: C.bg, position: 'sticky', top: 0, zIndex: 2 },
+  dmSearchInput: { width: '100%', boxSizing: 'border-box', background: C.white, border: `1px solid ${C.border}`, borderRadius: 24, padding: '10px 16px', fontSize: 14, color: '#1a0800', fontFamily: FONT, outline: 'none' },
   sectionLabel:  { fontSize: 11, color: C.muted, letterSpacing: 1.5, textTransform: 'uppercase', padding: '14px 16px 6px', background: C.bg, fontWeight: 700 },
   row:           { display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', background: C.white, borderBottom: `1px solid ${C.borderLight}`, cursor: 'pointer' },
   rowDisabled:   { display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', background: C.white, borderBottom: `1px solid ${C.borderLight}`, opacity: 0.4 },
@@ -429,6 +431,7 @@ export default function Chat({ user, adminMode }) {
   const [groupMsgs, setGroupMsgs] = useState([]);
   const [showNewGroup, setShowNewGroup] = useState(false);   // create-group modal
   const [showManage, setShowManage]     = useState(false);   // manage-members modal
+  const [dmSearch, setDmSearch]         = useState('');       // search users / conversations
   const uid     = user.uid;
   const isAdmin = !!adminMode;
   const myName  = isAdmin ? 'THEONYX ADMIN' : nameOf(user);
@@ -528,6 +531,18 @@ export default function Chat({ user, adminMode }) {
   const dmUnreadTotal    = threads.reduce((s, t) => s + (t.unreadFor?.[uid] || 0), 0);
   const groupUnreadTotal = groups.reduce((s, g) => s + (g.unreadFor?.[uid] || 0), 0);
   const messagesUnread   = dmUnreadTotal + groupUnreadTotal;
+  // search filter for the Messages tab
+  const dmTerm = dmSearch.trim().toLowerCase();
+  const shownGroups  = dmTerm ? groups.filter(g => (g.name || '').toLowerCase().includes(dmTerm)) : groups;
+  const shownThreads = dmTerm ? threads.filter(t => {
+    const ou = (t.participants || []).find(p => p !== uid);
+    return (t.names?.[ou] || '').toLowerCase().includes(dmTerm);
+  }) : threads;
+  // people matching the search who don't already have an open conversation (start a new DM)
+  const threadUids = new Set(threads.map(t => (t.participants || []).find(p => p !== uid)));
+  const searchPeople = dmTerm
+    ? people.filter(p => (p.name || '').toLowerCase().includes(dmTerm) && !threadUids.has(p.uid))
+    : [];
   // tab title flash: prefix "(N)" while there are unread messages
   const baseTitle = useRef(typeof document !== 'undefined' ? document.title : '');
   useEffect(() => {
@@ -743,15 +758,39 @@ export default function Chat({ user, adminMode }) {
       {/* messages / people */}
       {tab === 'dms' && (
         <div style={S.listScroll}>
+          {/* search users / conversations */}
+          <div style={S.dmSearchWrap}>
+            <input
+              style={S.dmSearchInput}
+              value={dmSearch}
+              onChange={e => setDmSearch(e.target.value)}
+              placeholder="Search people or conversations…"
+            />
+          </div>
+          {/* people results — start a new DM */}
+          {dmTerm && searchPeople.length > 0 && (
+            <>
+              <div style={S.sectionLabel}>People</div>
+              {searchPeople.map(p => (
+                <div key={p.uid} className="chat-row" style={S.row} onClick={() => openDM(p.uid, p.name)}>
+                  <div style={{ ...S.avatar, ...(p.isAdmin ? S.adminAvatar : {}) }}>{initialOf(p.name)}</div>
+                  <div style={{ flex: 1, overflow: 'hidden' }}>
+                    <div style={S.rowName}>{p.isAdmin ? '⭐ ' : ''}{p.name}</div>
+                    <div style={S.rowSub}>Tap to start a chat</div>
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
           {/* group chats */}
           <div style={S.sectionRow}>
             <span style={{ fontSize: 11, color: C.muted, letterSpacing: 1.5, textTransform: 'uppercase', fontWeight: 700 }}>Groups</span>
             <button style={S.newGroupBtn} onClick={() => setShowNewGroup(true)}>+ New group</button>
           </div>
-          {groups.length === 0 && (
-            <div style={{ ...S.rowSub, padding: '2px 16px 10px', maxWidth: 'none' }}>No groups yet — create one to chat with several people at once.</div>
+          {shownGroups.length === 0 && (
+            <div style={{ ...S.rowSub, padding: '2px 16px 10px', maxWidth: 'none' }}>{dmTerm ? 'No matching groups.' : 'No groups yet — create one to chat with several people at once.'}</div>
           )}
-          {groups.map(g => {
+          {shownGroups.map(g => {
             const unread    = g.unreadFor?.[uid] || 0;
             const hasUnread = unread > 0;
             const count     = (g.members || []).length;
@@ -774,8 +813,8 @@ export default function Chat({ user, adminMode }) {
               </div>
             );
           })}
-          {threads.length > 0 && <div style={S.sectionLabel}>Conversations</div>}
-          {threads.map(t => {
+          {shownThreads.length > 0 && <div style={S.sectionLabel}>Conversations</div>}
+          {shownThreads.map(t => {
             const otherUid  = (t.participants || []).find(p => p !== uid);
             const otherName = t.names?.[otherUid] || 'Guest';
             const unread    = t.unreadFor?.[uid] || 0;
@@ -799,9 +838,13 @@ export default function Chat({ user, adminMode }) {
               </div>
             );
           })}
-          {threads.length === 0 && groups.length === 0 && (
-            <div style={S.empty}>No conversations yet ☕<br /><span style={{ fontSize: 12 }}>Create a group to get started.</span></div>
-          )}
+          {dmTerm
+            ? (shownGroups.length === 0 && shownThreads.length === 0 && searchPeople.length === 0 && (
+                <div style={S.empty}>No matches for “{dmSearch.trim()}”</div>
+              ))
+            : (threads.length === 0 && groups.length === 0 && (
+                <div style={S.empty}>No conversations yet ☕<br /><span style={{ fontSize: 12 }}>Search a name above or create a group to get started.</span></div>
+              ))}
         </div>
       )}
     </div>
