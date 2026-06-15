@@ -250,7 +250,22 @@ export default function Orders({ userName }) {
       document.head.appendChild(style);
     }
   }, []);
+  // Load Google Identity Services — reuse a saved token, and re-auth silently (no button click)
   useEffect(() => {
+    const TOKEN_KEY = 'theonyx_gtoken_rw'; // shared with Inventory (same read/write scope)
+    const saveToken = (res) => {
+      if (!res || !res.access_token) return;
+      setAccessToken(res.access_token);
+      try {
+        const exp = Date.now() + (Number(res.expires_in || 3600) - 60) * 1000; // refresh 1 min early
+        localStorage.setItem(TOKEN_KEY, JSON.stringify({ token: res.access_token, exp }));
+      } catch (e) {}
+    };
+    // 1) Reuse a still-valid token from a previous visit (no prompt at all)
+    try {
+      const saved = JSON.parse(localStorage.getItem(TOKEN_KEY) || 'null');
+      if (saved && saved.token && saved.exp > Date.now()) setAccessToken(saved.token);
+    } catch (e) {}
     const script = document.createElement('script');
     script.src = 'https://accounts.google.com/gsi/client';
     script.async = true;
@@ -258,8 +273,17 @@ export default function Orders({ userName }) {
       if (!window.google) return;
       tokenClientRef.current = window.google.accounts.oauth2.initTokenClient({
         client_id: GOOGLE_CLIENT_ID, scope: SCOPES,
-        callback: (res) => { if (res.access_token) setAccessToken(res.access_token); },
+        callback: saveToken,
       });
+      // 2) If no valid saved token, try a SILENT grant (works once you've connected before — no click)
+      let hasValid = false;
+      try {
+        const saved = JSON.parse(localStorage.getItem(TOKEN_KEY) || 'null');
+        hasValid = !!(saved && saved.token && saved.exp > Date.now());
+      } catch (e) {}
+      if (!hasValid) {
+        try { tokenClientRef.current.requestAccessToken({ prompt: '' }); } catch (e) {}
+      }
     };
     document.body.appendChild(script);
     return () => document.body.removeChild(script);
