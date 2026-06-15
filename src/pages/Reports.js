@@ -441,12 +441,17 @@ export default function Reports({ role = 'staff', userName = '' }) {
   const projItems = daysElapsed > 0 ? Math.round(itemsMTD / daysElapsed * daysInMonth) : 0;
   const addPerItemShortfall = (projProfit < 0 && projItems > 0) ? (-projProfit) / projItems : 0;
   const addPerItemOverhead = projItems > 0 ? overheadVal / projItems : 0;
+  // Flat amount to add per item to cover overhead (break-even); 0 if already profitable
+  const flatAddPerItem = projProfit < 0 ? addPerItemShortfall : 0;
   // Top 10 products
   const productMap = {};
+  const productQty = {};
   orders.forEach(order => {
     (order.items || []).forEach(item => {
       if (!productMap[item.name]) productMap[item.name] = 0;
+      if (!productQty[item.name]) productQty[item.name] = 0;
       productMap[item.name] += (item.price || 0) * (item.qty || 1);
+      productQty[item.name] += (item.qty || 1);
     });
   });
   const totalSales = Object.values(productMap).reduce((a, b) => a + b, 0);
@@ -869,6 +874,11 @@ export default function Reports({ role = 'staff', userName = '' }) {
                         <div style={s.rank}>{i + 1}</div>
                         <div style={{ flex: 1 }}>
                           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--brown-dark)' }}>{name}</div>
+                          {flatAddPerItem > 0 && productQty[name] > 0 && (
+                            <div style={{ fontSize: 10, color: 'var(--gold)', marginTop: 1 }}>
+                              ≈{peso(sales / productQty[name])} → <b>{peso(sales / productQty[name] + flatAddPerItem)}</b>
+                            </div>
+                          )}
                           <div style={{ height: 4, background: '#f0e4d8', borderRadius: 2, marginTop: 4 }}>
                             <div style={{ height: '100%', background: 'var(--brown-mid)', borderRadius: 2, width: `${(sales / maxVal) * 100}%` }} />
                           </div>
