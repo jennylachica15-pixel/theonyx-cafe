@@ -517,28 +517,39 @@ export default function Chat({ user, adminMode }) {
     const q = query(collection(db, 'groups', activeGroup.id, 'messages'), orderBy('createdAt', 'asc'), limit(200));
     return onSnapshot(q, snap => setGroupMsgs(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
   }, [activeGroup]);
-  // user directory
+  // user directory — merge the chat directory with the (legacy) games directory
+  // so EVERY signed-up user appears, including people who registered long ago and
+  // only exist in the old `gameUsers` collection (not yet in `chatUsers`).
+  const dirRef = useRef({ chatUsers: [], gameUsers: [] });
   useEffect(() => {
-    return onSnapshot(collection(db, 'chatUsers'), snap =>
-      setPeople(
-        snap.docs
-          .map(d => {
-            const data = d.data() || {};
-            // Game and Chat sign-ins may store the name under different fields,
-            // so derive a display name from whatever is available (falling back
-            // to the email prefix, e.g. "jinky" from jinky@theonyxcafe.games).
-            const name = (
-              data.name || data.username || data.displayName ||
-              (data.email ? data.email.split('@')[0] : '')
-            ).trim();
-            return { uid: d.id, ...data, name };
-          })
-          // Include any registered user (games + chat) that has a usable name.
-          .filter(p => p.uid !== uid && !!p.name)
-          .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
-      ),
-      err => console.error('[Chat] chatUsers listener:', err)
-    );
+    // Derive a display name from whatever field exists (chat uses `name`, games
+    // may use `username`/`displayName`, else fall back to the email prefix).
+    const nameFrom = (data) => (
+      data.name || data.username || data.displayName ||
+      (data.email ? data.email.split('@')[0] : '')
+    ).trim();
+    const rebuild = () => {
+      const map = new Map();
+      // chatUsers first (preferred — these always have a real auth uid)
+      [...dirRef.current.chatUsers, ...dirRef.current.gameUsers].forEach(d => {
+        const id = d.id;
+        if (!id || id === uid) return;
+        const data = d.data() || {};
+        const name = nameFrom(data);
+        if (!name) return;
+        const prev = map.get(id) || {};
+        map.set(id, { uid: id, ...prev, ...data, name, isAdmin: data.isAdmin || prev.isAdmin });
+      });
+      setPeople([...map.values()].sort((a, b) => (a.name || '').localeCompare(b.name || '')));
+    };
+    const unsubChat = onSnapshot(collection(db, 'chatUsers'), snap => {
+      dirRef.current.chatUsers = snap.docs; rebuild();
+    }, err => console.error('[Chat] chatUsers listener:', err));
+    // The legacy games directory may not exist / be readable — ignore errors.
+    const unsubGame = onSnapshot(collection(db, 'gameUsers'), snap => {
+      dirRef.current.gameUsers = snap.docs; rebuild();
+    }, () => {});
+    return () => { unsubChat(); unsubGame(); };
   }, [uid]);
   // total unread across DMs + groups (used for the Messages tab badge + title)
   const dmUnreadTotal    = threads.reduce((s, t) => s + (t.unreadFor?.[uid] || 0), 0);
