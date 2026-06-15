@@ -522,12 +522,22 @@ export default function Chat({ user, adminMode }) {
     return onSnapshot(collection(db, 'chatUsers'), snap =>
       setPeople(
         snap.docs
-          .map(d => ({ uid: d.id, ...d.data() }))
-          // Everyone who signed up (games + chat) lands in chatUsers on login,
-          // so include any registered user with a name — not just one email domain.
-          .filter(p => p.uid !== uid && !!((p.name || '').trim()))
+          .map(d => {
+            const data = d.data() || {};
+            // Game and Chat sign-ins may store the name under different fields,
+            // so derive a display name from whatever is available (falling back
+            // to the email prefix, e.g. "jinky" from jinky@theonyxcafe.games).
+            const name = (
+              data.name || data.username || data.displayName ||
+              (data.email ? data.email.split('@')[0] : '')
+            ).trim();
+            return { uid: d.id, ...data, name };
+          })
+          // Include any registered user (games + chat) that has a usable name.
+          .filter(p => p.uid !== uid && !!p.name)
           .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
-      )
+      ),
+      err => console.error('[Chat] chatUsers listener:', err)
     );
   }, [uid]);
   // total unread across DMs + groups (used for the Messages tab badge + title)
