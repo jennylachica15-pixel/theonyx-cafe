@@ -523,7 +523,10 @@ export default function Chat({ user, adminMode }) {
       setPeople(
         snap.docs
           .map(d => ({ uid: d.id, ...d.data() }))
-          .filter(p => p.uid !== uid && ((p.email || '').endsWith('@theonyxcafe.games') || p.isAdmin === true))
+          // Everyone who signed up (games + chat) lands in chatUsers on login,
+          // so include any registered user with a name — not just one email domain.
+          .filter(p => p.uid !== uid && !!((p.name || '').trim()))
+          .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
       )
     );
   }, [uid]);
