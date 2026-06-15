@@ -354,6 +354,8 @@ export default function Reports({ role = 'staff', userName = '' }) {
   const [showComputation, setShowComputation] = useState(false); // collapse the profit breakdown
   const [openPriceGroup, setOpenPriceGroup] = useState(null);    // which suggested-prices group is open
   const [pricePct, setPricePct] = useState('');                  // extra % increase on top of overhead add
+  const [marginPct, setMarginPct] = useState('80');              // target gross margin % (ignores overhead)
+  const [openMarginGroup, setOpenMarginGroup] = useState(null);  // which margin-pricing group is open
   const tokenClientRef = React.useRef(null);
   const syncedRef = React.useRef(false);
   // Firestore fallback (used until connected to Google)
@@ -1049,6 +1051,58 @@ export default function Reports({ role = 'staff', userName = '' }) {
         })}
         <div style={{ fontSize: 10, color: 'var(--brown-light)', marginTop: 8, fontStyle: 'italic', lineHeight: 1.5 }}>
           {overheadKnown ? `Default adds ${peso(flatAddPerItem)} per item — the overhead (${peso(overheadVal)}) shared across ~${projItems.toLocaleString()} projected items. Changes when overhead changes. ` : 'Overhead not synced — tap Sync to include the overhead add. '}Type a % to raise prices further. Round to your preferred price.
+        </div>
+      </div>
+      {/* Price by gross margin — ignores overhead, based on capital cost */}
+      <div style={s.card}>
+        <div style={s.cardTitle}>Price by gross margin · ignores overhead</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--brown-dark)' }}>Target margin</span>
+          <input
+            type="number" min="0" max="95" inputMode="decimal" value={marginPct}
+            onChange={e => setMarginPct(e.target.value)} placeholder="80"
+            style={{ width: 64, padding: '7px 9px', borderRadius: 9, border: '0.5px solid #e3d0b4', fontSize: 13, background: '#fff', color: '#3a2613', textAlign: 'right', fontFamily: 'inherit', outline: 'none' }}
+          />
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--brown-dark)' }}>%</span>
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--brown-light)', marginBottom: 10, lineHeight: 1.5 }}>
+          Target price = capital cost ÷ (1 − margin). Shown only for items with a capital cost set.
+        </div>
+        {(() => {
+          const m = Math.min(0.95, Math.max(0, (Number(marginPct) || 0) / 100));
+          return MENU_PRICING.map(group => {
+            const open = openMarginGroup === group.id;
+            const priced = group.items.filter(it => getCostFrom(costMap, it.name) != null).length;
+            return (
+              <div key={group.id} style={{ borderTop: '1px solid #f0e4d8' }}>
+                <div onClick={() => setOpenMarginGroup(open ? null : group.id)} style={{ display: 'flex', alignItems: 'center', padding: '11px 0', cursor: 'pointer' }}>
+                  <div style={{ flex: 1, fontSize: 13, fontWeight: 700, color: 'var(--brown-dark)' }}>{group.label}<span style={{ fontSize: 10, color: 'var(--brown-light)', fontWeight: 400, marginLeft: 6 }}>{priced}/{group.items.length} priced</span></div>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', flexShrink: 0 }}><polyline points="6 9 12 15 18 9" /></svg>
+                </div>
+                {open && (
+                  <div style={{ paddingBottom: 8 }}>
+                    {group.items.map(item => {
+                      const cost = getCostFrom(costMap, item.name);
+                      return (
+                        <div key={item.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 0', borderTop: '1px solid #f7f0e6' }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--brown-dark)' }}>{item.name}</div>
+                            <div style={{ fontSize: 10, color: 'var(--brown-light)' }}>{cost != null ? `cost ${peso(cost)}` : 'no cost set'}</div>
+                          </div>
+                          {cost != null
+                            ? <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--green-ok)' }}>{peso(cost / (1 - m))}</div>
+                            : <div style={{ fontSize: 11, color: 'var(--brown-light)' }}>—</div>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          });
+        })()}
+        <div style={{ fontSize: 10, color: 'var(--brown-light)', marginTop: 8, fontStyle: 'italic', lineHeight: 1.5 }}>
+          Pure product margin (price vs. capital cost) — does not include overhead. Add capital costs in the "Capital Cost" tab to price more items.
         </div>
       </div>
       <div style={{ height: 80 }} />
