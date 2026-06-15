@@ -422,7 +422,8 @@ export default function Chat({ user, adminMode }) {
   const [tab, setTab]         = useState('global');
   const [globalMsgs, setGlobalMsgs] = useState([]);
   const [threads, setThreads] = useState([]);
-  const [people, setPeople]   = useState([]);
+  const [people, setPeople]   = useState([]);            // DM-able users (have an auth uid)
+  const [gamePlayers, setGamePlayers] = useState([]);    // game-only players (searchable, no uid yet)
   const [activeDM, setActiveDM] = useState(null);
   const [dmMsgs, setDmMsgs]   = useState([]);
   const [globalUnread, setGlobalUnread] = useState(0);   // unread count for Global tab
@@ -520,7 +521,7 @@ export default function Chat({ user, adminMode }) {
   // user directory — merge the chat directory with the (legacy) games directory
   // so EVERY signed-up user appears, including people who registered long ago and
   // only exist in the old `gameUsers` collection (not yet in `chatUsers`).
-  const dirRef = useRef({ chatUsers: [], gameUsers: [] });
+  const dirRef = useRef({ chatUsers: [], gameUsers: [], leaderboard: [] });
   useEffect(() => {
     // Derive a display name from whatever field exists (chat uses `name`, games
     // may use `username`/`displayName`, else fall back to the email prefix).
@@ -529,18 +530,32 @@ export default function Chat({ user, adminMode }) {
       (data.email ? data.email.split('@')[0] : '')
     ).trim();
     const rebuild = () => {
-      const map = new Map();
-      // chatUsers first (preferred — these always have a real auth uid)
+      // 1) Real accounts (have an auth uid) — these can be DM'd / notified.
+      const byUid = new Map();
       [...dirRef.current.chatUsers, ...dirRef.current.gameUsers].forEach(d => {
         const id = d.id;
         if (!id || id === uid) return;
         const data = d.data() || {};
         const name = nameFrom(data);
         if (!name) return;
-        const prev = map.get(id) || {};
-        map.set(id, { uid: id, ...prev, ...data, name, isAdmin: data.isAdmin || prev.isAdmin });
+        const prev = byUid.get(id) || {};
+        byUid.set(id, { uid: id, ...prev, ...data, name, isAdmin: data.isAdmin || prev.isAdmin });
       });
-      setPeople([...map.values()].sort((a, b) => (a.name || '').localeCompare(b.name || '')));
+      const authUsers = [...byUid.values()].sort((a, b) => a.name.localeCompare(b.name));
+      setPeople(authUsers);
+      // 2) Game players from the leaderboard (richmond, lancekulit, umi, …).
+      //    Anyone who ever saved a score is searchable here, even if they only
+      //    played games. Skip names that already match a real account.
+      const haveName = new Set(authUsers.map(p => p.name.toLowerCase()));
+      const gameOnly = new Map();
+      dirRef.current.leaderboard.forEach(d => {
+        const u = ((d.data() || {}).username || '').trim();
+        const key = u.toLowerCase();
+        if (!u || key === (myName || '').toLowerCase()) return;
+        if (haveName.has(key) || gameOnly.has(key)) return;
+        gameOnly.set(key, { uid: null, name: u, gameOnly: true });
+      });
+      setGamePlayers([...gameOnly.values()].sort((a, b) => a.name.localeCompare(b.name)));
     };
     const unsubChat = onSnapshot(collection(db, 'chatUsers'), snap => {
       dirRef.current.chatUsers = snap.docs; rebuild();
@@ -549,8 +564,13 @@ export default function Chat({ user, adminMode }) {
     const unsubGame = onSnapshot(collection(db, 'gameUsers'), snap => {
       dirRef.current.gameUsers = snap.docs; rebuild();
     }, () => {});
-    return () => { unsubChat(); unsubGame(); };
-  }, [uid]);
+    // Every game score lands in `leaderboard` (keyed username_game) — use it to
+    // make all players searchable. Ignore if it isn't readable.
+    const unsubLb = onSnapshot(collection(db, 'leaderboard'), snap => {
+      dirRef.current.leaderboard = snap.docs; rebuild();
+    }, () => {});
+    return () => { unsubChat(); unsubGame(); unsubLb(); };
+  }, [uid, myName]);
   // total unread across DMs + groups (used for the Messages tab badge + title)
   const dmUnreadTotal    = threads.reduce((s, t) => s + (t.unreadFor?.[uid] || 0), 0);
   const groupUnreadTotal = groups.reduce((s, g) => s + (g.unreadFor?.[uid] || 0), 0);
@@ -562,10 +582,12 @@ export default function Chat({ user, adminMode }) {
     const ou = (t.participants || []).find(p => p !== uid);
     return (t.names?.[ou] || '').toLowerCase().includes(dmTerm);
   }) : threads;
-  // people matching the search who don't already have an open conversation (start a new DM)
+  // people matching the search who don't already have an open conversation (start a new DM).
+  // Includes game-only players so everyone who signed up is findable.
   const threadUids = new Set(threads.map(t => (t.participants || []).find(p => p !== uid)));
   const searchPeople = dmTerm
-    ? people.filter(p => (p.name || '').toLowerCase().includes(dmTerm) && !threadUids.has(p.uid))
+    ? [...people, ...gamePlayers].filter(p =>
+        (p.name || '').toLowerCase().includes(dmTerm) && (!p.uid || !threadUids.has(p.uid)))
     : [];
   // tab title flash: prefix "(N)" while there are unread messages
   const baseTitle = useRef(typeof document !== 'undefined' ? document.title : '');
@@ -796,11 +818,16 @@ export default function Chat({ user, adminMode }) {
             <>
               <div style={S.sectionLabel}>People</div>
               {searchPeople.map(p => (
-                <div key={p.uid} className="chat-row" style={S.row} onClick={() => openDM(p.uid, p.name)}>
+                <div
+                  key={p.uid || `game:${p.name}`}
+                  className="chat-row"
+                  style={p.uid ? S.row : S.rowDisabled}
+                  onClick={() => p.uid && openDM(p.uid, p.name)}
+                >
                   <div style={{ ...S.avatar, ...(p.isAdmin ? S.adminAvatar : {}) }}>{initialOf(p.name)}</div>
                   <div style={{ flex: 1, overflow: 'hidden' }}>
                     <div style={S.rowName}>{p.isAdmin ? '⭐ ' : ''}{p.name}</div>
-                    <div style={S.rowSub}>Tap to start a chat</div>
+                    <div style={S.rowSub}>{p.uid ? 'Tap to start a chat' : 'Game player · ask them to open Chat once to message them'}</div>
                   </div>
                 </div>
               ))}
