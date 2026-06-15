@@ -356,6 +356,9 @@ export default function Reports({ role = 'staff', userName = '' }) {
   const [pricePct, setPricePct] = useState('');                  // extra % increase on top of overhead add
   const [marginPct, setMarginPct] = useState('80');              // target gross margin % (ignores overhead)
   const [openMarginGroup, setOpenMarginGroup] = useState(null);  // which margin-pricing group is open
+  const [showBestSellers, setShowBestSellers] = useState(false); // collapse the whole Best sellers card
+  const [showSuggested, setShowSuggested] = useState(false);     // collapse the whole Suggested prices card
+  const [showMargin, setShowMargin] = useState(false);           // collapse the whole margin-pricing card
   const tokenClientRef = React.useRef(null);
   const syncedRef = React.useRef(false);
   // Firestore fallback (used until connected to Google)
@@ -965,8 +968,11 @@ export default function Reports({ role = 'staff', userName = '' }) {
       {/* Best sellers — one card, tap a category to expand (Drinks top 10, others top 5) */}
       {catSections.length > 0 && (
         <div style={s.card}>
-          <div style={s.cardTitle}>Best sellers</div>
-          {catSections.map((sec, si) => {
+          <div onClick={() => setShowBestSellers(v => !v)} style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', marginBottom: showBestSellers ? 12 : 0 }}>
+            <div style={{ ...s.cardTitle, marginBottom: 0, flex: 1 }}>Best sellers</div>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: showBestSellers ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}><polyline points="6 9 12 15 18 9" /></svg>
+          </div>
+          {showBestSellers && catSections.map((sec, si) => {
             const limit = sec.cat === 'Drinks' ? 10 : 5;
             const open = openCat === sec.cat;
             const maxVal = sec.items[0] ? sec.items[0][1] : 1;
@@ -1006,7 +1012,11 @@ export default function Reports({ role = 'staff', userName = '' }) {
       )}
       {/* Suggested prices per size — overhead add (default) + your % increase */}
       <div style={s.card}>
-        <div style={s.cardTitle}>Suggested prices</div>
+        <div onClick={() => setShowSuggested(v => !v)} style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', marginBottom: showSuggested ? 12 : 0 }}>
+          <div style={{ ...s.cardTitle, marginBottom: 0, flex: 1 }}>Suggested prices</div>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: showSuggested ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}><polyline points="6 9 12 15 18 9" /></svg>
+        </div>
+        {showSuggested && (<>
         {/* % increase input */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
           <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--brown-dark)' }}>Extra increase</span>
@@ -1052,10 +1062,16 @@ export default function Reports({ role = 'staff', userName = '' }) {
         <div style={{ fontSize: 10, color: 'var(--brown-light)', marginTop: 8, fontStyle: 'italic', lineHeight: 1.5 }}>
           {overheadKnown ? `Default adds ${peso(flatAddPerItem)} per item — the overhead (${peso(overheadVal)}) shared across ~${projItems.toLocaleString()} projected items. Changes when overhead changes. ` : 'Overhead not synced — tap Sync to include the overhead add. '}Type a % to raise prices further. Round to your preferred price.
         </div>
+        </>)}
       </div>
       {/* Price by gross margin — ignores overhead, based on capital cost */}
       <div style={s.card}>
-        <div style={s.cardTitle}>Price by gross margin · ignores overhead</div>
+        <div onClick={() => setShowMargin(v => !v)} style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', marginBottom: showMargin ? 12 : 0 }}>
+          <div style={{ ...s.cardTitle, marginBottom: 0, flex: 1 }}>Price by gross margin · ignores overhead</div>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: showMargin ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}><polyline points="6 9 12 15 18 9" /></svg>
+        </div>
+        {showMargin && (<>
+        {/* margin input + list */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
           <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--brown-dark)' }}>Target margin</span>
           <input
@@ -1104,6 +1120,7 @@ export default function Reports({ role = 'staff', userName = '' }) {
         <div style={{ fontSize: 10, color: 'var(--brown-light)', marginTop: 8, fontStyle: 'italic', lineHeight: 1.5 }}>
           Pure product margin (price vs. capital cost) — does not include overhead. Add capital costs in the "Capital Cost" tab to price more items.
         </div>
+        </>)}
       </div>
       <div style={{ height: 80 }} />
     </div>
