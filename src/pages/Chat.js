@@ -24,6 +24,7 @@ const C = {
   adminBubble: '#fdf5e0',
   adminBorder: '#e8c840',
   danger:      '#e05050',
+  teal:        '#3f7d74',
   shadow:      'rgba(100,50,0,0.08)',
 };
 const FONT = "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif";
@@ -125,40 +126,53 @@ const fmtTime   = (ts) => {
   if (!ts?.toDate) return '';
   return ts.toDate().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 };
-
-// ── notify @mentions ──────────────────────────────────────────────────────────
-async function notifyMentions(text, fromUid, fromName, chatType, threadId, allUsers) {
-  const matches = [...text.matchAll(/@(\S+)/g)];
-  if (!matches.length) return;
-  const mentioned = [...new Set(matches.map(m => m[1].toLowerCase()))];
-  for (const name of mentioned) {
-    const target = allUsers.find(u => u.name?.toLowerCase() === name && u.uid !== fromUid);
-    if (!target) continue;
+// ── notify @mentions (+ @everyone) ─────────────────────────────────────────────
+// `recipients` = the people who belong to THIS chat (global = everyone, DM = the
+// other person, group = members). @everyone pings all of them.
+async function notifyMentions(text, fromUid, fromName, chatType, threadId, recipients) {
+  const list = recipients || [];
+  let targets = [];
+  const hasEveryone = /(^|\s)@everyone\b/i.test(text || '');
+  if (hasEveryone) {
+    targets = list.filter(u => u.uid !== fromUid);
+  } else {
+    const matches = [...(text || '').matchAll(/@(\S+)/g)];
+    if (!matches.length) return;
+    const mentioned = [...new Set(matches.map(m => m[1].toLowerCase()))];
+    targets = list.filter(u => mentioned.includes((u.name || '').toLowerCase()) && u.uid !== fromUid);
+  }
+  const seen = new Set();
+  for (const target of targets) {
+    if (!target?.uid || seen.has(target.uid)) continue;
+    seen.add(target.uid);
     try {
       await addDoc(collection(db, 'notifications'), {
         recipientUid: target.uid, fromUid, fromName,
-        text: text.slice(0, 120), chatType,
-        threadId: threadId || null, read: false,
+        text: (hasEveryone ? '@everyone: ' : '') + (text || '').slice(0, 120),
+        chatType, threadId: threadId || null, read: false,
         createdAt: serverTimestamp(),
       });
     } catch (_) {}
   }
 }
-// ── @mention text renderer ────────────────────────────────────────────────────
+// ── @mention text renderer (highlights @name and @everyone) ─────────────────────
 function MentionText({ text, myName, mine }) {
   const parts = (text || '').split(/(@\S+)/g);
   return (
     <>
       {parts.map((part, i) => {
         if (part.startsWith('@')) {
-          const isMe = myName && part.slice(1).toLowerCase() === myName.toLowerCase();
+          const tag = part.slice(1).toLowerCase();
+          const isEveryone = tag === 'everyone';
+          const isMe = myName && tag === myName.toLowerCase();
+          const highlight = isMe || isEveryone;
           return (
             <span key={i} style={{
               fontWeight: 700,
               color: mine ? 'rgba(255,230,180,0.95)' : C.primary,
-              background: isMe ? (mine ? 'rgba(255,255,255,0.18)' : 'rgba(160,82,45,0.12)') : 'transparent',
+              background: highlight ? (mine ? 'rgba(255,255,255,0.18)' : 'rgba(160,82,45,0.12)') : 'transparent',
               borderRadius: 4,
-              padding: isMe ? '0 3px' : 0,
+              padding: highlight ? '0 3px' : 0,
             }}>{part}</span>
           );
         }
@@ -206,8 +220,8 @@ function MessageThread({ messages, uid, myName, onDelete }) {
     </div>
   );
 }
-// ── input bar with @mention autocomplete ─────────────────────────────────────
-function InputBar({ onSend, chatUsers, myName }) {
+// ── input bar with @mention autocomplete (incl. @everyone) ─────────────────────
+function InputBar({ onSend, chatUsers, myName, allowEveryone = true }) {
   const [text, setText]               = useState('');
   const [mentionQuery, setMentionQuery] = useState(null);
   const [mentionStart, setMentionStart] = useState(-1);
@@ -228,8 +242,13 @@ function InputBar({ onSend, chatUsers, myName }) {
     setMentionQuery(null);
     setTimeout(() => inputRef.current?.focus(), 0);
   };
+  // "everyone" is offered first, then matching users
+  const base = [
+    ...(allowEveryone ? [{ uid: '__everyone', name: 'everyone', everyone: true }] : []),
+    ...(chatUsers || []),
+  ];
   const filtered = mentionQuery !== null
-    ? (chatUsers || []).filter(u => u.name?.toLowerCase().startsWith(mentionQuery) && u.name !== myName).slice(0, 5)
+    ? base.filter(u => (u.name || '').toLowerCase().startsWith(mentionQuery) && u.name !== myName).slice(0, 6)
     : [];
   const send = () => {
     const t = text.trim();
@@ -250,14 +269,16 @@ function InputBar({ onSend, chatUsers, myName }) {
               onMouseDown={e => { e.preventDefault(); selectMention(u.name); }}
               onTouchEnd={e => { e.preventDefault(); selectMention(u.name); }}
             >
-              <div style={{ ...S.mentionAvatar, ...(u.isAdmin ? S.adminAvatar : {}) }}>
-                {initialOf(u.name)}
+              <div style={{ ...S.mentionAvatar, ...(u.everyone ? { background: `linear-gradient(135deg, #6aa9a0, ${C.teal})` } : (u.isAdmin ? S.adminAvatar : {})) }}>
+                {u.everyone ? '@' : initialOf(u.name)}
               </div>
               <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: u.isAdmin ? C.admin : '#1a0800' }}>
-                  @{u.name}{u.isAdmin && ' ⭐'}
+                <div style={{ fontSize: 13, fontWeight: 600, color: u.everyone ? C.teal : (u.isAdmin ? C.admin : '#1a0800') }}>
+                  @{u.name}{u.isAdmin && !u.everyone ? ' ⭐' : ''}
                 </div>
-                {u.isAdmin && <div style={{ fontSize: 11, color: C.muted }}>Cafe staff</div>}
+                {u.everyone
+                  ? <div style={{ fontSize: 11, color: C.muted }}>Notify the whole chat</div>
+                  : (u.isAdmin && <div style={{ fontSize: 11, color: C.muted }}>Cafe staff</div>)}
               </div>
             </div>
           ))}
@@ -411,14 +432,12 @@ export default function Chat({ user, adminMode }) {
   const uid     = user.uid;
   const isAdmin = !!adminMode;
   const myName  = isAdmin ? 'THEONYX ADMIN' : nameOf(user);
-
   // Keep "current view" in refs so the live listeners below don't have to
   // re-subscribe every time you switch tabs / open a DM.
   const tabRef = useRef(tab);
   useEffect(() => { tabRef.current = tab; }, [tab]);
   const activeDMRef = useRef(activeDM);
   useEffect(() => { activeDMRef.current = activeDM; }, [activeDM]);
-
   // register in user directory
   useEffect(() => {
     setDoc(doc(db, 'chatUsers', uid), {
@@ -509,7 +528,6 @@ export default function Chat({ user, adminMode }) {
   const dmUnreadTotal    = threads.reduce((s, t) => s + (t.unreadFor?.[uid] || 0), 0);
   const groupUnreadTotal = groups.reduce((s, g) => s + (g.unreadFor?.[uid] || 0), 0);
   const messagesUnread   = dmUnreadTotal + groupUnreadTotal;
-
   // tab title flash: prefix "(N)" while there are unread messages
   const baseTitle = useRef(typeof document !== 'undefined' ? document.title : '');
   useEffect(() => {
@@ -518,7 +536,6 @@ export default function Chat({ user, adminMode }) {
     document.title = total > 0 ? `(${total}) ${baseTitle.current}` : baseTitle.current;
     return () => { document.title = baseTitle.current; };
   }, [globalUnread, messagesUnread]);
-
   // DM messages
   useEffect(() => {
     if (!activeDM) return;
@@ -532,6 +549,7 @@ export default function Chat({ user, adminMode }) {
   const sendGlobal = useCallback(async (text) => {
     try {
       await addDoc(collection(db, 'globalChat'), { uid, name: myName, text, admin: isAdmin, createdAt: serverTimestamp() });
+      // Global chat: @everyone pings the whole directory
       await notifyMentions(text, uid, myName, 'global', null, people);
     } catch (e) {
       console.error('[Chat] sendGlobal failed:', e);
@@ -550,7 +568,9 @@ export default function Chat({ user, adminMode }) {
       }, { merge: true });
       // updateDoc uses dotted key as a true nested field path (setDoc does not)
       await updateDoc(doc(db, 'dms', activeDM.id), { [`unreadFor.${otherUid}`]: increment(1) });
-      await notifyMentions(text, uid, myName, 'dm', activeDM.id, people);
+      // DM: mentions / @everyone only reach the other person
+      const dmRecipients = people.filter(p => p.uid === otherUid);
+      await notifyMentions(text, uid, myName, 'dm', activeDM.id, dmRecipients);
     } catch (e) {
       // Surface the real reason (very often Firestore security rules).
       console.error('[Chat] sendDM failed:', e);
@@ -564,7 +584,6 @@ export default function Chat({ user, adminMode }) {
     updateDoc(doc(db, 'dms', tId), { [`unreadFor.${uid}`]: 0 })
       .catch(e => { if (e?.code !== 'not-found') console.error('[Chat] clear unread failed:', e); });
   };
-
   // ── group chat actions ──────────────────────────────────────────────────────
   // Always read the freshest copy of the open group from the live `groups` list
   // (so member changes / new last message reflect immediately in the header).
@@ -605,16 +624,20 @@ export default function Chat({ user, adminMode }) {
       await addDoc(collection(db, 'groups', g.id, 'messages'), {
         uid, name: myName, text, admin: isAdmin, createdAt: serverTimestamp(),
       });
-      const others = ((groups.find(x => x.id === g.id) || g).members || []).filter(m => m !== uid);
+      const members = ((groups.find(x => x.id === g.id) || g).members || []);
+      const others = members.filter(m => m !== uid);
       const bump = {};
       others.forEach(m => { bump[`unreadFor.${m}`] = increment(1); });
       await updateDoc(doc(db, 'groups', g.id), {
         lastMessage: text, lastSender: uid, updatedAt: serverTimestamp(), ...bump,
       });
+      // Group: mentions / @everyone reach members only
+      const groupRecipients = people.filter(p => members.includes(p.uid));
+      await notifyMentions(text, uid, myName, 'group', g.id, groupRecipients);
     } catch (e) {
       console.error('[Chat] sendGroup failed:', e);
     }
-  }, [activeGroup, groups, uid, myName, isAdmin]);
+  }, [activeGroup, groups, uid, myName, isAdmin, people]);
   const addGroupMembers = async (g, memberUids) => {
     const merged = [...new Set([...(g.members || []), ...memberUids])];
     try {
@@ -626,11 +649,12 @@ export default function Chat({ user, adminMode }) {
       await updateDoc(doc(db, 'groups', g.id), { members: (g.members || []).filter(x => x !== m) });
     } catch (e) { console.error('[Chat] removeGroupMember failed:', e); }
   };
-
   // ── group thread view ─────────────────────────────────────────────────────────
   if (activeGroup && liveGroup) {
     const memberCount = (liveGroup.members || []).length;
     const isCreator = liveGroup.createdBy === uid;
+    // only suggest people who are in this group
+    const groupPeople = people.filter(p => (liveGroup.members || []).includes(p.uid));
     return (
       <div style={S.wrap}>
         {GlowStyles}
@@ -654,13 +678,14 @@ export default function Chat({ user, adminMode }) {
           )}
         </div>
         <MessageThread messages={groupMsgs} uid={uid} myName={myName} />
-        <InputBar onSend={sendGroup} chatUsers={people} myName={myName} />
+        <InputBar onSend={sendGroup} chatUsers={groupPeople} myName={myName} />
       </div>
     );
   }
-
   // ── DM thread view ──────────────────────────────────────────────────────────
   if (activeDM) {
+    const otherUid = activeDM.id.split('_').find(p => p !== uid);
+    const dmPeople = people.filter(p => p.uid === otherUid);
     return (
       <div style={S.wrap}>
         {GlowStyles}
@@ -676,7 +701,8 @@ export default function Chat({ user, adminMode }) {
           <div style={S.dmCardSub}>Theonyx Cafe member</div>
         </div>
         <MessageThread messages={dmMsgs} uid={uid} myName={myName} />
-        <InputBar onSend={sendDM} chatUsers={people} myName={myName} />
+        {/* @everyone not needed in a 1-on-1 DM */}
+        <InputBar onSend={sendDM} chatUsers={dmPeople} myName={myName} allowEveryone={false} />
       </div>
     );
   }
