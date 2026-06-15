@@ -16,6 +16,98 @@ const OVERHEAD_FALLBACK = 32300;                                            // u
 const GOOGLE_CLIENT_ID = '596322682185-n5hm66hvol3nnqqllnuop995kcnefbgu.apps.googleusercontent.com';
 const SCOPES           = 'https://www.googleapis.com/auth/spreadsheets.readonly';
 
+// Menu with sizes & prices (same as the Orders app) — for the "Suggested prices" card
+const SIZES = ['mini', 'classic', 'upgrade', 'regular'];
+const SIZE_LABELS = { mini: 'Mini', classic: 'Classic', upgrade: 'Upgrade', regular: 'Regular' };
+const MENU_PRICING = [
+  { id: 'espresso', label: 'Espresso based', items: [
+    { name: 'COFFEE LATTE', mini: 75, classic: 85, upgrade: 95 },
+    { name: 'CARAMEL MACCHIATO', mini: 99, classic: 120, upgrade: 150 },
+    { name: 'AMERICANO', mini: 50, classic: 75, upgrade: 99 },
+    { name: 'CAPUCCINO', mini: 50, classic: 85, upgrade: 120 },
+    { name: 'SPANISH LATTE', mini: 99, classic: 120, upgrade: 150 },
+    { name: 'MOCHA', mini: 99, classic: 120, upgrade: 150 },
+    { name: 'SEA SALT CARAMEL LATTE', mini: 99, classic: 120, upgrade: 150 },
+    { name: 'COFFEE MINT', mini: 99, classic: 120, upgrade: 150 },
+    { name: 'RHUMPUCCINO', mini: 99, classic: 135, upgrade: 150 },
+    { name: 'BREWED', mini: 25, classic: 50, upgrade: 85 },
+    { name: 'DIRTY MATCHA', classic: 120, upgrade: 150 },
+    { name: 'FRAPPE CARAMEL MACCHIATO', regular: 150 },
+  ]},
+  { id: 'noncoffee', label: 'Non-coffee', items: [
+    { name: 'STRAWBERRY LATTE', classic: 120, upgrade: 150 },
+    { name: 'STRAWBERRY MATCHA', classic: 120, upgrade: 150 },
+    { name: 'MATCHA LATTE', classic: 120, upgrade: 150 },
+    { name: 'MILK CHOCOLATE', classic: 89, upgrade: 120 },
+    { name: 'OREO CHOCOMILKSHAKE', classic: 120, upgrade: 150 },
+    { name: 'FRAPPE STRAWBERRY', regular: 165 },
+    { name: 'FRAPPE UBE HALAYA', regular: 150 },
+    { name: 'FRAPPE CHOCOLATE', regular: 150 },
+  ]},
+  { id: 'milktea', label: 'Milk tea', items: [
+    { name: 'M.T. - HOKKAIDO', regular: 55 },
+    { name: 'M.T. - OKINAWA', regular: 55 },
+    { name: 'M.T. - MANGO CHEESECAKE', regular: 60 },
+    { name: 'M.T. - RED VELVET', regular: 60 },
+    { name: 'M.T. - TARO', regular: 55 },
+    { name: 'M.T. - BLACK FOREST', regular: 60 },
+    { name: 'M.T. - DARK CHOCOLATE', regular: 60 },
+    { name: 'M.T. - COOKIES AND CREAM', regular: 55 },
+    { name: 'M.T. - WHITE BUNNY', regular: 60 },
+    { name: 'M.T. - WINTERMELON', regular: 60 },
+  ]},
+  { id: 'soda', label: 'Soda & tea', items: [
+    { name: 'SODA - PASSION', classic: 50 },
+    { name: 'SODA - STRAWBERRY', classic: 50 },
+    { name: 'SODA - BLUEBERRY', classic: 50 },
+    { name: 'SODA - MANGO', classic: 50 },
+    { name: 'TEA - BREAKFAST IN PARIS', classic: 50 },
+    { name: 'TEA - CHAMOMILE', classic: 50 },
+    { name: 'TEA - HIBISCUS', classic: 80 },
+  ]},
+  { id: 'pasta', label: 'Pasta', items: [
+    { name: 'PASTA - CARBONARA', regular: 130 },
+    { name: 'PASTA - BOLOGNESE', regular: 130 },
+  ]},
+  { id: 'rice', label: 'Rice meals', items: [
+    { name: 'TAPSILOG', regular: 90 },
+    { name: 'CORNSILOG', regular: 90 },
+    { name: 'SPAMSILOG', regular: 80 },
+    { name: 'PORK SISIG RICE', regular: 180 },
+    { name: 'PORK EMBOTIDO RICE', regular: 129 },
+    { name: 'LUMPIA RICE', regular: 80 },
+    { name: 'PORKCHOP', regular: 150 },
+    { name: 'RICE MEAL - C. TAPA', regular: 180 },
+    { name: 'RICE MEAL - C. HOTDOG', regular: 90 },
+    { name: 'RICE MEAL - C. PEPPER STEAK', regular: 180 },
+    { name: 'RICE MEAL - C. KOREAN', regular: 180 },
+    { name: 'RICE MEAL - C. INASAL', regular: 180 },
+  ]},
+  { id: 'pastries', label: 'Pastries & sweets', items: [
+    { name: 'WAFFLE - MANGO', regular: 80 },
+    { name: 'WAFFLE - CHOCOLATE', regular: 80 },
+    { name: 'WAFFLE - BLUEBERRY', regular: 80 },
+    { name: 'WAFFLE - OTHER', regular: 80 },
+    { name: 'PASTRY - COOKIES', regular: 50 },
+    { name: 'COOKIES SMALL', regular: 35 },
+    { name: 'SWEET BITES', regular: 15 },
+    { name: 'GRILLED CHEESE SANDWICH', regular: 80 },
+  ]},
+  { id: 'snacks', label: 'Snacks', items: [
+    { name: 'CHEESE BURGER', regular: 50 },
+    { name: 'SIOMAI', regular: 50 },
+    { name: 'ONYX BURGER', regular: 150 },
+    { name: 'NACHOS', regular: 130 },
+    { name: 'FRIES - BBQ', regular: 30 },
+    { name: 'FRIES - SOUR CREAM', regular: 30 },
+    { name: 'FRIES - CHEESE', regular: 30 },
+  ]},
+  { id: 'addons', label: 'Add-ons', items: [
+    { name: 'PEARL', regular: 10 },
+    { name: 'ESPRESSO SHOT', regular: 10 },
+    { name: 'RICE', regular: 15 },
+  ]},
+];
 const productColorMap = {};
 function getProductColor(name) {
   if (!productColorMap[name]) {
@@ -261,6 +353,7 @@ export default function Reports({ role = 'staff', userName = '' }) {
   const [showWeeklyRev, setShowWeeklyRev] = useState(false); // collapse "Net revenue by week"
   const [showUncosted, setShowUncosted] = useState(false);   // collapse "No capital cost yet"
   const [showComputation, setShowComputation] = useState(false); // collapse the profit breakdown
+  const [openPriceGroup, setOpenPriceGroup] = useState(null);    // which suggested-prices group is open
   const tokenClientRef = React.useRef(null);
   const syncedRef = React.useRef(false);
   // Firestore fallback (used until connected to Google)
@@ -874,11 +967,6 @@ export default function Reports({ role = 'staff', userName = '' }) {
                         <div style={s.rank}>{i + 1}</div>
                         <div style={{ flex: 1 }}>
                           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--brown-dark)' }}>{name}</div>
-                          {flatAddPerItem > 0 && productQty[name] > 0 && (
-                            <div style={{ fontSize: 10, color: 'var(--gold)', marginTop: 1 }}>
-                              ≈{peso(sales / productQty[name])} → <b>{peso(sales / productQty[name] + flatAddPerItem)}</b>
-                            </div>
-                          )}
                           <div style={{ height: 4, background: '#f0e4d8', borderRadius: 2, marginTop: 4 }}>
                             <div style={{ height: '100%', background: 'var(--brown-mid)', borderRadius: 2, width: `${(sales / maxVal) * 100}%` }} />
                           </div>
@@ -917,6 +1005,42 @@ export default function Reports({ role = 'staff', userName = '' }) {
           )}
           <div style={{ fontSize: 10, color: 'var(--brown-light)', marginTop: 8, fontStyle: 'italic', lineHeight: 1.5 }}>
             Rough guide — spreads the amount evenly across all items. Assumes volume stays about the same after a price change.
+          </div>
+        </div>
+      )}
+      {/* Suggested prices per size (order-menu format) to cover overhead */}
+      {flatAddPerItem > 0 && (
+        <div style={s.card}>
+          <div style={s.cardTitle}>Suggested prices · +{peso(flatAddPerItem)}/item to cover overhead</div>
+          {MENU_PRICING.map((group, gi) => {
+            const open = openPriceGroup === group.id;
+            return (
+              <div key={group.id} style={{ borderTop: gi === 0 ? 'none' : '1px solid #f0e4d8' }}>
+                <div onClick={() => setOpenPriceGroup(open ? null : group.id)} style={{ display: 'flex', alignItems: 'center', padding: '11px 0', cursor: 'pointer' }}>
+                  <div style={{ flex: 1, fontSize: 13, fontWeight: 700, color: 'var(--brown-dark)' }}>{group.label}</div>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', flexShrink: 0 }}><polyline points="6 9 12 15 18 9" /></svg>
+                </div>
+                {open && (
+                  <div style={{ paddingBottom: 8 }}>
+                    {group.items.map(item => (
+                      <div key={item.name} style={{ padding: '7px 0', borderTop: '1px solid #f7f0e6' }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--brown-dark)', marginBottom: 5 }}>{item.name}</div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                          {SIZES.filter(sz => item[sz]).map(sz => (
+                            <span key={sz} style={{ fontSize: 10.5, color: 'var(--brown-dark)', background: 'var(--cream)', border: '0.5px solid #e6d6c0', borderRadius: 8, padding: '4px 8px' }}>
+                              {SIZE_LABELS[sz]} <span style={{ color: 'var(--brown-light)' }}>{peso(item[sz])}</span> → <b style={{ color: 'var(--green-ok)' }}>{peso(item[sz] + flatAddPerItem)}</b>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          <div style={{ fontSize: 10, color: 'var(--brown-light)', marginTop: 8, fontStyle: 'italic', lineHeight: 1.5 }}>
+            Adds a flat +{peso(flatAddPerItem)} to every size to break even on overhead this month. Round to your preferred price.
           </div>
         </div>
       )}
