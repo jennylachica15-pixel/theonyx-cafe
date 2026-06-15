@@ -11,8 +11,7 @@ const SHEET_ID_STOCK   = '1Gnr_6SBcUBY4GcDqvGpTUZgE8NI3OIZAzlusG5YPfQg';   // St
 const TAB_CAPITAL      = 'Capital Cost';
 const SHEET_ID_ORDERS  = '1yadv9UgY8mFQzSwLsw3Qk3EepZeLL8dNl3YRtYsGZQU';   // Order Summary (sales)
 const TAB_ORDERS       = 'Sheet1';                                          // same tab the Orders app writes to
-const OVERHEAD_GID     = 695906692;                                         // tab in Stock Checks that holds the monthly operating cost
-const OVERHEAD_FALLBACK = 22300;                                            // used if the sheet can't be read (Rent+staff+utilities+…)
+const OVERHEAD_GID     = 695906692;                                         // tab in Stock Checks that holds the monthly operating cost (summed live, no fallback)
 const GOOGLE_CLIENT_ID = '596322682185-n5hm66hvol3nnqqllnuop995kcnefbgu.apps.googleusercontent.com';
 const SCOPES           = 'https://www.googleapis.com/auth/spreadsheets.readonly';
 
@@ -517,7 +516,9 @@ export default function Reports({ role = 'staff', userName = '' }) {
   const monthlyRev = profitInRange(m30start, null);
   const marginOf = (p) => (p.matched > 0 ? Math.round((p.net / p.matched) * 100) : 0);
   // ── Overhead, break-even & month-end projection (calendar month to date) ──
-  const overheadVal = overhead != null ? overhead : OVERHEAD_FALLBACK;
+  // No fallback — overhead is null until it's actually read from the sheet (so you know if it synced).
+  const overheadKnown = overhead != null;
+  const overheadVal = overhead || 0;
   const monthStartCal = new Date(now.getFullYear(), now.getMonth(), 1);
   const monthCalRev = profitInRange(monthStartCal, null);
   const daysElapsed = Math.max(1, now.getDate());
@@ -535,8 +536,8 @@ export default function Reports({ role = 'staff', userName = '' }) {
   const projItems = daysElapsed > 0 ? Math.round(itemsMTD / daysElapsed * daysInMonth) : 0;
   const addPerItemShortfall = (projProfit < 0 && projItems > 0) ? (-projProfit) / projItems : 0;
   const addPerItemOverhead = projItems > 0 ? overheadVal / projItems : 0;
-  // Flat amount to add per item to cover overhead (break-even); 0 if already profitable
-  const flatAddPerItem = projProfit < 0 ? addPerItemShortfall : 0;
+  // Flat amount to add per item to cover overhead (break-even); 0 if already profitable or overhead not synced
+  const flatAddPerItem = (overheadKnown && projProfit < 0) ? addPerItemShortfall : 0;
   // Top 10 products
   const productMap = {};
   const productQty = {};
@@ -640,10 +641,15 @@ export default function Reports({ role = 'staff', userName = '' }) {
       </div>
       {/* Profit this month — after overhead (hero) */}
       <div style={s.card}>
-        <div style={s.cardTitle}>Profit this month · after overhead{overhead == null ? ' (default)' : ''}</div>
+        <div style={s.cardTitle}>Profit this month · after overhead{overheadKnown ? '' : ' · not synced'}</div>
         {/* Big net-after-overhead number */}
         <div style={{ fontSize: 11, color: 'var(--brown-light)' }}>Net profit this month</div>
-        <div style={{ fontSize: 32, fontWeight: 800, letterSpacing: '-1px', color: netAfterOverhead >= 0 ? 'var(--green-ok)' : '#a3402d', margin: '2px 0 12px' }}>{peso(netAfterOverhead)}</div>
+        <div style={{ fontSize: 32, fontWeight: 800, letterSpacing: '-1px', color: !overheadKnown ? 'var(--brown-light)' : (netAfterOverhead >= 0 ? 'var(--green-ok)' : '#a3402d'), margin: '2px 0 12px' }}>{overheadKnown ? peso(netAfterOverhead) : '—'}</div>
+        {!overheadKnown && (
+          <div style={{ fontSize: 12, color: 'var(--brown-light)', background: 'var(--cream)', border: '0.5px solid #e6d6c0', borderRadius: 10, padding: '10px 12px', marginBottom: 12, lineHeight: 1.5 }}>
+            Overhead not loaded yet. Connect Google and tap <b style={{ color: 'var(--gold)' }}>Sync</b> to read it from the sheet.
+          </div>
+        )}
         {/* Computation (collapsible) */}
         <div onClick={() => setShowComputation(v => !v)} style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', marginBottom: showComputation ? 8 : 12 }}>
           <div style={{ flex: 1, fontSize: 11, fontWeight: 700, color: 'var(--brown-light)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Breakdown</div>
@@ -653,18 +659,20 @@ export default function Reports({ role = 'staff', userName = '' }) {
           <div style={{ background: 'var(--cream)', borderRadius: 12, padding: '12px 14px', marginBottom: 12 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--brown-dark)', padding: '4px 0' }}><span>Sales (this month)</span><span style={{ fontWeight: 600 }}>{peso(monthCalRev.sales)}</span></div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--brown-mid)', padding: '4px 0' }}><span>− Capital cost</span><span style={{ fontWeight: 600 }}>{peso(monthCalRev.cost)}</span></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--brown-mid)', padding: '4px 0 8px', borderBottom: '1px dashed #e3d0b4' }}><span>− Overhead (monthly)</span><span style={{ fontWeight: 600 }}>{peso(overheadVal)}</span></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 800, color: netAfterOverhead >= 0 ? 'var(--green-ok)' : '#a3402d', padding: '8px 0 2px' }}><span>= Net profit</span><span>{peso(netAfterOverhead)}</span></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--brown-mid)', padding: '4px 0 8px', borderBottom: '1px dashed #e3d0b4' }}><span>− Overhead (monthly)</span><span style={{ fontWeight: 600 }}>{overheadKnown ? peso(overheadVal) : '— not synced'}</span></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 800, color: !overheadKnown ? 'var(--brown-light)' : (netAfterOverhead >= 0 ? 'var(--green-ok)' : '#a3402d'), padding: '8px 0 2px' }}><span>= Net profit</span><span>{overheadKnown ? peso(netAfterOverhead) : '—'}</span></div>
           </div>
         )}
-        {/* Projection */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: projProfit >= 0 ? 'var(--cream)' : '#fbeeea', border: `0.5px solid ${projProfit >= 0 ? '#e6d6c0' : '#eccfc7'}`, borderRadius: 10, padding: '9px 12px', marginBottom: 14 }}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={projProfit >= 0 ? 'var(--green-ok)' : '#a3402d'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><polyline points="23 6 13.5 15.5 8.5 10.5 1 18" /><polyline points="17 6 23 6 23 12" /></svg>
-          <div style={{ flex: 1, fontSize: 12, color: 'var(--brown-dark)', lineHeight: 1.4 }}>
-            Projected month-end: <b>{peso(projProfit)}</b>
-            <div style={{ fontSize: 11, color: 'var(--brown-light)' }}>{projProfit >= 0 ? 'On track to cover overhead' : `Short by ${peso(-projProfit)} · projected sales ${peso(projSales)}`}</div>
+        {/* Projection — only when overhead is synced */}
+        {overheadKnown && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: projProfit >= 0 ? 'var(--cream)' : '#fbeeea', border: `0.5px solid ${projProfit >= 0 ? '#e6d6c0' : '#eccfc7'}`, borderRadius: 10, padding: '9px 12px', marginBottom: 14 }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={projProfit >= 0 ? 'var(--green-ok)' : '#a3402d'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><polyline points="23 6 13.5 15.5 8.5 10.5 1 18" /><polyline points="17 6 23 6 23 12" /></svg>
+            <div style={{ flex: 1, fontSize: 12, color: 'var(--brown-dark)', lineHeight: 1.4 }}>
+              Projected month-end: <b>{peso(projProfit)}</b>
+              <div style={{ fontSize: 11, color: 'var(--brown-light)' }}>{projProfit >= 0 ? 'On track to cover overhead' : `Short by ${peso(-projProfit)} · projected sales ${peso(projSales)}`}</div>
+            </div>
           </div>
-        </div>
+        )}
         {/* Key metrics */}
         <div style={s.statGrid}>
           <div style={s.statBox}>
@@ -678,21 +686,23 @@ export default function Reports({ role = 'staff', userName = '' }) {
             <div style={{ fontSize: 10, color: 'var(--brown-light)', marginTop: 1 }}>Profit per ₱1 of sales</div>
           </div>
         </div>
-        {/* Break-even (card with target icon) */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'var(--cream)', border: '0.5px solid #e6d6c0', borderRadius: 12, padding: '12px 14px', marginTop: 12 }}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1" /></svg>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--brown-dark)' }}>Break-even sales</div>
-            <div style={{ fontSize: 10.5, color: 'var(--brown-light)' }}>to cover {peso(overheadVal)} overhead</div>
+        {/* Break-even (card with target icon) — only when overhead is synced */}
+        {overheadKnown && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'var(--cream)', border: '0.5px solid #e6d6c0', borderRadius: 12, padding: '12px 14px', marginTop: 12 }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1" /></svg>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--brown-dark)' }}>Break-even sales</div>
+              <div style={{ fontSize: 10.5, color: 'var(--brown-light)' }}>to cover {peso(overheadVal)} overhead</div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--brown-dark)' }}>{peso(breakEvenSales)}<span style={{ fontSize: 10, color: 'var(--brown-light)' }}>/mo</span></div>
+              <div style={{ fontSize: 10.5, color: 'var(--brown-light)' }}>Daily target {peso(dailyTargetSales)}</div>
+            </div>
           </div>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--brown-dark)' }}>{peso(breakEvenSales)}<span style={{ fontSize: 10, color: 'var(--brown-light)' }}>/mo</span></div>
-            <div style={{ fontSize: 10.5, color: 'var(--brown-light)' }}>Daily target {peso(dailyTargetSales)}</div>
-          </div>
-        </div>
+        )}
         {/* Coverage + uncosted */}
         <div style={{ fontSize: 11, color: 'var(--brown-light)', lineHeight: 1.5, marginTop: 12 }}>
-          {coverageAll}% of sales has a capital cost set — profit is approximate while {uncostedAll.length} item{uncostedAll.length !== 1 ? 's have' : ' has'} no cost yet. Overhead is read live from the sheet ({peso(overheadVal)}).
+          {coverageAll}% of sales has a capital cost set — profit is approximate while {uncostedAll.length} item{uncostedAll.length !== 1 ? 's have' : ' has'} no cost yet. {overheadKnown ? `Overhead read live from the sheet (${peso(overheadVal)}).` : 'Overhead not synced yet — tap Sync.'}
         </div>
         {uncostedAll.length > 0 && (
           <div style={{ marginTop: 8 }}>
@@ -915,31 +925,37 @@ export default function Reports({ role = 'staff', userName = '' }) {
           </div>
           {/* After overhead · this calendar month */}
           <div style={{ marginTop: 14, borderTop: '1px solid #f0e4d8', paddingTop: 10 }}>
-            <div style={s.cardTitle}>After overhead · this month{overhead == null ? ' (default)' : ''}</div>
+            <div style={s.cardTitle}>After overhead · this month{overheadKnown ? '' : ' · not synced'}</div>
             <div style={s.statGrid}>
               <div style={s.statBox}><div style={s.statNum('var(--brown-dark)')}>{peso(monthCalRev.sales)}</div><div style={s.statLabel}>Sales (MTD)</div></div>
-              <div style={s.statBox}><div style={s.statNum('var(--brown-mid)')}>{peso(overheadVal)}</div><div style={s.statLabel}>Overhead / mo</div></div>
+              <div style={s.statBox}><div style={s.statNum('var(--brown-mid)')}>{overheadKnown ? peso(overheadVal) : '—'}</div><div style={s.statLabel}>Overhead / mo</div></div>
               <div style={s.statBox}><div style={s.statNum('var(--green-ok)')}>{peso(monthCalRev.net)}</div><div style={s.statLabel}>Gross profit</div></div>
-              <div style={s.statBox}><div style={s.statNum(netAfterOverhead >= 0 ? 'var(--green-ok)' : '#a3402d')}>{peso(netAfterOverhead)}</div><div style={s.statLabel}>Net after overhead</div></div>
+              <div style={s.statBox}><div style={s.statNum(!overheadKnown ? 'var(--brown-light)' : (netAfterOverhead >= 0 ? 'var(--green-ok)' : '#a3402d'))}>{overheadKnown ? peso(netAfterOverhead) : '—'}</div><div style={s.statLabel}>Net after overhead</div></div>
             </div>
-            {/* Break-even */}
-            <div style={s.productRow}>
-              <div style={{ flex: 1, fontSize: 12, fontWeight: 600, color: 'var(--brown-dark)' }}>Break-even sales</div>
-              <div style={{ fontSize: 11, color: 'var(--brown-light)', marginRight: 10 }}>Daily {peso(dailyTargetSales)}</div>
-              <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--brown-dark)' }}>{peso(breakEvenSales)}</div>
-            </div>
-            {/* Month-end projection */}
-            <div style={s.productRow}>
-              <div style={{ flex: 1, fontSize: 12, fontWeight: 600, color: 'var(--brown-dark)' }}>Projected month-end</div>
-              <div style={{ fontSize: 11, color: 'var(--brown-light)', marginRight: 10 }}>Sales {peso(projSales)}</div>
-              <div style={{ fontSize: 12.5, fontWeight: 700, color: projProfit >= 0 ? 'var(--green-ok)' : '#a3402d' }}>{peso(projProfit)}</div>
-            </div>
-            <div style={{ fontSize: 11, color: projProfit >= 0 ? 'var(--green-ok)' : '#a3402d', fontWeight: 600, marginTop: 6 }}>
-              {projProfit >= 0 ? `On track — projected profit after overhead` : `Short by ${peso(-projProfit)} of covering overhead`}
-            </div>
-            <div style={{ fontSize: 10, color: 'var(--brown-light)', marginTop: 6, fontStyle: 'italic', lineHeight: 1.5 }}>
-              Projection = current daily average × {daysInMonth} days. Profit is approximate while some items still have no capital cost.
-            </div>
+            {overheadKnown ? (
+              <>
+                {/* Break-even */}
+                <div style={s.productRow}>
+                  <div style={{ flex: 1, fontSize: 12, fontWeight: 600, color: 'var(--brown-dark)' }}>Break-even sales</div>
+                  <div style={{ fontSize: 11, color: 'var(--brown-light)', marginRight: 10 }}>Daily {peso(dailyTargetSales)}</div>
+                  <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--brown-dark)' }}>{peso(breakEvenSales)}</div>
+                </div>
+                {/* Month-end projection */}
+                <div style={s.productRow}>
+                  <div style={{ flex: 1, fontSize: 12, fontWeight: 600, color: 'var(--brown-dark)' }}>Projected month-end</div>
+                  <div style={{ fontSize: 11, color: 'var(--brown-light)', marginRight: 10 }}>Sales {peso(projSales)}</div>
+                  <div style={{ fontSize: 12.5, fontWeight: 700, color: projProfit >= 0 ? 'var(--green-ok)' : '#a3402d' }}>{peso(projProfit)}</div>
+                </div>
+                <div style={{ fontSize: 11, color: projProfit >= 0 ? 'var(--green-ok)' : '#a3402d', fontWeight: 600, marginTop: 6 }}>
+                  {projProfit >= 0 ? `On track — projected profit after overhead` : `Short by ${peso(-projProfit)} of covering overhead`}
+                </div>
+                <div style={{ fontSize: 10, color: 'var(--brown-light)', marginTop: 6, fontStyle: 'italic', lineHeight: 1.5 }}>
+                  Projection = current daily average × {daysInMonth} days. Profit is approximate while some items still have no capital cost.
+                </div>
+              </>
+            ) : (
+              <div style={{ fontSize: 11, color: 'var(--brown-light)', marginTop: 6 }}>Overhead not synced yet — tap Sync to load it from the sheet.</div>
+            )}
           </div>
         </div>
       )}
@@ -999,7 +1015,7 @@ export default function Reports({ role = 'staff', userName = '' }) {
           <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--brown-dark)' }}>%</span>
         </div>
         <div style={{ fontSize: 11, color: 'var(--brown-light)', marginBottom: 10, lineHeight: 1.5 }}>
-          New price = current + <b>{peso(flatAddPerItem)}</b> (covers overhead){(Number(pricePct) || 0) > 0 ? <> + {pricePct}% on top</> : ''}.
+          New price = current{overheadKnown ? <> + <b>{peso(flatAddPerItem)}</b> (covers overhead)</> : ''}{(Number(pricePct) || 0) > 0 ? <> + {pricePct}% on top</> : ''}{!overheadKnown && (Number(pricePct) || 0) === 0 ? <> · <span style={{ color: 'var(--gold)' }}>Sync overhead or type a %</span></> : ''}.
         </div>
         {MENU_PRICING.map((group, gi) => {
           const open = openPriceGroup === group.id;
@@ -1031,7 +1047,7 @@ export default function Reports({ role = 'staff', userName = '' }) {
           );
         })}
         <div style={{ fontSize: 10, color: 'var(--brown-light)', marginTop: 8, fontStyle: 'italic', lineHeight: 1.5 }}>
-          Default adds {peso(flatAddPerItem)} per item to break even on overhead. Type a % to raise prices further. Round to your preferred price.
+          {overheadKnown ? `Default adds ${peso(flatAddPerItem)} per item to break even on overhead. ` : 'Overhead not synced — tap Sync to include the overhead add. '}Type a % to raise prices further. Round to your preferred price.
         </div>
       </div>
       <div style={{ height: 80 }} />
