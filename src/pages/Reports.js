@@ -985,30 +985,6 @@ export default function Reports({ role = 'staff', userName = '' }) {
           })}
         </div>
       )}
-      {/* How much to add per item to cover overhead */}
-      {itemsMTD > 0 && (
-        <div style={s.card}>
-          <div style={s.cardTitle}>Price tweak to cover overhead</div>
-          <div style={{ fontSize: 11, color: 'var(--brown-light)', marginBottom: 10 }}>Based on about {projItems.toLocaleString()} items projected to sell this month.</div>
-          {projProfit < 0 ? (
-            <>
-              <div style={s.productRow}>
-                <div style={{ flex: 1, fontSize: 12, fontWeight: 600, color: 'var(--brown-dark)' }}>To break even this month<div style={{ fontSize: 10, color: 'var(--brown-light)', fontWeight: 400 }}>covers the {peso(-projProfit)} projected shortfall</div></div>
-                <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--green-ok)' }}>+{peso(addPerItemShortfall)}<span style={{ fontSize: 10, color: 'var(--brown-light)', fontWeight: 400 }}>/item</span></div>
-              </div>
-              <div style={s.productRow}>
-                <div style={{ flex: 1, fontSize: 12, fontWeight: 600, color: 'var(--brown-dark)' }}>To fully fund overhead from price<div style={{ fontSize: 10, color: 'var(--brown-light)', fontWeight: 400 }}>covers the whole {peso(overheadVal)} overhead</div></div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--gold)' }}>+{peso(addPerItemOverhead)}<span style={{ fontSize: 10, color: 'var(--brown-light)', fontWeight: 400 }}>/item</span></div>
-              </div>
-            </>
-          ) : (
-            <div style={{ fontSize: 12.5, color: 'var(--green-ok)', fontWeight: 600 }}>You're projected to cover overhead — no price increase needed.</div>
-          )}
-          <div style={{ fontSize: 10, color: 'var(--brown-light)', marginTop: 8, fontStyle: 'italic', lineHeight: 1.5 }}>
-            Rough guide — spreads the amount evenly across all items. Assumes volume stays about the same after a price change.
-          </div>
-        </div>
-      )}
       {/* Suggested prices per size — overhead add (default) + your % increase */}
       <div style={s.card}>
         <div style={s.cardTitle}>Suggested prices</div>
