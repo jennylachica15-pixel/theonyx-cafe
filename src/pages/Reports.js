@@ -929,40 +929,6 @@ export default function Reports({ role = 'staff', userName = '' }) {
               <div style={s.statBox}><div style={s.statNum('var(--gold)')}>{marginOf(monthlyRev)}%</div><div style={s.statLabel}>Gross Margin</div></div>
             </div>
           </div>
-          {/* After overhead · this calendar month */}
-          <div style={{ marginTop: 14, borderTop: '1px solid #f0e4d8', paddingTop: 10 }}>
-            <div style={s.cardTitle}>After overhead · this month{overheadKnown ? '' : ' · not synced'}</div>
-            <div style={s.statGrid}>
-              <div style={s.statBox}><div style={s.statNum('var(--brown-dark)')}>{peso(monthCalRev.sales)}</div><div style={s.statLabel}>Sales (MTD)</div></div>
-              <div style={s.statBox}><div style={s.statNum('var(--brown-mid)')}>{overheadKnown ? peso(overheadVal) : '—'}</div><div style={s.statLabel}>Overhead / mo</div></div>
-              <div style={s.statBox}><div style={s.statNum('var(--green-ok)')}>{peso(monthCalRev.net)}</div><div style={s.statLabel}>Gross profit</div></div>
-              <div style={s.statBox}><div style={s.statNum(!overheadKnown ? 'var(--brown-light)' : (netAfterOverhead >= 0 ? 'var(--green-ok)' : '#a3402d'))}>{overheadKnown ? peso(netAfterOverhead) : '—'}</div><div style={s.statLabel}>Net after overhead</div></div>
-            </div>
-            {overheadKnown ? (
-              <>
-                {/* Break-even */}
-                <div style={s.productRow}>
-                  <div style={{ flex: 1, fontSize: 12, fontWeight: 600, color: 'var(--brown-dark)' }}>Break-even sales</div>
-                  <div style={{ fontSize: 11, color: 'var(--brown-light)', marginRight: 10 }}>Daily {peso(dailyTargetSales)}</div>
-                  <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--brown-dark)' }}>{peso(breakEvenSales)}</div>
-                </div>
-                {/* Month-end projection */}
-                <div style={s.productRow}>
-                  <div style={{ flex: 1, fontSize: 12, fontWeight: 600, color: 'var(--brown-dark)' }}>Projected month-end</div>
-                  <div style={{ fontSize: 11, color: 'var(--brown-light)', marginRight: 10 }}>Sales {peso(projSales)}</div>
-                  <div style={{ fontSize: 12.5, fontWeight: 700, color: projProfit >= 0 ? 'var(--green-ok)' : '#a3402d' }}>{peso(projProfit)}</div>
-                </div>
-                <div style={{ fontSize: 11, color: projProfit >= 0 ? 'var(--green-ok)' : '#a3402d', fontWeight: 600, marginTop: 6 }}>
-                  {projProfit >= 0 ? `On track — projected profit after overhead` : `Short by ${peso(-projProfit)} of covering overhead`}
-                </div>
-                <div style={{ fontSize: 10, color: 'var(--brown-light)', marginTop: 6, fontStyle: 'italic', lineHeight: 1.5 }}>
-                  Projection = current daily average × {daysInMonth} days. Profit is approximate while some items still have no capital cost.
-                </div>
-              </>
-            ) : (
-              <div style={{ fontSize: 11, color: 'var(--brown-light)', marginTop: 6 }}>Overhead not synced yet — tap Sync to load it from the sheet.</div>
-            )}
-          </div>
         </div>
       )}
       {/* Best sellers — one card, tap a category to expand (Drinks top 10, others top 5) */}
