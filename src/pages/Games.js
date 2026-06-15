@@ -8,7 +8,7 @@ import {
 } from 'firebase/firestore';
 import ZombieGame from './ZombieGame';
 import { registerUser, loginUser, logoutUser } from './authHelpers';
-
+import AccountAuth from './AccountAuth';
 const S = {
   wrap: { minHeight: '100vh', background: '#0a0400', color: '#f5e6d0', fontFamily: "'Georgia', serif", position:'relative', overflow:'hidden' },
   header: { position:'relative', zIndex:2, background: 'linear-gradient(180deg, #3d1500 0%, #1a0800 100%)', padding: '20px 16px 14px', textAlign: 'center', borderBottom: '2px solid #8b4a00', overflow:'hidden' },
@@ -33,9 +33,7 @@ const S = {
   lbRow: (i) => ({ display: 'flex', alignItems: 'center', padding: '10px 14px', background: i % 2 === 0 ? 'rgba(61,31,0,0.5)' : 'transparent', borderRadius: 8, marginBottom: 4 }),
   medal: (i) => i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i+1}.`,
 };
-
 const MENU_NAMES = ['Latte','Matcha','Americano','Espresso','Cappuccino','Frappe','Mocha','Macchiato','Cortado','Affogato'];
-
 const GAME_LIST = [
   { id: 'snake',         title: 'Snake',               sub: 'Collect coffee beans',    mode: 'Single player' },
   { id: 'tetris',        title: 'Tetris',               sub: 'Classic stacking',        mode: 'Single player' },
@@ -46,9 +44,7 @@ const GAME_LIST = [
   { id: 'cafemystery',   title: 'Cafe Mystery',         sub: 'Who is the impostor?',    mode: 'Multiplayer'   },
   { id: 'fairyq',        title: 'Friends & Questions',  sub: 'Funny, deep & spicy',     mode: 'Group play'    },
 ];
-
 const LEADERBOARD_GAMES = GAME_LIST.filter(g => g.id !== 'cafemystery' && g.id !== 'fairyq' && g.id !== 'zombie');
-
 const fmtScore = (gameId, score) => {
   const v = Number(score) || 0;
   if (gameId === 'snake') {
@@ -60,9 +56,7 @@ const fmtScore = (gameId, score) => {
   if (gameId === 'zombie') return `${n} ${v === 1 ? 'day' : 'days'}`;
   return n;
 };
-
 // ─── WEEKLY RESET (resets every Monday 00:00 UTC) ────────────────────────────
-
 function getCurrentWeekStart() {
   const now = new Date();
   const day = now.getUTCDay(); // 0=Sun, 1=Mon … 6=Sat
@@ -72,7 +66,6 @@ function getCurrentWeekStart() {
   monday.setUTCHours(0, 0, 0, 0);
   return monday.getTime();
 }
-
 async function deleteOldScores() {
   // Only the FEATURED game resets weekly. All other games keep their scores
   // (so when a game becomes featured, its board starts fresh for the prize week).
@@ -84,10 +77,8 @@ async function deleteOldScores() {
   });
   await Promise.all(toDelete.map(d => deleteDoc(doc(db, 'leaderboard', d.id))));
 }
-
 // ─── AUTH / SCORE HELPERS ────────────────────────────────────────────────────
 // (registerUser / loginUser now live in authHelpers.js using real Firebase Auth)
-
 async function saveScore(username, gameId, score) {
   const weekStart = getCurrentWeekStart();
   const key = `${username}_${gameId}`;
@@ -102,7 +93,6 @@ async function saveScore(username, gameId, score) {
     await setDoc(ref, { username, gameId, score, weekStart, updatedAt: serverTimestamp() });
   }
 }
-
 async function getLeaderboard(gameId) {
   const weekStart = getCurrentWeekStart();
   const q = query(
@@ -117,9 +107,7 @@ async function getLeaderboard(gameId) {
     .filter(d => gameId !== FEATURED_GAME || d.weekStart === weekStart)
     .slice(0, 10);
 }
-
 // ─── DATE RANGE (Monday → Sunday) ────────────────────────────────────────────
-
 const _now = new Date();
 const _day = _now.getUTCDay();
 const _diffToMonday = (_day === 0 ? -6 : 1 - _day);
@@ -130,50 +118,23 @@ const _we = new Date(_ws);
 _we.setUTCDate(_ws.getUTCDate() + 6);
 const _fmt = d => d.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
 const weeklyDateRange = `${_fmt(_ws)} – ${_fmt(_we)}`;
-
 // ─── FEATURED GAME ────────────────────────────────────────────────────────────
-
 const FEATURED_GAME_WEEKS = LEADERBOARD_GAMES.map(g => g.id);
 const FEATURED_WEEK_NUM = Math.floor(getCurrentWeekStart() / (7 * 24 * 60 * 60 * 1000));
 const FEATURED_GAME = FEATURED_GAME_WEEKS[FEATURED_WEEK_NUM % FEATURED_GAME_WEEKS.length];
 const GAME_NAMES = { snake:'Snake', tetris:'Tetris', racing:'Cafe Racer', flappybarista:'Flappy Barista', zombie:'Zombie Barista', guessword:'Guess the Word' };
-
 // ─── MODALS ───────────────────────────────────────────────────────────────────
-
+// One shared sign-in (same account as the Chat tab) via <AccountAuth/>.
 function AuthModal({ onAuth, onClose }) {
-  const [mode, setMode] = useState('login');
-  const [username, setUsername] = useState(() => { try { return localStorage.getItem('cafeGameUser') || ''; } catch { return ''; } });
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const handle = async () => {
-    if (!username.trim() || !password.trim()) { setError('Fill in both fields'); return; }
-    setLoading(true); setError('');
-    try {
-      let user;
-      if (mode === 'register') user = await registerUser(username.trim(), password);
-      else user = await loginUser(username.trim(), password);
-      onAuth(user);
-    } catch(e) { setError(e.message); }
-    setLoading(false);
-  };
   return (
     <div style={S.overlay}>
       <div style={S.modal}>
-        <div style={{fontSize:36,marginBottom:8}}>☕</div>
-        <div style={{fontSize:20,fontWeight:'bold',color:'#d4a853',marginBottom:4}}>{mode==='login'?'Welcome Back!':'Join the Cafe'}</div>
-        <div style={{fontSize:12,color:'#a07850',marginBottom:20}}>{mode==='login'?'Sign in to track your scores':'Create a unique cafe name'}</div>
-        <input style={S.input} placeholder="Username (e.g. Latte)" value={username} onChange={e=>setUsername(e.target.value)} autoCapitalize="none"/>
-        <input style={S.input} placeholder="Password (6+ characters)" type="password" value={password} onChange={e=>setPassword(e.target.value)}/>
-        {error && <div style={{color:'#ff6b6b',fontSize:13,marginBottom:8}}>{error}</div>}
-        <button style={S.btn()} onClick={handle} disabled={loading}>{loading?'...':mode==='login'?'Sign In':'Create Account'}</button>
-        <button style={S.btn('#6b3a1f')} onClick={()=>{setMode(mode==='login'?'register':'login');setError('');}}>{mode==='login'?'New? Create Account':'Already have one? Sign In'}</button>
-        <button style={{background:'none',border:'none',color:'#a07850',cursor:'pointer',fontSize:13}} onClick={onClose}>Play as Guest</button>
+        <div style={{ fontSize: 36, marginBottom: 8 }}>☕</div>
+        <AccountAuth heading="Welcome to the Cafe" sub="One account for Games & Chat" onDone={onAuth} onGuest={onClose} />
       </div>
     </div>
   );
 }
-
 function NameModal({ gameTitle, username, onStart, onClose }) {
   const [name, setName] = useState(username || '');
   return (
@@ -190,7 +151,6 @@ function NameModal({ gameTitle, username, onStart, onClose }) {
     </div>
   );
 }
-
 function LeaderboardModal({ onClose, username }) {
   const [tab, setTab] = useState(LEADERBOARD_GAMES[0].id);
   const [rows, setRows] = useState([]);
@@ -217,10 +177,7 @@ function LeaderboardModal({ onClose, username }) {
     </div>
   );
 }
-
-
 // ─── SNAKE GAME ───────────────────────────────────────────────────────────────
-
 function SnakeGame({ playerName, onScore }) {
   const wrapRef = useRef(null);
   const areaRef = useRef(null);
@@ -237,7 +194,6 @@ function SnakeGame({ playerName, onScore }) {
   const [alive, setAlive] = useState(true);
   const [boosting, setBoosting] = useState(false);
   const [ready, setReady] = useState(false);
-
   // Fit the board to the available full-screen area.
   const measure = useCallback(() => {
     const area = areaRef.current; if (!area) return;
@@ -253,7 +209,6 @@ function SnakeGame({ playerName, onScore }) {
     jsRef.current = { ...jsRef.current, cx: r + 16, cy: rows * cell - r - 16, r, kR: Math.round(r * 0.38), md: Math.round(r * 0.55) };
     setReady(true);
   }, []);
-
   // Build a level: walls (barriers), beans (food), and an exit on the right edge.
   const buildLevel = useCallback((lvl) => {
     const { cols, rows } = gridRef.current;
@@ -292,14 +247,12 @@ function SnakeGame({ playerName, onScore }) {
     }
     return { snake, dir: { x: 1, y: 0 }, nextDir: { x: 1, y: 0 }, walls, food, exit, exitOpen: false, running: true, score: 0, level: lvl };
   }, []);
-
   const startGame = useCallback(() => {
     measure();
     const st = buildLevel(1);
     stateRef.current = st;
     setScore(0); setLevel(1); setBeansLeft(st.food.length); setExitOpen(false); setAlive(true);
   }, [measure, buildLevel]);
-
   useEffect(() => {
     measure();
     const ro = new ResizeObserver(() => measure());
@@ -307,9 +260,7 @@ function SnakeGame({ playerName, onScore }) {
     return () => ro.disconnect();
   }, [measure]);
   useEffect(() => { if (ready && !stateRef.current) startGame(); }, [ready, startGame]);
-
   const turn = useCallback((dx, dy) => { const g = stateRef.current; if (!g) return; if (dx !== -g.dir.x || dy !== -g.dir.y) g.nextDir = { x: dx, y: dy }; }, []);
-
   const handleJsMove = useCallback((clientX, clientY) => {
     const canvas = canvasRef.current; if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
@@ -328,7 +279,6 @@ function SnakeGame({ playerName, onScore }) {
       else turn(0, -1);
     }
   }, [turn]);
-
   useEffect(() => {
     const canvas = canvasRef.current; if (!canvas) return;
     const js = jsRef.current;
@@ -348,12 +298,10 @@ function SnakeGame({ playerName, onScore }) {
     window.addEventListener('mouseup', mu);
     return () => { canvas.removeEventListener('touchstart', ts); canvas.removeEventListener('touchmove', tm); canvas.removeEventListener('touchend', te); canvas.removeEventListener('mousedown', md); window.removeEventListener('mousemove', mm); window.removeEventListener('mouseup', mu); };
   }, [handleJsMove, ready]);
-
   useEffect(() => {
     const k = e => { const m = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] }; if (m[e.key]) { e.preventDefault(); turn(m[e.key][0], m[e.key][1]); } };
     window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);
   }, [turn]);
-
   // Movement loop (self-scheduling so FAST + per-level speed can change live).
   useEffect(() => {
     if (!alive || !ready) return;
@@ -392,7 +340,6 @@ function SnakeGame({ playerName, onScore }) {
     moveRef.current = setTimeout(step, 220);
     return () => { stop = true; clearTimeout(moveRef.current); };
   }, [alive, ready, buildLevel, onScore]);
-
   // Draw loop.
   useEffect(() => {
     if (!ready) return;
@@ -431,10 +378,8 @@ function SnakeGame({ playerName, onScore }) {
     rafId = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(rafId);
   }, [ready]);
-
   const startBoost = (e) => { if (e && e.preventDefault) e.preventDefault(); boostRef.current = true; setBoosting(true); };
   const endBoost = () => { boostRef.current = false; setBoosting(false); };
-
   return (
     <div ref={wrapRef} style={{ display: 'flex', flexDirection: 'column', flex: 1, background: '#0f1318', overflow: 'hidden' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 14px', background: '#0d1117', borderBottom: '1px solid #1e2530', flexShrink: 0 }}>
@@ -453,10 +398,7 @@ function SnakeGame({ playerName, onScore }) {
     </div>
   );
 }
-
-
 // ─── TETRIS GAME ──────────────────────────────────────────────────────────────
-
 function TetrisGame({ playerName, onScore }) {
   const canvasRef=useRef(null),nextCanvRef=useRef(null),containerRef=useRef(null),stateRef=useRef(null),rafRef=useRef(null),cellRef=useRef(24);
   const COLS=10,ROWS=20;
@@ -506,10 +448,7 @@ function TetrisGame({ playerName, onScore }) {
     </div>
   );
 }
-
-
 // ─── RACING GAME ──────────────────────────────────────────────────────────────
-
 function RacingGame({ playerName, onScore }) {
   const canvasRef=useRef(null),containerRef=useRef(null),stateRef=useRef(null),rafRef=useRef(null);
   const [score,setScore]=useState(0),[gameOver,setGameOver]=useState(false),[started,setStarted]=useState(false),[collected,setCollected]=useState(0),[canvasSize,setCanvasSize]=useState({w:320,h:480});
@@ -529,14 +468,9 @@ function RacingGame({ playerName, onScore }) {
   const btnStyle={background:'linear-gradient(180deg,#555,#333)',border:'2px solid #888',color:'#fff',padding:'18px 36px',borderRadius:14,fontSize:26,cursor:'pointer',userSelect:'none',WebkitUserSelect:'none',boxShadow:'0 4px 0 #111'};
   return(<div ref={containerRef} style={{display:'flex',flexDirection:'column',alignItems:'center',height:'100%',background:'#1a1a1a',overflow:'hidden'}}><div style={{color:'#d4a853',fontSize:14,fontWeight:'bold',padding:'4px 0',flexShrink:0}}>{playerName} - Score: {score} ☕x{collected}</div><canvas ref={canvasRef} width={W} height={H} style={{display:'block',flex:1,maxWidth:'100%'}}/>{!started&&!gameOver&&<button style={{width:160,background:'#d4a853',border:'none',borderRadius:10,padding:'12px',color:'#1a0a00',fontSize:15,fontWeight:'bold',cursor:'pointer',flexShrink:0}} onClick={startGame}>Start</button>}{gameOver&&(<div style={{textAlign:'center',flexShrink:0}}><div style={{color:'#ff6b6b',fontSize:20,fontWeight:'bold'}}>CRASH! 💥</div><div style={{color:'#d4a853',marginBottom:8}}>Score: {score}</div><button style={{width:160,background:'#d4a853',border:'none',borderRadius:10,padding:'12px',color:'#1a0a00',fontSize:15,fontWeight:'bold',cursor:'pointer'}} onClick={startGame}>Again</button></div>)}{started&&!gameOver&&(<div style={{display:'flex',gap:20,padding:'8px 0',flexShrink:0}}><button style={btnStyle} onPointerDown={e=>{e.preventDefault();moveLeft();}} onTouchStart={e=>{e.preventDefault();moveLeft();}}>&lt;</button><button style={btnStyle} onPointerDown={e=>{e.preventDefault();moveRight();}} onTouchStart={e=>{e.preventDefault();moveRight();}}>&gt;</button></div>)}</div>);
 }
-
-
 // ─── FLAPPY BARISTA ───────────────────────────────────────────────────────────
-
 const KELLY_FACE_B64 = "data:image/jpeg;base64,/9j/4QkhaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wLwA8P3hwYWNrZXQgYmVnaW49Iu+7vyIgaWQ9Ilc1TTBNcENlaGlIenJlU3pOVGN6a2M5ZCI/PiA8eDp4bXBtZXRhIHhtbG5zOng9ImFkb2JlOm5zOm1ldGEvIiB4OnhtcHRrPSJYTVAgQ29yZSA2LjAuMCI+IDxyZGY6UkRGIHhtbG5zOnJkZj0iaHR0cDovL3d3dy53My5vcmcvMTk5OS8wMi8yMi1yZGYtc3ludGF4LW5zIyI+IDxyZGY6RGVzY3JpcHRpb24gcmRmOmFib3V0PSIiLz4gPC9yZGY6UkRGPiA8L3g6eG1wbWV0YT4gICAgICAgICAgICAgICAgICAgICAgICA8P3hwYWNrZXQgZW5kPSJ3Ij8+AP/tABhQaG90b3Nob3AgMy4wADhCSU0EBAAAAAAAHBwBWgADGyVHHAIAAAIAAhwCeAAMMDIwMDA2MDAwMDAwAP/iAihJQ0NfUFJPRklMRQABAQAAAhhhcHBsBAAAAG1udHJSR0IgWFlaIAfmAAEAAQAAAAAAAGFjc3BBUFBMAAAAAEFQUEwAAAAAAAAAAAAAAAAAAAAAAAD21gABAAAAANMtYXBwbAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAARZGVzYwAAAVAAAABiZG1kZAAAAbQAAAAkY3BydAAAAdgAAAAjd3RwdAAAAfwAAAAUclhZWgAAAgAAAAAUZ1hZWgAAA";
-
 const MARYZ_FACE_B64 = "data:image/jpeg;base64,/9j/4QkhaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wLwA8P3hwYWNrZXQgYmVnaW49Iu+7vyIgaWQ9Ilc1TTBNcENlaGlIenJlU3pOVGN6a2M5ZCI/PiA8eDp4bXBtZXRhIHhtbG5zOng9ImFkb2JlOm5zOm1ldGEvIiB4OnhtcHRrPSJYTVAgQ29yZSA2LjAuMCI+IDxyZGY6UkRGIHhtbG5zOnJkZj0iaHR0cDovL3d3dy53My5vcmcvMTk5OS8wMi8yMi1yZGYtc3ludGF4LW5zIyI+IDxyZGY6RGVzY3JpcHRpb24gcmRmOmFib3V0PSIiLz4gPC9yZGY6UkRGPiA8L3g6eG1wbWV0YT4gICAgICAgICAgICAgICAgICAgICAgICA8P3hwYWNrZXQgZW5kPSJ3Ij8+AP/tABhQaG90b3Nob3AgMy4wADhCSU0EBAAAAAAAHBwBWgADGyVHHAIAAAIAAhwCeAAMMDIwMDA2MDAwMDAwAP/iAihJQ0NfUFJPRklMRQABAQAAAhhhcHBsBAAAAG1udHJSR0IgWFlaIAfmAAEAAQAAAAAAAGFjc3BBUFBMAAAAAEFQUEwAAAAAAAAAAAAAAAAAAAAAAAD21gABAAAAANMtYXBwbAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAARZGVzYwAAAVAAAABiZG1kZAAAAbQAAAAkY3BydAAAAdgAAAAjd3RwdAAAAfwAAAAUclhZWgAAAgAAAAAUZ1hZWgAAA";
-
 function FlappyBarista({ playerName, onScore }) {
   const canvasRef = useRef(null);
   const stateRef  = useRef(null);
@@ -610,10 +544,7 @@ function FlappyBarista({ playerName, onScore }) {
     </div>
   );
 }
-
-
 // ─── GUESS THE WORD ───────────────────────────────────────────────────────────
-
 const WORD_LIST = [
   { word:'LATTE',      hint:'Espresso + steamed milk',                         category:'Drinks' },
   { word:'MOCHA',      hint:'Coffee with chocolate syrup',                     category:'Drinks' },
@@ -683,11 +614,9 @@ const WORD_LIST = [
   { word:'FIESTA',     hint:'Town festival celebrating the patron saint',      category:'PH Culture' },
   { word:'HARANA',     hint:'Traditional Filipino serenade under a window',    category:'PH Culture' },
 ];
-
 const PLAYABLE = WORD_LIST.filter(w => w.word.length >= 4 && w.word.length <= 9);
 const KEYBOARD_ROWS = ['QWERTYUIOP','ASDFGHJKL','ZXCVBNM'];
 const MAX_MISTAKES = 3;
-
 function GuessWordGame({ playerName, onScore }) {
   const [wordData, setWordData] = useState(null);
   const [guesses, setGuesses] = useState([]);
@@ -700,7 +629,6 @@ function GuessWordGame({ playerName, onScore }) {
   const [mistakes, setMistakes] = useState(0);
   const [baristaMsg, setBaristaMsg] = useState('wave');
   const [usedWords, setUsedWords] = useState(() => { try { return JSON.parse(localStorage.getItem('gwUsedWords')||'[]'); } catch { return []; } });
-
   const pickWord = useCallback((used=[]) => {
     const avail = PLAYABLE.filter(w => !used.includes(w.word));
     const list = avail.length > 0 ? avail : PLAYABLE;
@@ -708,12 +636,9 @@ function GuessWordGame({ playerName, onScore }) {
     setWordData(list[Math.floor(Math.random()*list.length)]);
     setGuesses([]); setCurrent(''); setGameState('playing'); setMistakes(0); setBaristaMsg('wave');
   }, []);
-
   useEffect(() => { pickWord([]); }, []);
-
   const word = wordData?.word || '';
   const WL = word.length;
-
   const getTileState = (guess, pos) => {
     if (!guess || pos >= guess.length) return 'empty';
     const letter = guess[pos];
@@ -721,7 +646,6 @@ function GuessWordGame({ playerName, onScore }) {
     if (word.includes(letter)) return 'present';
     return 'absent';
   };
-
   const getKeyState = (letter) => {
     let best = 'unused';
     for (const g of guesses) {
@@ -735,7 +659,6 @@ function GuessWordGame({ playerName, onScore }) {
     }
     return best;
   };
-
   const submitGuess = () => {
     if (current.length !== WL) { setShake(true); setTimeout(()=>setShake(false),500); return; }
     if (gameState !== 'playing') return;
@@ -754,14 +677,12 @@ function GuessWordGame({ playerName, onScore }) {
       else { setTimeout(()=>{ setBaristaMsg(newMistakes===MAX_MISTAKES-1?'sad':'wave'); },700); }
     }
   };
-
   const pressKey = (key) => {
     if (gameState !== 'playing') return;
     if (key === 'ENTER') { submitGuess(); return; }
     if (key === 'DEL') { setCurrent(c=>c.slice(0,-1)); return; }
     if (current.length < WL) setCurrent(c => c + key);
   };
-
   useEffect(() => {
     const k = e => {
       if (gameState !== 'playing') return;
@@ -771,21 +692,17 @@ function GuessWordGame({ playerName, onScore }) {
     };
     window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);
   }, [current, gameState, word, WL, mistakes]);
-
   const nextRound = () => {
     const nu = [...usedWords, word];
     setUsedWords(nu); try { localStorage.setItem('gwUsedWords', JSON.stringify(nu)); } catch {}
     setRound(r => r + 1); pickWord(nu);
   };
-
   const tileColors = { correct:{bg:'#538d4e',border:'#538d4e',color:'#fff'}, present:{bg:'#b59f3b',border:'#b59f3b',color:'#fff'}, absent:{bg:'#3a3a3c',border:'#3a3a3c',color:'#fff'}, empty:{bg:'transparent',border:'#3a3a3c',color:'#fff'}, active:{bg:'transparent',border:'#999',color:'#fff'} };
   const keyColors = { correct:{bg:'#538d4e',color:'#fff'}, present:{bg:'#b59f3b',color:'#fff'}, absent:{bg:'#3a3a3c',color:'#fff'}, unused:{bg:'#6b3a1f',color:'#d4a853'} };
   const TILE_SIZE = Math.min(46, Math.floor((Math.min(typeof window !== 'undefined' ? window.innerWidth : 390, 400) - 48) / Math.max(WL, 5)));
   const msgMap = { wave:{text:'Guess the word!',color:'#ffd700'}, fight:{text:mistakes>=MAX_MISTAKES-1?'Last chance! -15pts':'WRONG! -15pts',color:mistakes>=MAX_MISTAKES-1?'#ff8800':'#ff4444'}, cheer:{text:'CORRECT!',color:'#44ff88'}, sad:{text:'Game Over!',color:'#888'} };
   const msg = msgMap[baristaMsg] || msgMap.wave;
-
   if (!wordData) return <div style={{color:'#d4a853',textAlign:'center',padding:40}}>Loading...</div>;
-
   return (
     <div style={{height:'100%',background:'#121213',color:'#fff',display:'flex',flexDirection:'column',fontFamily:"'Arial',sans-serif",overflow:'hidden'}}>
       <div style={{background:'#1a1a1b',borderBottom:'1px solid #3a3a3c',padding:'7px 14px',display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0}}>
@@ -856,10 +773,7 @@ function GuessWordGame({ playerName, onScore }) {
     </div>
   );
 }
-
-
 // ─── FRIENDS & QUESTIONS ─────────────────────────────────────────────────────
-
 const FAIRY_QUESTIONS = [
   { text:"If your life had a theme song, what would it be and why?", tag:"deep" },
   { text:"What is one thing you would never eat even if someone paid you?", tag:"funny" },
@@ -892,47 +806,39 @@ const FAIRY_QUESTIONS = [
   { text:"What is one thing you would change about yourself if you could?", tag:"deep" },
   { text:"If your personality was a weather forecast, what would today's forecast be?", tag:"funny" },
 ];
-
 const FAIRY_CATEGORIES = [
   { id:"all",   label:"All questions", icon:"✦" },
   { id:"funny", label:"Funny only",    icon:"😄" },
   { id:"deep",  label:"Deep only",     icon:"🌙" },
   { id:"spicy", label:"Spicy only",    icon:"🔥" },
 ];
-
 const FAIRY_TAG_COLORS = {
   deep:  { bg:"#3d1060", color:"#d48fff", label:"Thoughtful" },
   funny: { bg:"#1a3060", color:"#8fc8ff", label:"Funny"      },
   spicy: { bg:"#601020", color:"#ffb0b0", label:"Spicy"      },
 };
-
 function shuffleArr(arr) { return [...arr].sort(()=>Math.random()-0.5); }
-
 function FairyQGame({ playerName, onBack }) {
   const [screen, setScreen] = useState("intro");
   const [category, setCategory] = useState("all");
   const [questions, setQuestions] = useState([]);
   const [qIdx, setQIdx] = useState(0);
   const [skipped, setSkipped] = useState(0);
-
   const startGame = (cat) => {
     const pool = FAIRY_QUESTIONS.filter(q => cat==="all" || q.tag===cat);
     setQuestions(shuffleArr(pool).slice(0,15));
     setCategory(cat); setQIdx(0); setSkipped(0); setScreen("game");
   };
-
   const nextQ = (skip) => {
     if (skip) setSkipped(s=>s+1);
     if (qIdx+1 >= questions.length) { setScreen("done"); }
     else { setQIdx(i=>i+1); }
   };
-
   const C = { bg:"#1a0530", card:"#2d0a50", cardBorder:"#7a3db5", softBorder:"#4a2070", purple:"#9455d0", purpleDim:"#7a3db5", textPrimary:"#f0c6ff", textMuted:"#c48de8", textDim:"#7a5090" };
   const btnPrimary = { width:"100%", padding:"14px", borderRadius:14, background:C.purpleDim, border:"none", color:"#fff", fontSize:15, fontWeight:700, cursor:"pointer", marginTop:4, fontFamily:"inherit" };
   const btnSecondary = { width:"100%", padding:"10px", borderRadius:14, background:"transparent", border:`1.5px solid ${C.softBorder}`, color:C.textDim, fontSize:13, fontWeight:600, cursor:"pointer", marginTop:8, fontFamily:"inherit" };
   const topBar = { display:"flex", alignItems:"center", justifyContent:"space-between", padding:"12px 16px", background:"#12022a", borderBottom:`1px solid ${C.softBorder}`, flexShrink:0 };
   const base = { minHeight:"100%", background:C.bg, color:C.textPrimary, fontFamily:"'Georgia', serif", display:"flex", flexDirection:"column" };
-
   if (screen==="intro") {
     return (
       <div style={base}>
@@ -961,7 +867,6 @@ function FairyQGame({ playerName, onBack }) {
       </div>
     );
   }
-
   if (screen==="game") {
     const q = questions[qIdx];
     const tc = FAIRY_TAG_COLORS[q.tag] || FAIRY_TAG_COLORS.funny;
@@ -992,7 +897,6 @@ function FairyQGame({ playerName, onBack }) {
       </div>
     );
   }
-
   return (
     <div style={base}>
       <div style={topBar}>
@@ -1010,19 +914,14 @@ function FairyQGame({ playerName, onBack }) {
     </div>
   );
 }
-
-
 // ─── MAIN GAMES PAGE ─────────────────────────────────────────────────────────
-
 const FEATURED_GAME_WEEKS_LB = LEADERBOARD_GAMES.map(g => g.id);
-
 export default function GamesPage({ user }) {
   const [activeGame, setActiveGame] = useState(null);
   const [showLB, setShowLB] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
   const [musicOn, setMusicOn] = useState(true);
   const audioRef = useRef(null);
-
   useEffect(() => {
     if (!audioRef.current) {
       audioRef.current = new Audio('/game-music.mp3');
@@ -1034,7 +933,6 @@ export default function GamesPage({ user }) {
     else { audio.pause(); }
     return () => { audio.pause(); };
   }, [activeGame, musicOn]);
-
   // ── Weekly reset on every Monday ──────────────────────────────────────────
   useEffect(() => {
     // Delete old Firestore scores
@@ -1055,9 +953,7 @@ export default function GamesPage({ user }) {
       localStorage.removeItem('gwUsedWords');
     }
   }, []);
-
   const [username, setUsername] = useState(() => { try { return localStorage.getItem('cafeGameUser') || null; } catch { return null; } });
-
   // Keep username in sync with the shared Firebase Auth session
   // (so signing in from the Chat tab also signs you in here, and vice versa)
   useEffect(() => {
@@ -1068,7 +964,6 @@ export default function GamesPage({ user }) {
       else localStorage.removeItem('cafeGameUser');
     } catch {}
   }, [user]);
-
   const [showName, setShowName] = useState(false);
   const [pendingGame, setPendingGame] = useState(null);
   const [playerName, setPlayerName] = useState(() => { try { return localStorage.getItem('cafePlayerName') || ''; } catch { return ''; } });
@@ -1077,7 +972,6 @@ export default function GamesPage({ user }) {
   const [lbRows, setLbRows] = useState([]);
   const [lbLoading, setLbLoading] = useState(true);
   const [featuredLeader, setFeaturedLeader] = useState(null);
-
   useEffect(() => {
     const fetchLB = async () => {
       setLbLoading(true);
@@ -1094,7 +988,6 @@ export default function GamesPage({ user }) {
     };
     fetchLB();
   }, [lbGame]);
-
   const saveLocal = (gameId, score) => {
     setLocalBests(prev => {
       const upd = {...prev, [gameId]: Math.max(prev[gameId]||0, score)};
@@ -1102,7 +995,6 @@ export default function GamesPage({ user }) {
       return upd;
     });
   };
-
   const handleGameSelect = (game) => {
     if (game.id==='cafemystery' || game.id==='zombie' || game.id==='fairyq') { setActiveGame(game); return; }
     setPendingGame(game); setShowName(true);
@@ -1123,7 +1015,6 @@ export default function GamesPage({ user }) {
     logoutUser().catch(()=>{});
     setUsername(null); try { localStorage.removeItem('cafeGameUser'); } catch {}
   };
-
   if (activeGame) {
     return (
       <div style={S.fullscreen}>
@@ -1145,13 +1036,11 @@ export default function GamesPage({ user }) {
       </div>
     );
   }
-
   return (
     <div style={S.wrap}>
       {showAuth   && <AuthModal onAuth={handleAuth} onClose={()=>setShowAuth(false)}/>}
       {showName && pendingGame && <NameModal gameTitle={pendingGame.title} username={username} onStart={handleNameStart} onClose={()=>setShowName(false)}/>}
       {showLB     && <LeaderboardModal onClose={()=>setShowLB(false)} username={username}/>}
-
       {/* Header */}
       <div style={S.header}>
         <div style={{position:'absolute',inset:0,background:'radial-gradient(ellipse at 50% 0%, rgba(255,140,0,0.2) 0%, transparent 70%)',pointerEvents:'none'}}/>
@@ -1169,16 +1058,13 @@ export default function GamesPage({ user }) {
         </div>
         <div style={S.sub}>Theonyx Cafe Arcade</div>
       </div>
-
       <div style={{height:3,background:'linear-gradient(90deg,transparent 0%,#ff4400 20%,#ffcc00 50%,#ff4400 80%,transparent 100%)',boxShadow:'0 0 10px rgba(255,140,0,0.7)',position:'relative',zIndex:2}}/>
-
       {/* Music toggle */}
       <div style={{position:'absolute',top:12,right:12,zIndex:10}}>
         <button onClick={()=>setMusicOn(m=>!m)} style={{background:'rgba(0,0,0,0.5)',border:'1px solid rgba(212,168,83,0.4)',borderRadius:20,padding:'4px 10px',color:'#ffd700',fontSize:13,cursor:'pointer'}}>
           {musicOn?'🔊':'🔇'}
         </button>
       </div>
-
       {/* Auth bar */}
       <div style={{position:'relative',zIndex:2,display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 14px',background:'linear-gradient(90deg,#1a0800,#2a1000,#1a0800)',borderBottom:'1px solid #3d1500'}}>
         {username ? (
@@ -1199,14 +1085,12 @@ export default function GamesPage({ user }) {
           </>
         )}
       </div>
-
       {/* Ticker */}
       <div style={{overflow:'hidden',height:22,display:'flex',alignItems:'center',background:'#ffd700',position:'relative',zIndex:2}}>
         <div style={{display:'flex',whiteSpace:'nowrap',animation:'lbTicker 16s linear infinite',fontSize:10,fontWeight:700,color:'#1a0800',letterSpacing:0.8}}>
           {[1,2].map(i=>(<span key={i} style={{padding:'0 28px'}}>TOP SCORER THIS WEEK WINS 1 FREE DRINK &nbsp;★&nbsp; REGISTER TO SAVE SCORES &nbsp;★&nbsp;</span>))}
         </div>
       </div>
-
       {/* Inline Leaderboard */}
       <div style={{background:'linear-gradient(180deg,#120800,#0a0400)',padding:'10px 12px 14px',position:'relative',zIndex:2}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
@@ -1219,7 +1103,6 @@ export default function GamesPage({ user }) {
             <span style={{fontSize:9,color:'#c8943a',fontWeight:700}}>{lbGame===FEATURED_GAME ? 'Weekly · Resets Monday' : 'All-time scores'}</span>
           </div>
         </div>
-
         {/* Weekly prize */}
         <div style={{background:'#1a0d00',border:'1px solid #ffd70033',borderRadius:10,padding:'7px 10px',marginBottom:8,display:'flex',alignItems:'center',gap:9}}>
           <span style={{fontSize:28,animation:'floatLB 2.5s ease-in-out infinite',display:'inline-block'}}>☕</span>
@@ -1241,7 +1124,6 @@ export default function GamesPage({ user }) {
             <div style={{fontSize:9,color:'#4a3010',textAlign:'center',maxWidth:60}}>No scores yet!</div>
           )}
         </div>
-
         {/* Game tabs */}
         <div style={{display:'flex',overflowX:'auto',background:'#100600',borderRadius:8,padding:'0 4px',gap:1,scrollbarWidth:'none',marginBottom:8,justifyContent:'center'}}>
           {LEADERBOARD_GAMES.map(g=>(
@@ -1250,7 +1132,6 @@ export default function GamesPage({ user }) {
             </button>
           ))}
         </div>
-
         {/* Podium top 3 */}
         {lbLoading ? (
           <div style={{textAlign:'center',color:'#4a3010',fontSize:11,padding:'16px 0'}}>Loading...</div>
@@ -1288,7 +1169,6 @@ export default function GamesPage({ user }) {
           </>
         )}
       </div>
-
       {/* Game Grid */}
       <div style={{height:2,background:'linear-gradient(90deg,transparent,#ff4400 20%,#ffcc00 50%,#ff4400 80%,transparent)'}}/>
       <div style={{padding:'12px 12px 16px',background:'#0f0700',position:'relative',zIndex:2}}>
@@ -1310,7 +1190,6 @@ export default function GamesPage({ user }) {
           ))}
         </div>
       </div>
-
       <style>{`
         @keyframes logoGlow{from{filter:drop-shadow(0 0 6px #ff8800) drop-shadow(0 0 14px #ff4400)}to{filter:drop-shadow(0 0 14px #ffcc00) drop-shadow(0 0 28px #ff8800)}}
         @keyframes lbTicker{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
