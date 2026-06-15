@@ -26,9 +26,8 @@ const styles = {
   logoRow: { display: 'flex', alignItems: 'center', gap: 10 },
   topTitle: { fontFamily: 'var(--font-display)', fontSize: 17, fontWeight: 700, color: '#f0d080', letterSpacing: 1.5 },
   content: { flex: 1, overflowY: 'auto' },
-  bottomNav: { display: 'flex', background: 'rgba(61,31,10,0.78)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', borderTop: '1px solid rgba(212,168,83,0.18)', flexShrink: 0 },
-  navItem: (active) => ({ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '10px 4px 12px', cursor: 'pointer', borderTop: active ? '2px solid #d4a853' : '2px solid transparent', color: active ? '#d4a853' : 'rgba(255,255,255,0.45)', position: 'relative' }),
-  navLabel: (active) => ({ fontSize: 10, fontWeight: active ? 600 : 400, marginTop: 3 }),
+  bottomNav: { display: 'flex', justifyContent: 'space-around', alignItems: 'center', gap: 4, background: 'rgba(26,13,5,0.92)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(212,168,83,0.18)', borderRadius: 34, margin: '6px 14px 16px', padding: '7px 10px', flexShrink: 0, boxShadow: '0 10px 28px rgba(0,0,0,0.5)' },
+  navItem: (active) => ({ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '11px 0', cursor: 'pointer', borderRadius: 24, color: active ? '#1a0a00' : 'rgba(255,255,255,0.7)', background: active ? '#d4a853' : 'transparent', position: 'relative', transition: 'background 0.2s, color 0.2s' }),
   adminBtn: { background: 'rgba(212,168,83,0.15)', border: '1px solid rgba(212,168,83,0.4)', borderRadius: 8, color: '#d4a853', fontSize: 12, padding: '6px 14px', cursor: 'pointer', fontWeight: 500 },
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 },
   loginCard: { background: '#1a0a00', border: '1px solid rgba(212,168,83,0.3)', borderRadius: 20, padding: '32px 28px', width: '100%', maxWidth: 360, animation: 'slideUp 0.3s ease' },
@@ -129,9 +128,8 @@ export default function PublicApp({ onAdminLogin, user }) {
       </div>
       <div style={styles.bottomNav}>
         {TABS.map(tab => (
-          <div key={tab.id} style={styles.navItem(activeTab === tab.id)} onClick={() => setActiveTab(tab.id)}>
+          <div key={tab.id} style={styles.navItem(activeTab === tab.id)} onClick={() => setActiveTab(tab.id)} title={tab.label}>
             {NAV_ICONS[tab.id]}
-            <span style={styles.navLabel(activeTab === tab.id)}>{tab.label}</span>
             {tab.id === 'chat' && mentionBadge > 0 && (
               <div style={styles.badge}>{mentionBadge > 9 ? '9+' : mentionBadge}</div>
             )}
