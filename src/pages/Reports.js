@@ -354,6 +354,7 @@ export default function Reports({ role = 'staff', userName = '' }) {
   const [showUncosted, setShowUncosted] = useState(false);   // collapse "No capital cost yet"
   const [showComputation, setShowComputation] = useState(false); // collapse the profit breakdown
   const [openPriceGroup, setOpenPriceGroup] = useState(null);    // which suggested-prices group is open
+  const [pricePct, setPricePct] = useState('');                  // extra % increase on top of overhead add
   const tokenClientRef = React.useRef(null);
   const syncedRef = React.useRef(false);
   // Firestore fallback (used until connected to Google)
@@ -1008,42 +1009,55 @@ export default function Reports({ role = 'staff', userName = '' }) {
           </div>
         </div>
       )}
-      {/* Suggested prices per size (order-menu format) to cover overhead */}
-      {flatAddPerItem > 0 && (
-        <div style={s.card}>
-          <div style={s.cardTitle}>Suggested prices · +{peso(flatAddPerItem)}/item to cover overhead</div>
-          {MENU_PRICING.map((group, gi) => {
-            const open = openPriceGroup === group.id;
-            return (
-              <div key={group.id} style={{ borderTop: gi === 0 ? 'none' : '1px solid #f0e4d8' }}>
-                <div onClick={() => setOpenPriceGroup(open ? null : group.id)} style={{ display: 'flex', alignItems: 'center', padding: '11px 0', cursor: 'pointer' }}>
-                  <div style={{ flex: 1, fontSize: 13, fontWeight: 700, color: 'var(--brown-dark)' }}>{group.label}</div>
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', flexShrink: 0 }}><polyline points="6 9 12 15 18 9" /></svg>
-                </div>
-                {open && (
-                  <div style={{ paddingBottom: 8 }}>
-                    {group.items.map(item => (
-                      <div key={item.name} style={{ padding: '7px 0', borderTop: '1px solid #f7f0e6' }}>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--brown-dark)', marginBottom: 5 }}>{item.name}</div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                          {SIZES.filter(sz => item[sz]).map(sz => (
-                            <span key={sz} style={{ fontSize: 10.5, color: 'var(--brown-dark)', background: 'var(--cream)', border: '0.5px solid #e6d6c0', borderRadius: 8, padding: '4px 8px' }}>
-                              {SIZE_LABELS[sz]} <span style={{ color: 'var(--brown-light)' }}>{peso(item[sz])}</span> → <b style={{ color: 'var(--green-ok)' }}>{peso(item[sz] + flatAddPerItem)}</b>
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-          <div style={{ fontSize: 10, color: 'var(--brown-light)', marginTop: 8, fontStyle: 'italic', lineHeight: 1.5 }}>
-            Adds a flat +{peso(flatAddPerItem)} to every size to break even on overhead this month. Round to your preferred price.
-          </div>
+      {/* Suggested prices per size — overhead add (default) + your % increase */}
+      <div style={s.card}>
+        <div style={s.cardTitle}>Suggested prices</div>
+        {/* % increase input */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--brown-dark)' }}>Extra increase</span>
+          <input
+            type="number" min="0" inputMode="decimal" value={pricePct}
+            onChange={e => setPricePct(e.target.value)} placeholder="0"
+            style={{ width: 64, padding: '7px 9px', borderRadius: 9, border: '0.5px solid #e3d0b4', fontSize: 13, background: '#fff', color: '#3a2613', textAlign: 'right', fontFamily: 'inherit', outline: 'none' }}
+          />
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--brown-dark)' }}>%</span>
         </div>
-      )}
+        <div style={{ fontSize: 11, color: 'var(--brown-light)', marginBottom: 10, lineHeight: 1.5 }}>
+          New price = current + <b>{peso(flatAddPerItem)}</b> (covers overhead){(Number(pricePct) || 0) > 0 ? <> + {pricePct}% on top</> : ''}.
+        </div>
+        {MENU_PRICING.map((group, gi) => {
+          const open = openPriceGroup === group.id;
+          const pct = Number(pricePct) || 0;
+          const newPriceOf = (p) => p * (1 + pct / 100) + flatAddPerItem;
+          return (
+            <div key={group.id} style={{ borderTop: '1px solid #f0e4d8' }}>
+              <div onClick={() => setOpenPriceGroup(open ? null : group.id)} style={{ display: 'flex', alignItems: 'center', padding: '11px 0', cursor: 'pointer' }}>
+                <div style={{ flex: 1, fontSize: 13, fontWeight: 700, color: 'var(--brown-dark)' }}>{group.label}</div>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', flexShrink: 0 }}><polyline points="6 9 12 15 18 9" /></svg>
+              </div>
+              {open && (
+                <div style={{ paddingBottom: 8 }}>
+                  {group.items.map(item => (
+                    <div key={item.name} style={{ padding: '7px 0', borderTop: '1px solid #f7f0e6' }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--brown-dark)', marginBottom: 5 }}>{item.name}</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {SIZES.filter(sz => item[sz]).map(sz => (
+                          <span key={sz} style={{ fontSize: 10.5, color: 'var(--brown-dark)', background: 'var(--cream)', border: '0.5px solid #e6d6c0', borderRadius: 8, padding: '4px 8px' }}>
+                            {SIZE_LABELS[sz]} <span style={{ color: 'var(--brown-light)' }}>{peso(item[sz])}</span> → <b style={{ color: 'var(--green-ok)' }}>{peso(newPriceOf(item[sz]))}</b>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+        <div style={{ fontSize: 10, color: 'var(--brown-light)', marginTop: 8, fontStyle: 'italic', lineHeight: 1.5 }}>
+          Default adds {peso(flatAddPerItem)} per item to break even on overhead. Type a % to raise prices further. Round to your preferred price.
+        </div>
+      </div>
       <div style={{ height: 80 }} />
     </div>
   );
