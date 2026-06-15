@@ -261,43 +261,6 @@ function SnakeGame({ playerName, onScore }) {
   }, [measure]);
   useEffect(() => { if (ready && !stateRef.current) startGame(); }, [ready, startGame]);
   const turn = useCallback((dx, dy) => { const g = stateRef.current; if (!g) return; if (dx !== -g.dir.x || dy !== -g.dir.y) g.nextDir = { x: dx, y: dy }; }, []);
-  const handleJsMove = useCallback((clientX, clientY) => {
-    const canvas = canvasRef.current; if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const sx = canvas.width / rect.width, sy = canvas.height / rect.height;
-    const mx = (clientX - rect.left) * sx, my = (clientY - rect.top) * sy;
-    const js = jsRef.current;
-    let dx = mx - js.cx, dy = my - js.cy;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist > js.md) { dx = dx / dist * js.md; dy = dy / dist * js.md; }
-    js.kx = dx; js.ky = dy;
-    const angle = Math.atan2(dy, dx) * 180 / Math.PI;
-    if (Math.abs(dx) > 6 || Math.abs(dy) > 6) {
-      if (angle > -45 && angle <= 45) turn(1, 0);
-      else if (angle > 45 && angle <= 135) turn(0, 1);
-      else if (angle > 135 || angle <= -135) turn(-1, 0);
-      else turn(0, -1);
-    }
-  }, [turn]);
-  useEffect(() => {
-    const canvas = canvasRef.current; if (!canvas) return;
-    const js = jsRef.current;
-    const onJS = (mx, my) => Math.hypot(mx - js.cx, my - js.cy) < js.r * 1.5;
-    const gp = (cx, cy) => { const r = canvas.getBoundingClientRect(); return [(cx - r.left) * (canvas.width / r.width), (cy - r.top) * (canvas.height / r.height)]; };
-    const ts = e => { const [mx, my] = gp(e.touches[0].clientX, e.touches[0].clientY); if (onJS(mx, my)) { js.on = true; e.preventDefault(); } };
-    const tm = e => { if (js.on) { handleJsMove(e.touches[0].clientX, e.touches[0].clientY); e.preventDefault(); } };
-    const te = () => { js.on = false; js.kx = 0; js.ky = 0; };
-    const md = e => { const [mx, my] = gp(e.clientX, e.clientY); if (onJS(mx, my)) js.on = true; };
-    const mm = e => { if (js.on) handleJsMove(e.clientX, e.clientY); };
-    const mu = () => { js.on = false; js.kx = 0; js.ky = 0; };
-    canvas.addEventListener('touchstart', ts, { passive: false });
-    canvas.addEventListener('touchmove', tm, { passive: false });
-    canvas.addEventListener('touchend', te);
-    canvas.addEventListener('mousedown', md);
-    window.addEventListener('mousemove', mm);
-    window.addEventListener('mouseup', mu);
-    return () => { canvas.removeEventListener('touchstart', ts); canvas.removeEventListener('touchmove', tm); canvas.removeEventListener('touchend', te); canvas.removeEventListener('mousedown', md); window.removeEventListener('mousemove', mm); window.removeEventListener('mouseup', mu); };
-  }, [handleJsMove, ready]);
   useEffect(() => {
     const k = e => { const m = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] }; if (m[e.key]) { e.preventDefault(); turn(m[e.key][0], m[e.key][1]); } };
     window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);
@@ -370,8 +333,6 @@ function SnakeGame({ playerName, onScore }) {
         }
         if (sn.length) { const h = sn[0], hx = h.x * cell + cell / 2, hy = h.y * cell + cell / 2, rr = cell * 0.42; ctx.save(); ctx.translate(hx, hy); ctx.rotate(Math.atan2(g.dir.y, g.dir.x)); [-1, 1].forEach(sgn => { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(rr * 0.3, sgn * rr * 0.4, rr * 0.26, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(rr * 0.38, sgn * rr * 0.4, rr * 0.13, 0, Math.PI * 2); ctx.fill(); }); ctx.restore(); }
       }
-      const js = jsRef.current;
-      ctx.save(); ctx.globalAlpha = js.on ? 0.8 : 0.4; ctx.fillStyle = 'rgba(20,10,0,.8)'; ctx.beginPath(); ctx.arc(js.cx, js.cy, js.r, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = 'rgba(212,168,83,.5)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(js.cx, js.cy, js.r, 0, Math.PI * 2); ctx.stroke(); const kx = js.cx + js.kx, ky = js.cy + js.ky; ctx.fillStyle = '#c8943a'; ctx.beginPath(); ctx.arc(kx, ky, js.kR, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1; ctx.restore();
       if (g && !g.running) { ctx.fillStyle = 'rgba(0,0,0,.72)'; ctx.fillRect(0, H / 2 - 60, W, 120); ctx.fillStyle = '#ff4444'; ctx.font = 'bold 26px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; ctx.fillText('GAME OVER', W / 2, H / 2 - 14); ctx.fillStyle = '#ffd700'; ctx.font = '15px Arial'; ctx.fillText('Level ' + g.level + ' · ' + g.score + ' pts', W / 2, H / 2 + 16); ctx.fillStyle = '#8bc34a'; ctx.font = '13px Arial'; ctx.fillText('Tap Restart to play again', W / 2, H / 2 + 40); }
       rafId = requestAnimationFrame(draw);
     };
@@ -390,14 +351,26 @@ function SnakeGame({ playerName, onScore }) {
       </div>
       <div ref={areaRef} style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
         <canvas ref={canvasRef} style={{ display: 'block', touchAction: 'none' }} />
+      </div>
+      {/* Arrow controls (replaces the joystick) */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 18px 16px', background: '#0d1117', flexShrink: 0 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 50px)', gridTemplateRows: 'repeat(2, 46px)', gap: 6 }}>
+          <span />
+          <button style={arrowBtn} onPointerDown={e => { e.preventDefault(); turn(0, -1); }}>▲</button>
+          <span />
+          <button style={arrowBtn} onPointerDown={e => { e.preventDefault(); turn(-1, 0); }}>◀</button>
+          <button style={arrowBtn} onPointerDown={e => { e.preventDefault(); turn(0, 1); }}>▼</button>
+          <button style={arrowBtn} onPointerDown={e => { e.preventDefault(); turn(1, 0); }}>▶</button>
+        </div>
         <button onPointerDown={startBoost} onPointerUp={endBoost} onPointerLeave={endBoost} onPointerCancel={endBoost} onTouchStart={startBoost} onTouchEnd={endBoost}
-          style={{ position: 'absolute', right: 18, bottom: 24, width: 72, height: 72, borderRadius: '50%', background: boosting ? 'radial-gradient(circle at 35% 30%, #ffe066, #e8a000)' : 'rgba(30,15,0,0.78)', border: '2px solid ' + (boosting ? '#ffe066' : 'rgba(212,168,83,0.55)'), color: boosting ? '#1a0a00' : '#ffd700', fontWeight: 'bold', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', userSelect: 'none', WebkitUserSelect: 'none', touchAction: 'none', boxShadow: boosting ? '0 0 18px rgba(255,200,60,0.8)' : '0 2px 8px rgba(0,0,0,0.5)' }}>
+          style={{ width: 72, height: 72, borderRadius: '50%', background: boosting ? 'radial-gradient(circle at 35% 30%, #ffe066, #e8a000)' : 'rgba(30,15,0,0.78)', border: '2px solid ' + (boosting ? '#ffe066' : 'rgba(212,168,83,0.55)'), color: boosting ? '#1a0a00' : '#ffd700', fontWeight: 'bold', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', userSelect: 'none', WebkitUserSelect: 'none', touchAction: 'none', boxShadow: boosting ? '0 0 18px rgba(255,200,60,0.8)' : '0 2px 8px rgba(0,0,0,0.5)' }}>
           <span style={{ fontSize: 22, lineHeight: 1 }}>⚡</span><span style={{ fontSize: 10, letterSpacing: 1 }}>FAST</span>
         </button>
       </div>
     </div>
   );
 }
+const arrowBtn = { background: 'rgba(30,15,0,0.85)', border: '2px solid rgba(212,168,83,0.55)', borderRadius: 12, color: '#ffd700', fontSize: 20, fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', userSelect: 'none', WebkitUserSelect: 'none', touchAction: 'none' };
 // ─── TETRIS GAME ──────────────────────────────────────────────────────────────
 function TetrisGame({ playerName, onScore }) {
   const canvasRef=useRef(null),nextCanvRef=useRef(null),containerRef=useRef(null),stateRef=useRef(null),rafRef=useRef(null),cellRef=useRef(24);
@@ -411,7 +384,7 @@ function TetrisGame({ playerName, onScore }) {
   const merge=(board,piece)=>{const b=board.map(r=>[...r]);piece.shape.forEach((row,y)=>row.forEach((v,x)=>{if(v)b[piece.y+y][piece.x+x]=piece.color;}));return b;};
   const clearLines=(board)=>{const b=board.filter(r=>r.some(v=>!v));const n=ROWS-b.length;return{board:[...Array.from({length:n},()=>Array(COLS).fill(0)),...b],cleared:n};};
   const initState=()=>({board:Array.from({length:ROWS},()=>Array(COLS).fill(0)),piece:newPiece(),next:newPiece(),score:0,lines:0,level:1,lastTime:0,speed:600});
-  const calcCell=useCallback(()=>{const c=containerRef.current;if(!c)return 24;const bw=Math.floor(c.clientWidth*0.62),bh=c.clientHeight-110,byW=Math.floor(bw/COLS),byH=Math.floor(bh/ROWS);return Math.max(10,Math.min(byW,byH,30));},[]);
+  const calcCell=useCallback(()=>{const c=containerRef.current;if(!c)return 24;const bw=Math.floor(c.clientWidth*0.70),bh=c.clientHeight-90,byW=Math.floor(bw/COLS),byH=Math.floor(bh/ROWS);return Math.max(12,Math.min(byW,byH,44));},[]);
   const drawBlock=(ctx,x,y,color,cell,alpha=1)=>{ctx.globalAlpha=alpha;ctx.fillStyle=color;ctx.fillRect(x*cell+1,y*cell+1,cell-2,cell-2);ctx.fillStyle='rgba(255,255,255,0.3)';ctx.fillRect(x*cell+1,y*cell+1,cell-2,Math.max(2,cell*0.18));ctx.fillRect(x*cell+1,y*cell+1,Math.max(2,cell*0.18),cell-2);ctx.fillStyle='rgba(0,0,0,0.35)';ctx.fillRect(x*cell+1,y*cell+cell-Math.max(2,cell*0.18)-1,cell-2,Math.max(2,cell*0.18));ctx.globalAlpha=1;};
   const drawBoard=useCallback(()=>{const canvas=canvasRef.current;if(!canvas)return;const st=stateRef.current;if(!st)return;const CELL=cellRef.current,ctx=canvas.getContext('2d'),W=COLS*CELL,H=ROWS*CELL;ctx.fillStyle='#080c14';ctx.fillRect(0,0,W,H);for(let x=0;x<=COLS;x++){ctx.strokeStyle='rgba(255,255,255,0.04)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x*CELL,0);ctx.lineTo(x*CELL,H);ctx.stroke();}for(let y=0;y<=ROWS;y++){ctx.beginPath();ctx.moveTo(0,y*CELL);ctx.lineTo(W,y*CELL);ctx.stroke();}ctx.strokeStyle=st.piece?.glow||'#00e5ff';ctx.lineWidth=2;ctx.strokeRect(0,0,W,H);let gy=st.piece.y;while(!collides(st.board,{...st.piece,y:gy+1}))gy++;st.piece.shape.forEach((row,y)=>row.forEach((v,x)=>{if(v)drawBlock(ctx,st.piece.x+x,gy+y,st.piece.color,CELL,0.15);}));st.board.forEach((row,y)=>row.forEach((v,x)=>{if(v)drawBlock(ctx,x,y,v,CELL);}));ctx.shadowColor=st.piece.glow;ctx.shadowBlur=CELL*0.8;st.piece.shape.forEach((row,y)=>row.forEach((v,x)=>{if(v)drawBlock(ctx,st.piece.x+x,st.piece.y+y,st.piece.color,CELL);}));ctx.shadowBlur=0;},[]);
   const drawNext=useCallback(()=>{const canvas=nextCanvRef.current;if(!canvas)return;const st=stateRef.current;if(!st)return;const NC=16,W=4*NC,H=4*NC;canvas.width=W;canvas.height=H;const ctx=canvas.getContext('2d');ctx.fillStyle='#080c14';ctx.fillRect(0,0,W,H);const p=st.next,ox=Math.floor((4-p.shape[0].length)/2),oy=Math.floor((4-p.shape.length)/2);ctx.shadowColor=p.glow;ctx.shadowBlur=NC*0.8;p.shape.forEach((row,y)=>row.forEach((v,x)=>{if(v)drawBlock(ctx,ox+x,oy+y,p.color,NC);}));ctx.shadowBlur=0;},[]);
@@ -534,13 +507,8 @@ function FlappyBarista({ playerName, onScore }) {
     return()=>{if(rafRef.current)cancelAnimationFrame(rafRef.current);};
   }, [phase, playerName, best, onScore]);
   return (
-    <div style={{display:'flex',flexDirection:'column',flex:1,alignItems:'center',background:'#87ceeb',overflow:'hidden'}}>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'6px 14px',background:'#1a0800',borderBottom:'1px solid #3d1f00',width:'100%',boxSizing:'border-box',flexShrink:0}}>
-        <span style={{fontSize:12,color:'#ffd700',fontWeight:'bold'}}>{playerName}</span>
-        <span style={{fontSize:13,color:'#d4a853',fontWeight:'bold',letterSpacing:1}}>FLAPPY BARISTA</span>
-        <span style={{fontSize:12,color:'#8bc34a',fontWeight:'bold'}}>Best: {best}</span>
-      </div>
-      <canvas ref={canvasRef} width={W} height={H} style={{display:'block',maxWidth:'100%',cursor:'pointer',touchAction:'none'}} onClick={flap} onTouchStart={e=>{e.preventDefault();flap();}}/>
+    <div style={{display:'flex',flex:1,alignItems:'center',justifyContent:'center',background:'#87ceeb',overflow:'hidden'}}>
+      <canvas ref={canvasRef} width={W} height={H} style={{display:'block',height:'100%',width:'auto',maxWidth:'100%',maxHeight:'100%',cursor:'pointer',touchAction:'none'}} onClick={flap} onTouchStart={e=>{e.preventDefault();flap();}}/>
     </div>
   );
 }
