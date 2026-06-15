@@ -210,7 +210,8 @@ const parseSheetDateTime = (dateStr, timeStr) => {
   if (tm) { h = Number(tm[1]) % 12; if (tm[4] && /pm/i.test(tm[4])) h += 12; mi = Number(tm[2]); }
   return new Date(yr, Number(dm[1]) - 1, Number(dm[2]), h, mi);
 };
-export default function Orders({ userName }) {
+export default function Orders({ userName, role }) {
+  const isManager = String(role || '').trim().toLowerCase() === 'manager';
   const [tab, setTab] = useState(1);
   const [openGroup, setOpenGroup] = useState(null);
   const [order, setOrder] = useState([]);
@@ -411,6 +412,7 @@ export default function Orders({ userName }) {
   // ── Recover ONLY orders not yet in the sheet (syncedToSheet === false) ──
   // Uses the per-order flag (not datetime) so already-synced orders are never re-added.
   const backfillMissing = async () => {
+    if (!isManager) { alert('Only a manager can sync missing orders.'); return; }
     if (!accessToken) { alert('Connect Google first, then try again.'); return; }
     const missing = allOrders
       .filter(o => !o.hidden && o.syncedToSheet === false)
@@ -552,10 +554,12 @@ export default function Orders({ userName }) {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.green} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                 Connected — orders sync to Sheets & Drive
               </div>
-              {/* Recover orders saved in the app but missing from the sheet */}
-              <button style={s.syncMissingBtn} onClick={backfillMissing} disabled={backfilling}>
-                <LinkIcon /> {backfilling ? 'Syncing missing orders…' : `Sync missing orders to Sheet${unsyncedCount > 0 ? ` (${unsyncedCount})` : ''}`}
-              </button>
+              {/* Recover orders saved in the app but missing from the sheet — managers only */}
+              {isManager && (
+                <button style={s.syncMissingBtn} onClick={backfillMissing} disabled={backfilling}>
+                  <LinkIcon /> {backfilling ? 'Syncing missing orders…' : `Sync missing orders to Sheet${unsyncedCount > 0 ? ` (${unsyncedCount})` : ''}`}
+                </button>
+              )}
               <label style={s.label}>Buyer name (optional)</label>
               <input style={s.input} placeholder="Customer name..." value={buyerName} onChange={e => setBuyerName(e.target.value)} />
               <label style={s.label}>Payment method</label>
