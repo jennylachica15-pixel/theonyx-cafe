@@ -408,42 +408,22 @@ export default function Orders({ userName }) {
     } catch (e) { console.error(e); }
     setSaving(false);
   };
-  // ── Recover orders that are in the app but never reached the sheet ──
-  // Reads the sheet, finds the latest datetime present, and appends every
-  // non-hidden order created AFTER that — so nothing is duplicated.
+  // ── Recover ONLY orders not yet in the sheet (syncedToSheet === false) ──
+  // Uses the per-order flag (not datetime) so already-synced orders are never re-added.
   const backfillMissing = async () => {
     if (!accessToken) { alert('Connect Google first, then try again.'); return; }
+    const missing = allOrders
+      .filter(o => !o.hidden && o.syncedToSheet === false)
+      .sort((a, b) => (a.createdAt?.toDate ? a.createdAt.toDate() : 0) - (b.createdAt?.toDate ? b.createdAt.toDate() : 0));
+    if (missing.length === 0) {
+      alert('No missing orders — everything is already in the sheet.');
+      return;
+    }
     setBackfilling(true);
     try {
-      const res = await fetch(
-        `https://sheets.googleapis.com/v4/spreadsheets/${SALES_SHEET_ID}/values/${SALES_SHEET_TAB}!A:J`,
-        { headers: { Authorization: `Bearer ${accessToken}` } }
-      );
-      if (!res.ok) throw new Error('read ' + res.status);
-      const data = await res.json();
-      const rows = data.values || [];
-      let header = -1, maxTime = 0;
-      for (let i = 0; i < rows.length; i++) {
-        const low = (rows[i] || []).map(x => String(x || '').trim().toLowerCase());
-        if (header === -1 && low.includes('date') && low.includes('item')) { header = i; continue; }
-        if (header === -1) continue;
-        const dt = parseSheetDateTime((rows[i] || [])[0], (rows[i] || [])[1]);
-        if (dt && !isNaN(dt.getTime())) maxTime = Math.max(maxTime, dt.getTime());
-      }
-      if (!maxTime) {
-        alert('Could not read the last recorded row from the sheet, so backfill was stopped to avoid duplicates. Please check the sheet and try again.');
-        setBackfilling(false); return;
-      }
-      const missing = allOrders
-        .filter(o => !o.hidden && o.createdAt?.toDate && o.createdAt.toDate().getTime() > maxTime)
-        .sort((a, b) => a.createdAt.toDate() - b.createdAt.toDate());
-      if (missing.length === 0) {
-        alert('No missing orders — the sheet is already up to date.');
-        setBackfilling(false); return;
-      }
       const out = [];
       missing.forEach(o => {
-        const d = o.createdAt.toDate();
+        const d = o.createdAt?.toDate ? o.createdAt.toDate() : new Date();
         const ds = d.toLocaleDateString('en-PH', { month: '2-digit', day: '2-digit', year: '2-digit' });
         const ts = d.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' });
         (o.items || []).forEach(it => out.push([
@@ -453,6 +433,7 @@ export default function Orders({ userName }) {
       });
       const ok = await appendToSheet(out);
       if (ok) {
+        // Mark each as synced so they're never re-added (prevents double entries)
         for (const o of missing) { try { await updateDoc(doc(db, 'orders', o.id), { syncedToSheet: true }); } catch (e) {} }
         alert(`Recovered ${missing.length} order(s) → ${out.length} row(s) added to the sheet.`);
       } else {
