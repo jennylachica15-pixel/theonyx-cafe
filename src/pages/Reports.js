@@ -25,7 +25,7 @@ function getProductColor(name) {
   return productColorMap[name];
 }
 function formatAmount(val) {
-  return val >= 1000 ? `P${(val / 1000).toFixed(1)}k` : `P${val.toLocaleString()}`;
+  return val >= 1000 ? `₱${(val / 1000).toFixed(1)}k` : `₱${val.toLocaleString()}`;
 }
 function formatDateShort(date) {
   return `${date.toLocaleString('default', { month: 'short' })} ${date.getDate()}`;
@@ -435,6 +435,12 @@ export default function Reports({ role = 'staff', userName = '' }) {
   const projSales = monthCalRev.sales / daysElapsed * daysInMonth;
   const projNet = monthCalRev.net / daysElapsed * daysInMonth;  // projected gross profit
   const projProfit = projNet - overheadVal;                     // projected profit after overhead
+  // How much to add per item (price tweak) to cover overhead
+  const monthOrders = orders.filter(o => { const d = o.createdAt?.toDate && o.createdAt.toDate(); return d && d >= monthStartCal; });
+  const itemsMTD = monthOrders.reduce((sm, o) => sm + (o.items || []).reduce((q, it) => q + (Number(it.qty) || 0), 0), 0);
+  const projItems = daysElapsed > 0 ? Math.round(itemsMTD / daysElapsed * daysInMonth) : 0;
+  const addPerItemShortfall = (projProfit < 0 && projItems > 0) ? (-projProfit) / projItems : 0;
+  const addPerItemOverhead = projItems > 0 ? overheadVal / projItems : 0;
   // Top 10 products
   const productMap = {};
   orders.forEach(order => {
@@ -489,7 +495,7 @@ export default function Reports({ role = 'staff', userName = '' }) {
   const marginAll = profitAll.matched > 0 ? Math.round((profitAll.net / profitAll.matched) * 100) : 0;
   const coverageAll = profitAll.sales > 0 ? Math.round((profitAll.matched / profitAll.sales) * 100) : 0;
   const uncostedAll = Object.entries(profitAll.uncosted).sort((a, b) => b[1] - a[1]);
-  const peso = (v) => `P${Math.round(v).toLocaleString()}`;
+  const peso = (v) => (v < 0 ? '-₱' : '₱') + Math.round(Math.abs(v)).toLocaleString();
   const tooltipTopOffset = dailyTooltip
     ? Math.max(52, 36 + dailyTooltip.products.length * 20)
     : 32;
@@ -517,15 +523,15 @@ export default function Reports({ role = 'staff', userName = '' }) {
       {/* Summary Stats */}
       <div style={s.statGrid}>
         <div style={s.statBox}>
-          <div style={s.statNum('var(--brown-dark)')}>P{todayTotal.toLocaleString()}</div>
+          <div style={s.statNum('var(--brown-dark)')}>₱{todayTotal.toLocaleString()}</div>
           <div style={s.statLabel}>Today</div>
         </div>
         <div style={s.statBox}>
-          <div style={s.statNum('var(--brown-mid)')}>P{weekTotal.toLocaleString()}</div>
+          <div style={s.statNum('var(--brown-mid)')}>₱{weekTotal.toLocaleString()}</div>
           <div style={s.statLabel}>This Week</div>
         </div>
         <div style={s.statBox}>
-          <div style={s.statNum('var(--gold)')}>P{monthTotal.toLocaleString()}</div>
+          <div style={s.statNum('var(--gold)')}>₱{monthTotal.toLocaleString()}</div>
           <div style={s.statLabel}>This Month</div>
         </div>
         <div style={s.statBox}>
@@ -853,7 +859,7 @@ export default function Reports({ role = 'staff', userName = '' }) {
                     <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--brown-dark)' }}>{sec.cat}</div>
                     <div style={{ fontSize: 10.5, color: 'var(--brown-light)' }}>Top {limit} · {sec.items.length} item{sec.items.length !== 1 ? 's' : ''}</div>
                   </div>
-                  <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--brown-dark)', marginRight: 8 }}>P{Math.round(sec.total).toLocaleString()}</div>
+                  <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--brown-dark)', marginRight: 8 }}>₱{Math.round(sec.total).toLocaleString()}</div>
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', flexShrink: 0 }}><polyline points="6 9 12 15 18 9" /></svg>
                 </div>
                 {open && (
@@ -868,7 +874,7 @@ export default function Reports({ role = 'staff', userName = '' }) {
                           </div>
                         </div>
                         <div style={{ textAlign: 'right' }}>
-                          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--brown-dark)' }}>P{sales.toLocaleString()}</div>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--brown-dark)' }}>₱{sales.toLocaleString()}</div>
                           <div style={{ fontSize: 10, color: 'var(--brown-light)' }}>{totalSales > 0 ? ((sales / totalSales) * 100).toFixed(1) : 0}%</div>
                         </div>
                       </div>
@@ -878,6 +884,30 @@ export default function Reports({ role = 'staff', userName = '' }) {
               </div>
             );
           })}
+        </div>
+      )}
+      {/* How much to add per item to cover overhead */}
+      {itemsMTD > 0 && (
+        <div style={s.card}>
+          <div style={s.cardTitle}>Price tweak to cover overhead</div>
+          <div style={{ fontSize: 11, color: 'var(--brown-light)', marginBottom: 10 }}>Based on about {projItems.toLocaleString()} items projected to sell this month.</div>
+          {projProfit < 0 ? (
+            <>
+              <div style={s.productRow}>
+                <div style={{ flex: 1, fontSize: 12, fontWeight: 600, color: 'var(--brown-dark)' }}>To break even this month<div style={{ fontSize: 10, color: 'var(--brown-light)', fontWeight: 400 }}>covers the {peso(-projProfit)} projected shortfall</div></div>
+                <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--green-ok)' }}>+{peso(addPerItemShortfall)}<span style={{ fontSize: 10, color: 'var(--brown-light)', fontWeight: 400 }}>/item</span></div>
+              </div>
+              <div style={s.productRow}>
+                <div style={{ flex: 1, fontSize: 12, fontWeight: 600, color: 'var(--brown-dark)' }}>To fully fund overhead from price<div style={{ fontSize: 10, color: 'var(--brown-light)', fontWeight: 400 }}>covers the whole {peso(overheadVal)} overhead</div></div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--gold)' }}>+{peso(addPerItemOverhead)}<span style={{ fontSize: 10, color: 'var(--brown-light)', fontWeight: 400 }}>/item</span></div>
+              </div>
+            </>
+          ) : (
+            <div style={{ fontSize: 12.5, color: 'var(--green-ok)', fontWeight: 600 }}>You're projected to cover overhead — no price increase needed.</div>
+          )}
+          <div style={{ fontSize: 10, color: 'var(--brown-light)', marginTop: 8, fontStyle: 'italic', lineHeight: 1.5 }}>
+            Rough guide — spreads the amount evenly across all items. Assumes volume stays about the same after a price change.
+          </div>
         </div>
       )}
       <div style={{ height: 80 }} />
