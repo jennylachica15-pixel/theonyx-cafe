@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { auth, db } from '../firebase/config';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
-import { registerUser, loginUser } from './authHelpers';
+import AccountAuth from './AccountAuth';
 import GuestLanding from './GuestLanding';
 import Gallery from './Gallery';
 import Snapshots from './Snapshots';
@@ -51,41 +51,12 @@ const TABS = [
   { id: 'chat',      label: 'Chat'      },
 ];
 function ChatGate({ user }) {
-  const [mode, setMode] = useState('signin');
-  const [username, setUsername] = useState(() => { try { return localStorage.getItem('cafeGameUser') || ''; } catch { return ''; } });
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  // Same single account as the Games tab — signing in here unlocks both.
   if (user) return <Chat user={user} />;
-  const submit = async (e) => {
-    e.preventDefault();
-    setError(''); setLoading(true);
-    try {
-      if (mode === 'register') await registerUser(username, password);
-      else await loginUser(username, password);
-    } catch (err) {
-      setError(err.message || 'Something went wrong. Please try again.');
-    }
-    setLoading(false);
-  };
   return (
     <div style={styles.chatGate}>
       <div style={{ ...styles.loginCard, animation: 'none' }}>
-        <div style={styles.loginTitle}>{mode === 'register' ? 'Join the Chat' : 'Sign In to Chat'}</div>
-        <div style={styles.loginSub}>SAME ACCOUNT AS THE GAMES</div>
-        {error && <div style={styles.errorBox}>{error}</div>}
-        <form onSubmit={submit}>
-          <label style={styles.label}>Username</label>
-          <input style={styles.input} type="text" placeholder="e.g. Latte" value={username} onChange={e => setUsername(e.target.value)} autoCapitalize="none" required maxLength={20} />
-          <label style={styles.label}>Password</label>
-          <input style={styles.input} type="password" placeholder={mode === 'register' ? '6+ characters' : '••••••••'} value={password} onChange={e => setPassword(e.target.value)} required />
-          <button type="submit" style={{ ...styles.loginBtn, opacity: loading ? 0.7 : 1 }} disabled={loading}>
-            {loading ? 'Please wait…' : (mode === 'register' ? 'Create Account' : 'Sign In')}
-          </button>
-        </form>
-        <button style={styles.switchLink} onClick={() => { setError(''); setMode(mode === 'register' ? 'signin' : 'register'); }}>
-          {mode === 'register' ? 'Already have an account? Sign in' : 'New here? Create an account'}
-        </button>
+        <AccountAuth heading="Sign in to chat" sub="One account for Games & Chat" />
       </div>
     </div>
   );
