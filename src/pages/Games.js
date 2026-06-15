@@ -352,25 +352,28 @@ function SnakeGame({ playerName, onScore }) {
       <div ref={areaRef} style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
         <canvas ref={canvasRef} style={{ display: 'block', touchAction: 'none' }} />
       </div>
-      {/* Arrow controls (replaces the joystick) */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 18px 16px', background: '#0d1117', flexShrink: 0 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 50px)', gridTemplateRows: 'repeat(2, 46px)', gap: 6 }}>
+      {/* Arrow controls (replaces the joystick) — classic D-pad cross */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 26px 24px', background: '#0d1117', flexShrink: 0 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 54px)', gridTemplateRows: 'repeat(3, 54px)', gap: 10 }}>
           <span />
           <button style={arrowBtn} onPointerDown={e => { e.preventDefault(); turn(0, -1); }}>▲</button>
           <span />
           <button style={arrowBtn} onPointerDown={e => { e.preventDefault(); turn(-1, 0); }}>◀</button>
-          <button style={arrowBtn} onPointerDown={e => { e.preventDefault(); turn(0, 1); }}>▼</button>
+          <span />
           <button style={arrowBtn} onPointerDown={e => { e.preventDefault(); turn(1, 0); }}>▶</button>
+          <span />
+          <button style={arrowBtn} onPointerDown={e => { e.preventDefault(); turn(0, 1); }}>▼</button>
+          <span />
         </div>
         <button onPointerDown={startBoost} onPointerUp={endBoost} onPointerLeave={endBoost} onPointerCancel={endBoost} onTouchStart={startBoost} onTouchEnd={endBoost}
-          style={{ width: 72, height: 72, borderRadius: '50%', background: boosting ? 'radial-gradient(circle at 35% 30%, #ffe066, #e8a000)' : 'rgba(30,15,0,0.78)', border: '2px solid ' + (boosting ? '#ffe066' : 'rgba(212,168,83,0.55)'), color: boosting ? '#1a0a00' : '#ffd700', fontWeight: 'bold', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', userSelect: 'none', WebkitUserSelect: 'none', touchAction: 'none', boxShadow: boosting ? '0 0 18px rgba(255,200,60,0.8)' : '0 2px 8px rgba(0,0,0,0.5)' }}>
+          style={{ width: 76, height: 76, borderRadius: '50%', background: boosting ? 'radial-gradient(circle at 35% 30%, #ffe066, #e8a000)' : 'rgba(30,15,0,0.78)', border: '2px solid ' + (boosting ? '#ffe066' : 'rgba(212,168,83,0.55)'), color: boosting ? '#1a0a00' : '#ffd700', fontWeight: 'bold', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', userSelect: 'none', WebkitUserSelect: 'none', touchAction: 'none', boxShadow: boosting ? '0 0 18px rgba(255,200,60,0.8)' : '0 2px 8px rgba(0,0,0,0.5)' }}>
           <span style={{ fontSize: 22, lineHeight: 1 }}>⚡</span><span style={{ fontSize: 10, letterSpacing: 1 }}>FAST</span>
         </button>
       </div>
     </div>
   );
 }
-const arrowBtn = { background: 'rgba(30,15,0,0.85)', border: '2px solid rgba(212,168,83,0.55)', borderRadius: 12, color: '#ffd700', fontSize: 20, fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', userSelect: 'none', WebkitUserSelect: 'none', touchAction: 'none' };
+const arrowBtn = { width: 54, height: 54, background: 'rgba(40,22,4,0.9)', border: '2px solid rgba(212,168,83,0.5)', borderRadius: 14, color: '#ffd700', fontSize: 22, fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', userSelect: 'none', WebkitUserSelect: 'none', touchAction: 'none' };
 // ─── TETRIS GAME ──────────────────────────────────────────────────────────────
 function TetrisGame({ playerName, onScore }) {
   const canvasRef=useRef(null),nextCanvRef=useRef(null),containerRef=useRef(null),stateRef=useRef(null),rafRef=useRef(null),cellRef=useRef(24);
