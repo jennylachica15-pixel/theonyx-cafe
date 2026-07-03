@@ -6,6 +6,7 @@ const SALES_SHEET_ID = '1yadv9UgY8mFQzSwLsw3Qk3EepZeLL8dNl3YRtYsGZQU';
 const SALES_SHEET_TAB = 'Sheet1';
 const RECEIPT_FOLDER_ID = '16FGEhlHtHObYC0pBg0jfphsNxksdWF1m';
 const SCOPES = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file';
+const TOKEN_KEY = 'theonyx_gtoken_rw'; // shared with Inventory (same read/write scope)
 const PAYMENT_METHODS = ['Cash', 'GCash', 'Maya', 'Card'];
 const SIZES = ['mini', 'classic', 'upgrade', 'regular'];
 const SIZE_LABELS = { mini: 'Mini', classic: 'Classic', upgrade: 'Upgrade', regular: 'Regular' };
@@ -227,6 +228,7 @@ export default function Orders({ userName, role }) {
   const [completedOrder, setCompletedOrder] = useState(null);
   const [accessToken, setAccessToken] = useState(null);
   const tokenClientRef = React.useRef(null);
+  const accessTokenRef = React.useRef(null); // always-current token for async fetches
   const [allOrders, setAllOrders] = useState([]);
   const [expandedId, setExpandedId] = useState(null);
   const [editingKey, setEditingKey] = useState(null);
@@ -238,6 +240,8 @@ export default function Orders({ userName, role }) {
   const [removeReason, setRemoveReason] = useState('');
   const [removeSaving, setRemoveSaving] = useState(false);
   const [backfilling, setBackfilling] = useState(false);
+  // keep a ref copy of the token so async fetches always read the latest value
+  useEffect(() => { accessTokenRef.current = accessToken; }, [accessToken]);
   // inject keyframe animation once
   useEffect(() => {
     const id = 'order-complete-keyframes';
@@ -256,10 +260,10 @@ export default function Orders({ userName, role }) {
   }, []);
   // Load Google Identity Services — reuse a saved token, and re-auth silently (no button click)
   useEffect(() => {
-    const TOKEN_KEY = 'theonyx_gtoken_rw'; // shared with Inventory (same read/write scope)
     const saveToken = (res) => {
       if (!res || !res.access_token) return;
       setAccessToken(res.access_token);
+      accessTokenRef.current = res.access_token;
       try {
         const exp = Date.now() + (Number(res.expires_in || 3600) - 60) * 1000; // refresh 1 min early
         localStorage.setItem(TOKEN_KEY, JSON.stringify({ token: res.access_token, exp }));
@@ -268,7 +272,10 @@ export default function Orders({ userName, role }) {
     // 1) Reuse a still-valid token from a previous visit (no prompt at all)
     try {
       const saved = JSON.parse(localStorage.getItem(TOKEN_KEY) || 'null');
-      if (saved && saved.token && saved.exp > Date.now()) setAccessToken(saved.token);
+      if (saved && saved.token && saved.exp > Date.now()) {
+        setAccessToken(saved.token);
+        accessTokenRef.current = saved.token;
+      }
     } catch (e) {}
     const script = document.createElement('script');
     script.src = 'https://accounts.google.com/gsi/client';
@@ -364,14 +371,49 @@ export default function Orders({ userName, role }) {
       <div class="footer">Thank you for visiting Theonyx Cafe!<br/>Follow us @theonyx.cafe</div>
     </body></html>
   `;
-  // Returns true only when the sheet actually accepted the rows
-  const appendToSheet = async (rows) => {
-    if (!accessToken) return false;
+  // Ask Google for a fresh token silently (no popup if already granted before).
+  // Returns the new token string, or null if it couldn't get one.
+  const getFreshToken = () => new Promise((resolve) => {
+    if (!tokenClientRef.current) { resolve(null); return; }
+    let settled = false;
+    const finish = (val) => { if (!settled) { settled = true; resolve(val); } };
+    tokenClientRef.current.callback = (res) => {
+      if (res && res.access_token) {
+        setAccessToken(res.access_token);
+        accessTokenRef.current = res.access_token;
+        try {
+          const exp = Date.now() + (Number(res.expires_in || 3600) - 60) * 1000;
+          localStorage.setItem(TOKEN_KEY, JSON.stringify({ token: res.access_token, exp }));
+        } catch (e) {}
+        finish(res.access_token);
+      } else {
+        finish(null);
+      }
+    };
+    try { tokenClientRef.current.requestAccessToken({ prompt: '' }); } catch (e) { finish(null); }
+    // safety timeout so we never hang forever
+    setTimeout(() => finish(null), 8000);
+  });
+  // Append rows to the sheet. Returns true only when the sheet actually accepted them.
+  // If the token has expired (401), it silently refreshes and retries once.
+  const appendToSheet = async (rows, allowRetry = true) => {
+    const token = accessTokenRef.current;
+    if (!token) { console.warn('appendToSheet: no access token'); return false; }
     try {
       const res = await fetch(
-        `https://sheets.googleapis.com/v4/spreadsheets/${SALES_SHEET_ID}/values/${SALES_SHEET_TAB}!A:J:append?valueInputOption=USER_ENTERED`,
-        { method: 'POST', headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ values: rows }) }
+        `https://sheets.googleapis.com/v4/spreadsheets/${SALES_SHEET_ID}/values/${encodeURIComponent(SALES_SHEET_TAB)}!A:J:append?valueInputOption=USER_ENTERED`,
+        { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ values: rows }) }
       );
+      // Token expired/invalid — get a new one and try again once.
+      if ((res.status === 401 || res.status === 403) && allowRetry) {
+        const fresh = await getFreshToken();
+        if (fresh) return appendToSheet(rows, false);
+      }
+      if (!res.ok) {
+        let detail = '';
+        try { detail = await res.text(); } catch (e) {}
+        console.error('Sheet append failed:', res.status, detail);
+      }
       return res.ok;
     } catch (e) { console.error('Sheet append error:', e); return false; }
   };
@@ -389,7 +431,7 @@ export default function Orders({ userName, role }) {
         cashier, hidden: false, syncedToSheet: false, createdAt: serverTimestamp(),
       });
       let sheetOk = false;
-      if (accessToken) {
+      if (accessTokenRef.current) {
         const rows = order.map(o => [dateStr, timeStr, buyerName || 'Walk-in', o.name, o.size, o.qty, o.price, o.price * o.qty, paymentMethod, cashier]);
         sheetOk = await appendToSheet(rows);
         try {
@@ -397,7 +439,7 @@ export default function Orders({ userName, role }) {
           const form = new FormData();
           form.append('metadata', new Blob([JSON.stringify({ name: `${pdfName}.html`, parents: [RECEIPT_FOLDER_ID], mimeType: 'text/html' })], { type: 'application/json' }));
           form.append('file', blob);
-          await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', { method: 'POST', headers: { Authorization: `Bearer ${accessToken}` }, body: form });
+          await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', { method: 'POST', headers: { Authorization: `Bearer ${accessTokenRef.current}` }, body: form });
         } catch (e) { console.error('Receipt upload error:', e); }
       }
       // Record whether the sheet actually got it; if not, the backfill button can recover it
@@ -416,7 +458,7 @@ export default function Orders({ userName, role }) {
   // Uses the per-order flag (not datetime) so already-synced orders are never re-added.
   const backfillMissing = async () => {
     if (!isManager) { alert('Only a manager can sync missing orders.'); return; }
-    if (!accessToken) { alert('Connect Google first, then try again.'); return; }
+    if (!accessTokenRef.current) { alert('Connect Google first, then try again.'); return; }
     const missing = allOrders
       .filter(o => !o.hidden && o.syncedToSheet === false)
       .sort((a, b) => (a.createdAt?.toDate ? a.createdAt.toDate() : 0) - (b.createdAt?.toDate ? b.createdAt.toDate() : 0));
@@ -513,7 +555,7 @@ export default function Orders({ userName, role }) {
       const removeDateStr = removedAt.toLocaleDateString('en-PH', { month: '2-digit', day: '2-digit', year: '2-digit' });
       const removeTimeStr = removedAt.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' });
       await updateDoc(doc(db, 'orders', orderId), { hidden: true, removeReason: removeReason.trim(), removedBy: cashier, removedAt: removedAt.toISOString() });
-      if (ord && accessToken) {
+      if (ord && accessTokenRef.current) {
         const rows = (ord.items || []).map(it => ([removeDateStr, removeTimeStr, ord.buyerName || 'Walk-in', `[ORDER REMOVED] ${it.name}`, it.size || '', it.qty, it.price, it.price * it.qty, ord.paymentMethod || '', cashier, removeReason.trim() ? `Reason: ${removeReason.trim()}` : 'No reason given']));
         await appendToSheet(rows);
       }
