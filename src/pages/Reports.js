@@ -1117,5 +1117,4 @@ export default function Reports({ role = 'staff', userName = '' }) {
       <div style={{ height: 80 }} />
     </div>
   );
-
 }
