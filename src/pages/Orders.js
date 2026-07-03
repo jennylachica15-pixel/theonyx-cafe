@@ -454,18 +454,31 @@ export default function Orders({ userName, role }) {
     } catch (e) { console.error(e); }
     setSaving(false);
   };
-  // ── Recover ONLY orders not yet in the sheet (syncedToSheet === false) ──
-  // Uses the per-order flag (not datetime) so already-synced orders are never re-added.
+  // ── Recover orders not confirmed in the sheet ──
+  // Catches BOTH syncedToSheet === false AND older orders where the flag was
+  // never set (undefined) — those are the ones a previous app version missed.
+  // A confirm dialog shows the count + date range so you can avoid re-adding
+  // anything that's already in the sheet.
   const backfillMissing = async () => {
     if (!isManager) { alert('Only a manager can sync missing orders.'); return; }
     if (!accessTokenRef.current) { alert('Connect Google first, then try again.'); return; }
     const missing = allOrders
-      .filter(o => !o.hidden && o.syncedToSheet === false)
+      .filter(o => !o.hidden && o.syncedToSheet !== true)
       .sort((a, b) => (a.createdAt?.toDate ? a.createdAt.toDate() : 0) - (b.createdAt?.toDate ? b.createdAt.toDate() : 0));
     if (missing.length === 0) {
-      alert('No missing orders — everything is already in the sheet.');
+      alert('No missing orders — everything is already marked as synced.');
       return;
     }
+    // Show the date range so you can sanity-check before writing.
+    const firstD = missing[0].createdAt?.toDate ? missing[0].createdAt.toDate() : null;
+    const lastD = missing[missing.length - 1].createdAt?.toDate ? missing[missing.length - 1].createdAt.toDate() : null;
+    const rangeTxt = (firstD && lastD)
+      ? `\n\nOldest: ${firstD.toLocaleString('en-PH')}\nNewest: ${lastD.toLocaleString('en-PH')}`
+      : '';
+    const proceed = window.confirm(
+      `Found ${missing.length} order(s) not yet confirmed in the sheet.${rangeTxt}\n\nAdd them to the sheet now?`
+    );
+    if (!proceed) return;
     setBackfilling(true);
     try {
       const out = [];
@@ -499,7 +512,8 @@ export default function Orders({ userName, role }) {
   const todayList = allOrders.filter(o => !o.hidden && inWindow(o, startYesterday));
   const summaryList = allOrders.filter(o => !o.hidden && inWindow(o, startToday));
   // Count of orders saved in the app but not yet confirmed in the sheet
-  const unsyncedCount = allOrders.filter(o => !o.hidden && o.syncedToSheet === false).length;
+  // (matches the backfill filter: anything not explicitly marked synced)
+  const unsyncedCount = allOrders.filter(o => !o.hidden && o.syncedToSheet !== true).length;
   const groups = [];
   todayList.forEach(o => {
     const d = tsToDate(o.createdAt);
