@@ -95,9 +95,7 @@ const MENU_CATEGORIES = [
       { name: 'Siomai', regular: 50 },
       { name: 'Onyx Burger', regular: 150 },
       { name: 'Onyx Nachos', regular: 130 },
-      { name: 'Fries - BBQ', regular: 30 },
-      { name: 'Fries - Sour Cream', regular: 30 },
-      { name: 'Fries - Cheese', regular: 30 },
+      { name: 'Fries Overload', regular: 90 },
     ]
   },
   { id: 'addons', label: 'Add-ons',
@@ -105,6 +103,9 @@ const MENU_CATEGORIES = [
       { name: 'Pearl', regular: 10 },
       { name: 'Espresso Shot', regular: 10 },
       { name: 'Rice', regular: 15 },
+      { name: 'Fries - BBQ', regular: 30 },
+      { name: 'Fries - Sour Cream', regular: 30 },
+      { name: 'Fries - Cheese', regular: 30 },
     ]
   },
 ];
