@@ -370,6 +370,7 @@ export default function Reports({ role = 'staff', userName = '' }) {
     const unsub = onSnapshot(query(collection(db, 'orders'), orderBy('createdAt', 'desc')), snap => {
       const allOrders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       const filtered = allOrders.filter(o => {
+        if (o.hidden) return false;                 // skip removed/hidden orders
         if (!o.createdAt?.toDate) return false;
         return isAfterReportStart(o.createdAt.toDate());
       });
@@ -459,8 +460,9 @@ export default function Reports({ role = 'staff', userName = '' }) {
   }, [accessToken]);
 
   const now = new Date();
-  // Effective data: prefer live sheet data, fall back to Firestore + default costs
-  const orders = sheetOrders ?? fsOrders;
+  // Orders come from Firestore — real timestamps, always complete, and immune to
+  // the sheet's Date-column formatting. Capital cost + overhead still sync from the sheet.
+  const orders = fsOrders;
   const costMap = { ...CAPITAL_COST, ...(sheetCost || {}) };
   // Daily with per-product breakdown
   const dailyData = Array.from({ length: 7 }, (_, i) => {
@@ -635,7 +637,7 @@ export default function Reports({ role = 'staff', userName = '' }) {
   return (
     <div style={s.page}>
       <div style={s.title}>Reports</div>
-      <div style={s.sub}>Sales overview · From Jun 4 · {sheetOrders ? 'Live from Sheets' : 'From app data'}</div>
+      <div style={s.sub}>Sales overview · From Jun 4 · From app data</div>
       {/* Google connect / sync */}
       {!accessToken ? (
         <button style={s.connBtn} onClick={() => tokenClientRef.current?.requestAccessToken()}>
@@ -644,7 +646,7 @@ export default function Reports({ role = 'staff', userName = '' }) {
       ) : (
         <div style={s.syncBar}>
           <span style={s.syncBadge}>
-            {sheetOrders
+            {sheetCost
               ? `Synced · ${orders.length} orders · ${Object.keys(sheetCost || {}).length} costs`
               : 'Connected — tap Sync'}
           </span>
