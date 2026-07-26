@@ -67,6 +67,7 @@ const MENU_PRICING = [
   { id: 'pasta', label: 'Pasta', items: [
     { name: 'PASTA - CARBONARA', regular: 130 },
     { name: 'PASTA - BOLOGNESE', regular: 130 },
+    { name: 'Pasta - Classic Mac and Cheese', regular: 130 },
   ]},
   { id: 'rice', label: 'Rice meals', items: [
     { name: 'TAPSILOG', regular: 90 },
