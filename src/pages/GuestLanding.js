@@ -60,6 +60,7 @@ const MENU_CATEGORIES = [
     items: [
       { name: 'Pasta - Carbonara', regular: 130 },
       { name: 'Pasta - Bolognese', regular: 130 },
+      { name: 'Pasta - Classic Mac and Cheese', regular: 130 },
     ]
   },
   { id: 'rice', label: 'Rice Meals',
