@@ -21,14 +21,14 @@ const NAV_ICONS = {
   chat: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8z"/><circle cx="8.5" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="15.5" cy="12" r="1" fill="currentColor" stroke="none"/></svg>,
 };
 const styles = {
-  container: { display: 'flex', flexDirection: 'column', height: '100vh', background: 'linear-gradient(160deg, #140800 0%, #3d1f0a 50%, #6b3a1f 100%)', maxWidth: 480, margin: '0 auto' },
-  topbar: { padding: '10px 16px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, background: 'rgba(61,31,10,0.55)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', borderBottom: '1px solid rgba(212,168,83,0.18)' },
+  container: { display: 'flex', flexDirection: 'column', height: '100vh', background: '#e6d7bf', maxWidth: 480, margin: '0 auto' },
+  topbar: { padding: '10px 16px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, background: 'rgba(255,252,246,0.72)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', borderBottom: '1px solid rgba(176,132,58,0.30)' },
   logoRow: { display: 'flex', alignItems: 'center', gap: 10 },
-  topTitle: { fontFamily: 'var(--font-display)', fontSize: 17, fontWeight: 700, color: '#f0d080', letterSpacing: 1.5 },
+  topTitle: { fontFamily: 'var(--font-display)', fontSize: 17, fontWeight: 700, color: '#5c3b16', letterSpacing: 1.5 },
   content: { flex: 1, overflowY: 'auto' },
-  bottomNav: { display: 'flex', justifyContent: 'space-around', alignItems: 'center', gap: 4, background: 'rgba(26,13,5,0.92)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(212,168,83,0.18)', borderRadius: 34, margin: '6px 14px 16px', padding: '7px 10px', flexShrink: 0, boxShadow: '0 10px 28px rgba(0,0,0,0.5)' },
-  navItem: (active) => ({ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '11px 0', cursor: 'pointer', borderRadius: 24, color: active ? '#1a0a00' : 'rgba(255,255,255,0.7)', background: active ? '#d4a853' : 'transparent', position: 'relative', transition: 'background 0.2s, color 0.2s' }),
-  adminBtn: { background: 'rgba(212,168,83,0.15)', border: '1px solid rgba(212,168,83,0.4)', borderRadius: 8, color: '#d4a853', fontSize: 12, padding: '6px 14px', cursor: 'pointer', fontWeight: 500 },
+  bottomNav: { display: 'flex', justifyContent: 'space-around', alignItems: 'center', gap: 4, background: 'rgba(255,252,246,0.92)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(176,132,58,0.30)', borderRadius: 34, margin: '6px 14px 16px', padding: '7px 10px', flexShrink: 0, boxShadow: '0 8px 22px rgba(92,59,22,0.22)' },
+  navItem: (active) => ({ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '11px 0', cursor: 'pointer', borderRadius: 24, color: active ? '#1a0a00' : 'rgba(74,51,32,0.65)', background: active ? '#d4a853' : 'transparent', position: 'relative', transition: 'background 0.2s, color 0.2s' }),
+  adminBtn: { background: 'rgba(165,116,28,0.12)', border: '1px solid rgba(165,116,28,0.45)', borderRadius: 8, color: '#a5741c', fontSize: 12, padding: '6px 14px', cursor: 'pointer', fontWeight: 500 },
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 },
   loginCard: { background: '#1a0a00', border: '1px solid rgba(212,168,83,0.3)', borderRadius: 20, padding: '32px 28px', width: '100%', maxWidth: 360, animation: 'slideUp 0.3s ease' },
   loginTitle: { fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700, color: '#f0d080', marginBottom: 4, textAlign: 'center' },
@@ -40,7 +40,7 @@ const styles = {
   errorBox: { background: 'rgba(193,18,31,0.2)', color: '#ff6b6b', borderRadius: 8, padding: '9px 12px', fontSize: 13, marginBottom: 12, border: '1px solid rgba(193,18,31,0.3)' },
   chatGate: { height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 },
   switchLink: { background: 'none', border: 'none', color: '#d4a853', fontSize: 13, cursor: 'pointer', textDecoration: 'underline', marginTop: 12, width: '100%' },
-  badge: { position: 'absolute', top: 6, right: 8, minWidth: 16, height: 16, borderRadius: 8, background: '#ff4444', color: '#fff', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px', lineHeight: 1, border: '1.5px solid rgba(61,31,10,0.9)' },
+  badge: { position: 'absolute', top: 6, right: 8, minWidth: 16, height: 16, borderRadius: 8, background: '#ff4444', color: '#fff', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px', lineHeight: 1, border: '1.5px solid rgba(255,252,246,0.95)' },
 };
 const TABS = [
   { id: 'home',      label: 'Menu'      },
