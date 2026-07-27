@@ -46,12 +46,12 @@ function StarRating({ value, onChange, label, color = '#d4a853', disabled = fals
   return (
     <div style={{ marginBottom: 16, opacity: disabled ? 0.35 : 1 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.75)' }}>{label}</div>
-        {disabled && <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', background: 'rgba(255,255,255,0.08)', padding: '2px 8px', borderRadius: 10 }}>N/A for this drink</span>}
+        <div style={{ fontSize: 13, color: '#5a4632' }}>{label}</div>
+        {disabled && <span style={{ fontSize: 10, color: 'rgba(74,51,32,0.55)', background: 'rgba(92,59,22,0.1)', padding: '2px 8px', borderRadius: 10 }}>N/A for this drink</span>}
       </div>
       <div style={{ display: 'flex', gap: 8 }}>
         {[1,2,3,4,5].map(star => (
-          <div key={star} onClick={() => !disabled && onChange(star)} style={{ cursor: disabled ? 'not-allowed' : 'pointer', fontSize: 28, color: star <= value ? color : 'rgba(255,255,255,0.2)', transition: 'color 0.15s' }}>★</div>
+          <div key={star} onClick={() => !disabled && onChange(star)} style={{ cursor: disabled ? 'not-allowed' : 'pointer', fontSize: 28, color: star <= value ? color : 'rgba(92,59,22,0.25)', transition: 'color 0.15s' }}>★</div>
         ))}
       </div>
     </div>
@@ -60,17 +60,17 @@ function StarRating({ value, onChange, label, color = '#d4a853', disabled = fals
 
 const s = {
   page: { minHeight: '100vh', background: 'transparent', padding: '16px 16px 100px' },
-  title: { fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: 'white', marginBottom: 4 },
-  sub: { fontSize: 13, color: 'rgba(255,255,255,0.6)', marginBottom: 20 },
-  section: { background: 'rgba(20,8,0,0.55)', borderRadius: 14, padding: '16px', marginBottom: 12, border: '1px solid rgba(212,168,83,0.2)' },
-  sectionTitle: { fontSize: 13, fontWeight: 700, color: '#d4a853', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.8 },
-  label: { fontSize: 13, color: 'rgba(255,255,255,0.75)', marginBottom: 6, display: 'block' },
-  input: { width: '100%', padding: '11px 14px', borderRadius: 10, border: '1px solid rgba(212,168,83,0.25)', background: 'rgba(255,255,255,0.06)', color: 'white', fontSize: 14, outline: 'none', boxSizing: 'border-box', marginBottom: 12 },
-  textarea: { width: '100%', padding: '11px 14px', borderRadius: 10, border: '1px solid rgba(212,168,83,0.25)', background: 'rgba(255,255,255,0.06)', color: 'white', fontSize: 13, outline: 'none', boxSizing: 'border-box', minHeight: 80, resize: 'none' },
-  select: { width: '100%', padding: '11px 14px', borderRadius: 10, border: '1px solid rgba(212,168,83,0.25)', background: 'rgba(30,12,0,0.8)', color: 'white', fontSize: 14, outline: 'none', boxSizing: 'border-box', marginBottom: 12 },
+  title: { fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: '#5c3b16', marginBottom: 4 },
+  sub: { fontSize: 13, color: 'rgba(74,51,32,0.7)', marginBottom: 20 },
+  section: { background: 'rgba(255,252,246,0.72)', borderRadius: 14, padding: '16px', marginBottom: 12, border: '1px solid rgba(176,132,58,0.30)' },
+  sectionTitle: { fontSize: 13, fontWeight: 700, color: '#a5741c', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.8 },
+  label: { fontSize: 13, color: '#5a4632', marginBottom: 6, display: 'block' },
+  input: { width: '100%', padding: '11px 14px', borderRadius: 10, border: '1px solid rgba(176,132,58,0.30)', background: 'rgba(255,255,255,0.7)', color: '#3d2817', fontSize: 14, outline: 'none', boxSizing: 'border-box', marginBottom: 12 },
+  textarea: { width: '100%', padding: '11px 14px', borderRadius: 10, border: '1px solid rgba(176,132,58,0.30)', background: 'rgba(255,255,255,0.7)', color: '#3d2817', fontSize: 13, outline: 'none', boxSizing: 'border-box', minHeight: 80, resize: 'none' },
+  select: { width: '100%', padding: '11px 14px', borderRadius: 10, border: '1px solid rgba(176,132,58,0.30)', background: 'rgba(255,255,255,0.7)', color: '#3d2817', fontSize: 14, outline: 'none', boxSizing: 'border-box', marginBottom: 12 },
   submitBtn: { width: '100%', padding: '14px', borderRadius: 12, background: '#d4a853', color: '#1a0a00', fontSize: 15, fontWeight: 700, border: 'none', cursor: 'pointer', marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 },
   tagRow: { display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 },
-  tag: (active) => ({ padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500, cursor: 'pointer', border: '1px solid', borderColor: active ? '#d4a853' : 'rgba(255,255,255,0.15)', background: active ? 'rgba(212,168,83,0.2)' : 'transparent', color: active ? '#d4a853' : 'rgba(255,255,255,0.5)' }),
+  tag: (active) => ({ padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500, cursor: 'pointer', border: '1px solid', borderColor: active ? '#a5741c' : 'rgba(120,85,35,0.30)', background: active ? 'rgba(165,116,28,0.15)' : 'transparent', color: active ? '#a5741c' : '#6b5842' }),
 };
 
 // ── Thank-you popup styles ────────────────────────────────────────────────────
@@ -162,10 +162,10 @@ export default function Snapshots() {
       <div style={s.sub}>We'd love to hear your feedback!</div>
 
       {/* Privacy notice */}
-      <div style={{ background: 'rgba(212,168,83,0.1)', border: '1px solid rgba(212,168,83,0.25)', borderRadius: 10, padding: '10px 14px', marginBottom: 14, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d4a853" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', lineHeight: 1.6 }}>
-          Your privacy is important to us. <strong style={{ color: '#d4a853' }}>No personal email addresses are collected or stored</strong> in this form. Only your name and feedback responses are recorded.
+      <div style={{ background: 'rgba(212,168,83,0.14)', border: '1px solid rgba(176,132,58,0.35)', borderRadius: 10, padding: '10px 14px', marginBottom: 14, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a5741c" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <div style={{ fontSize: 12, color: 'rgba(74,51,32,0.72)', lineHeight: 1.6 }}>
+          Your privacy is important to us. <strong style={{ color: '#8a5a1f' }}>No personal email addresses are collected or stored</strong> in this form. Only your name and feedback responses are recorded.
         </div>
       </div>
 
@@ -180,7 +180,7 @@ export default function Snapshots() {
       {/* What did you order */}
       <div style={s.section}>
         <div style={s.sectionTitle}>What did you order?</div>
-        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginBottom: 10 }}>Tap all that apply</div>
+        <div style={{ fontSize: 12, color: 'rgba(74,51,32,0.55)', marginBottom: 10 }}>Tap all that apply</div>
         <div style={s.tagRow}>
           {MENU_ITEMS.map(item => (
             <div key={item} style={s.tag(form.orders.includes(item))} onClick={() => toggleOrder(item)}>{item}</div>
