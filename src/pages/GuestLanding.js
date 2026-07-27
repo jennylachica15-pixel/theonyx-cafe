@@ -152,7 +152,7 @@ export default function GuestLanding() {
     touchStartY.current = null;
   };
   return (
-    <div style={{ minHeight: '100vh', background: 'transparent', paddingBottom: 40 }}>
+    <div style={{ minHeight: '100vh', background: '#e6d7bf', paddingBottom: 40 }}>
       {/* Hero with slideshow */}
       <div
         style={{ position: 'relative', height: 280, overflow: 'hidden' }}
@@ -193,58 +193,58 @@ export default function GuestLanding() {
       </div>
       {/* Body */}
       <div style={{ padding: '18px 16px 0' }}>
-        <div style={{ background: 'rgba(20,8,0,0.55)', borderRadius: 14, padding: '16px 18px', marginBottom: 16, border: '1px solid rgba(212,168,83,0.25)', backdropFilter: 'blur(8px)' }}>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: 15, fontWeight: 700, color: '#f0d080', marginBottom: 6 }}>Welcome to Theonyx Cafe</div>
-          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.85)', lineHeight: 1.7 }}>
+        <div style={{ background: 'rgba(255,252,246,0.72)', borderRadius: 14, padding: '16px 18px', marginBottom: 16, border: '1px solid rgba(176,132,58,0.30)', backdropFilter: 'blur(8px)' }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 15, fontWeight: 700, color: '#5c3b16', marginBottom: 6 }}>Welcome to Theonyx Cafe</div>
+          <div style={{ fontSize: 13, color: '#5a4632', lineHeight: 1.7 }}>
             We are glad to have you here. Browse our menu below and follow us on social media for updates and promos.
           </div>
-          <div style={{ fontSize: 12, color: '#d4a853', marginTop: 8, fontWeight: 500 }}>Open everyday · 10:00 AM – 11:00 PM</div>
+          <div style={{ fontSize: 12, color: '#a5741c', marginTop: 8, fontWeight: 500 }}>Open everyday · 10:00 AM – 11:00 PM</div>
         </div>
-        <div style={{ fontFamily: 'var(--font-display)', fontSize: 17, fontWeight: 700, color: '#f0d080', marginBottom: 12 }}>Our Menu</div>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: 17, fontWeight: 700, color: '#5c3b16', marginBottom: 12 }}>Our Menu</div>
         {MENU_CATEGORIES.map(cat => (
-          <div key={cat.id} style={{ background: 'rgba(20,8,0,0.55)', borderRadius: 14, marginBottom: 8, overflow: 'hidden', border: '1px solid rgba(212,168,83,0.2)', backdropFilter: 'blur(8px)' }}>
+          <div key={cat.id} style={{ background: 'rgba(255,252,246,0.72)', borderRadius: 14, marginBottom: 8, overflow: 'hidden', border: '1px solid rgba(176,132,58,0.30)', backdropFilter: 'blur(8px)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 16px', cursor: 'pointer' }} onClick={() => setOpenCat(openCat === cat.id ? null : cat.id)}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ color: '#d4a853', display: 'flex', alignItems: 'center' }}>{CAT_ICONS[cat.id]}</div>
+                <div style={{ color: '#a5741c', display: 'flex', alignItems: 'center' }}>{CAT_ICONS[cat.id]}</div>
                 <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: 'white' }}>{cat.label}</div>
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 1 }}>{cat.items.length} items</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: '#4a3320' }}>{cat.label}</div>
+                  <div style={{ fontSize: 11, color: 'rgba(74,51,32,0.55)', marginTop: 1 }}>{cat.items.length} items</div>
                 </div>
               </div>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d4a853" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: openCat === cat.id ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', flexShrink: 0 }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a5741c" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: openCat === cat.id ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', flexShrink: 0 }}>
                 <polyline points="6 9 12 15 18 9"/>
               </svg>
             </div>
             {openCat === cat.id && cat.items.map((item, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 16px', borderTop: '1px solid rgba(212,168,83,0.1)' }}>
-                <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.85)' }}>{item.name}</span>
-                <span style={{ fontSize: 12, color: '#d4a853', fontWeight: 600 }}>{getPriceRange(item)}</span>
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 16px', borderTop: '1px solid rgba(120,85,35,0.14)' }}>
+                <span style={{ fontSize: 13, color: '#5a4632' }}>{item.name}</span>
+                <span style={{ fontSize: 12, color: '#a5741c', fontWeight: 600 }}>{getPriceRange(item)}</span>
               </div>
             ))}
           </div>
         ))}
         {/* Footer CTA */}
         <div style={{ padding: '20px 4px 0', textAlign: 'center' }}>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700, color: '#f0d080', marginBottom: 6 }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700, color: '#5c3b16', marginBottom: 6 }}>
             Come Visit Us!
           </div>
-          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', lineHeight: 1.8, marginBottom: 12 }}>
+          <div style={{ fontSize: 12, color: 'rgba(74,51,32,0.72)', lineHeight: 1.8, marginBottom: 12 }}>
             Whether you're looking for a quiet place to unwind, catch up with friends, or enjoy a great meal — Theonyx Cafe is the perfect spot. We warmly welcome you.
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center', marginBottom: 6 }}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#d4a853" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#a5741c" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
               <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
             </svg>
-            <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>52 Carillo St., Brgy. San Nicolas, Bay, Laguna</span>
+            <span style={{ fontSize: 12, color: 'rgba(74,51,32,0.78)' }}>52 Carillo St., Brgy. San Nicolas, Bay, Laguna</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center', marginBottom: 14 }}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#d4a853" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#a5741c" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
             </svg>
-            <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>Open everyday · 10:00 AM – 11:00 PM</span>
+            <span style={{ fontSize: 12, color: 'rgba(74,51,32,0.78)' }}>Open everyday · 10:00 AM – 11:00 PM</span>
           </div>
           <a href="https://maps.app.goo.gl/wZTLY5BWJavdjoni6" target="_blank" rel="noreferrer"
-            style={{ fontSize: 12, color: '#d4a853', textDecoration: 'underline', fontWeight: 600 }}>
+            style={{ fontSize: 12, color: '#a5741c', textDecoration: 'underline', fontWeight: 600 }}>
             Get Directions →
           </a>
         </div>
