@@ -185,9 +185,9 @@ export default function Gallery() {
     <div style={{ padding: '16px 16px 0', minHeight: '100vh', background: 'transparent' }}>
       {/* Header */}
       <div style={{ marginBottom: 4 }}>
-        <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: 'white' }}>Snapshots</div>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: '#5c3b16' }}>Snapshots</div>
       </div>
-      <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginBottom: 14 }}>Share your experience at Theonyx Cafe</div>
+      <div style={{ fontSize: 13, color: 'rgba(74,51,32,0.7)', marginBottom: 14 }}>Share your experience at Theonyx Cafe</div>
 
       {/* Connect + Capture row */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 14, alignItems: 'center' }}>
@@ -196,32 +196,32 @@ export default function Gallery() {
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
               Connect
             </button>
-          : <div style={{ padding: '7px 12px', borderRadius: 10, background: 'rgba(45,106,79,0.25)', color: '#6fcf97', fontSize: 11, fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 5, border: '1px solid rgba(45,106,79,0.25)', flexShrink: 0 }}>✅ Ready</div>
+          : <div style={{ padding: '7px 12px', borderRadius: 10, background: 'rgba(45,106,79,0.25)', color: '#2f7d51', fontSize: 11, fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 5, border: '1px solid rgba(45,106,79,0.25)', flexShrink: 0 }}>✅ Ready</div>
         }
-        <div style={{ flex: 1, background: 'rgba(107,58,31,0.35)', borderRadius: 10, padding: '9px 13px', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', border: '1px solid rgba(212,168,83,0.2)' }} onClick={() => fileRef.current.click()}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#d4a853" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-          <span style={{ fontSize: 12, fontWeight: 600, color: '#f0d080' }}>Capture the moment here!</span>
+        <div style={{ flex: 1, background: 'rgba(255,252,246,0.72)', borderRadius: 10, padding: '9px 13px', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', border: '1px solid rgba(176,132,58,0.30)' }} onClick={() => fileRef.current.click()}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a5741c" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          <span style={{ fontSize: 12, fontWeight: 600, color: '#5c3b16' }}>Capture the moment here!</span>
         </div>
       </div>
       <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handleFile} />
 
       {photo && !uploading && <img src={photo} alt="preview" style={{ width: '100%', borderRadius: 10, maxHeight: 180, objectFit: 'cover', marginBottom: 12 }} />}
-      {uploading && <div style={{ height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.1)', marginBottom: 12, overflow: 'hidden' }}><div style={{ height: '100%', borderRadius: 2, background: '#d4a853', width: `${progress}%`, transition: 'width 0.3s' }} /></div>}
-      {success && <div style={{ fontSize: 12, color: success.includes('⚠️') ? '#ff6b6b' : '#6fcf97', marginBottom: 10, padding: '7px 12px', background: 'rgba(0,0,0,0.25)', borderRadius: 8 }}>{success}</div>}
+      {uploading && <div style={{ height: 3, borderRadius: 2, background: 'rgba(92,59,22,0.15)', marginBottom: 12, overflow: 'hidden' }}><div style={{ height: '100%', borderRadius: 2, background: '#d4a853', width: `${progress}%`, transition: 'width 0.3s' }} /></div>}
+      {success && <div style={{ fontSize: 12, color: success.includes('⚠️') ? '#c1121f' : '#2f7d51', marginBottom: 10, padding: '7px 12px', background: 'rgba(255,252,246,0.8)', border: '1px solid rgba(176,132,58,0.25)', borderRadius: 8 }}>{success}</div>}
 
       {/* Guest Snapshots title + grid toggle */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-        <div style={{ fontFamily: 'var(--font-display)', fontSize: 15, fontWeight: 700, color: 'white' }}>Guest Snapshots</div>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: 15, fontWeight: 700, color: '#5c3b16' }}>Guest Snapshots</div>
         <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginRight: 2 }}>View:</span>
+          <span style={{ fontSize: 10, color: 'rgba(74,51,32,0.55)', marginRight: 2 }}>View:</span>
           {[1,2,3,4,5].map(n => (
-            <button key={n} onClick={() => setCols(n)} style={{ width: 24, height: 24, borderRadius: 5, background: cols === n ? '#d4a853' : 'rgba(107,58,31,0.4)', color: cols === n ? '#1a0a00' : 'rgba(255,255,255,0.6)', border: cols === n ? 'none' : '1px solid rgba(212,168,83,0.2)', cursor: 'pointer', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
+            <button key={n} onClick={() => setCols(n)} style={{ width: 24, height: 24, borderRadius: 5, background: cols === n ? '#d4a853' : 'rgba(255,252,246,0.72)', color: cols === n ? '#1a0a00' : '#5a4632', border: cols === n ? 'none' : '1px solid rgba(176,132,58,0.30)', cursor: 'pointer', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
               {n}
             </button>
           ))}
         </div>
       </div>
-      {photos.length === 0 && <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.35)', padding: '30px 0', fontSize: 13 }}>No photos yet. Be the first to share!</div>}
+      {photos.length === 0 && <div style={{ textAlign: 'center', color: 'rgba(74,51,32,0.5)', padding: '30px 0', fontSize: 13 }}>No photos yet. Be the first to share!</div>}
 
       {/* Photo grid */}
       <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: cols === 1 ? 12 : cols === 2 ? 8 : 5, paddingBottom: 80 }}>
@@ -232,7 +232,7 @@ export default function Gallery() {
           const photoComments = comments[p.id] || [];
 
           return (
-            <div key={p.id} style={{ borderRadius: cols >= 3 ? 6 : 12, overflow: 'hidden', background: 'rgba(20,8,0,0.5)', border: '1px solid rgba(212,168,83,0.1)' }}>
+            <div key={p.id} style={{ borderRadius: cols >= 3 ? 6 : 12, overflow: 'hidden', background: 'rgba(255,252,246,0.72)', border: '1px solid rgba(176,132,58,0.25)' }}>
               {/* Photo with overlay */}
               <div style={{ position: 'relative', cursor: 'pointer', aspectRatio: '1', overflow: 'hidden' }} onClick={() => cols > 1 ? setSelected(p) : null}>
                 {p.thumb
@@ -266,22 +266,22 @@ export default function Gallery() {
               {/* Single column: show caption + comments below */}
               {cols === 1 && (
                 <div style={{ padding: '8px 12px 10px' }}>
-                  {p.feedback && <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', fontStyle: 'italic', marginBottom: 6 }}>"{p.feedback}"</div>}
+                  {p.feedback && <div style={{ fontSize: 12, color: 'rgba(74,51,32,0.72)', fontStyle: 'italic', marginBottom: 6 }}>"{p.feedback}"</div>}
                   {isExpanded && (
-                    <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 8 }}>
+                    <div style={{ borderTop: '1px solid rgba(92,59,22,0.14)', paddingTop: 8 }}>
                       {photoComments.length === 0
-                        ? <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginBottom: 8 }}>No comments yet.</div>
+                        ? <div style={{ fontSize: 11, color: 'rgba(74,51,32,0.5)', marginBottom: 8 }}>No comments yet.</div>
                         : photoComments.map((c, i) => (
                             <div key={i} style={{ marginBottom: 6 }}>
-                              <span style={{ fontSize: 12, fontWeight: 600, color: '#d4a853' }}>{c.name} </span>
-                              <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>{c.text}</span>
+                              <span style={{ fontSize: 12, fontWeight: 600, color: '#a5741c' }}>{c.name} </span>
+                              <span style={{ fontSize: 12, color: 'rgba(74,51,32,0.75)' }}>{c.text}</span>
                             </div>
                           ))
                       }
-                      <input style={{ width: '100%', padding: '7px 10px', borderRadius: 7, border: '1px solid rgba(212,168,83,0.2)', background: 'rgba(255,255,255,0.05)', color: 'white', fontSize: 11, outline: 'none', boxSizing: 'border-box', marginBottom: 5 }}
+                      <input style={{ width: '100%', padding: '7px 10px', borderRadius: 7, border: '1px solid rgba(176,132,58,0.30)', background: 'rgba(255,255,255,0.7)', color: '#3d2817', fontSize: 11, outline: 'none', boxSizing: 'border-box', marginBottom: 5 }}
                         placeholder="Your name (optional)" value={commenterName[p.id] || ''} onChange={e => setCommenterName(prev => ({ ...prev, [p.id]: e.target.value }))} />
                       <div style={{ display: 'flex', gap: 5 }}>
-                        <input style={{ flex: 1, padding: '7px 10px', borderRadius: 7, border: '1px solid rgba(212,168,83,0.2)', background: 'rgba(255,255,255,0.05)', color: 'white', fontSize: 11, outline: 'none' }}
+                        <input style={{ flex: 1, padding: '7px 10px', borderRadius: 7, border: '1px solid rgba(176,132,58,0.30)', background: 'rgba(255,255,255,0.7)', color: '#3d2817', fontSize: 11, outline: 'none' }}
                           placeholder="Write a comment..." value={commentText[p.id] || ''} onChange={e => setCommentText(prev => ({ ...prev, [p.id]: e.target.value }))} onKeyDown={e => e.key === 'Enter' && submitComment(p.id)} />
                         <button onClick={() => submitComment(p.id)} style={{ padding: '7px 12px', borderRadius: 7, background: '#d4a853', color: '#1a0a00', fontSize: 11, fontWeight: 700, border: 'none', cursor: 'pointer' }}>Post</button>
                       </div>
