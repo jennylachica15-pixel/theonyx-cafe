@@ -78,6 +78,9 @@ const MENU_CATEGORIES = [
       { name: 'Chicken Pepper Steak', regular: 180 },
       { name: 'Korean Chicken', regular: 180 },
       { name: 'Chicken Inasal', regular: 180 },
+      { name: 'Chicken Wings-Buffalo', regular: 190 },
+      { name: 'Chicken Wings-Salted Egg', regular: 190 },
+      
     ]
   },
   { id: 'pastries', label: 'Pastries & Sweets',
