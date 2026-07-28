@@ -87,6 +87,7 @@ const MENU_GROUPS = [
     { name: 'COOKIES SMALL',        regular: 35 },
     { name: 'SWEET BITES',          regular: 15 },
     { name: 'GRILLED CHEESE SANDWICH', regular: 80 },
+    { name: 'BREAKFAST PANCAKE', regular: 80 },
   ]},
   { id: 'snacks', label: 'Snacks', items: [
     { name: 'CHEESE BURGER',   regular: 50  },
