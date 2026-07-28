@@ -92,6 +92,8 @@ const MENU_CATEGORIES = [
       { name: 'Cookies Small', regular: 35 },
       { name: 'Sweet Bites', regular: 15 },
       { name: 'Grilled Cheese Sandwich', regular: 80 },
+      { name: 'Breakfast Pancake', regular: 80 },
+      
     ]
   },
   { id: 'snacks', label: 'Snacks',
