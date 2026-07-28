@@ -42,6 +42,7 @@ const MENU_PRICING = [
     { name: 'FRAPPE STRAWBERRY', regular: 165 },
     { name: 'FRAPPE UBE HALAYA', regular: 150 },
     { name: 'FRAPPE CHOCOLATE', regular: 150 },
+    { name: 'FRAPPE JAVA CHIP', regular: 150 },
   ]},
   { id: 'milktea', label: 'Milk tea', items: [
     { name: 'M.T. - HOKKAIDO', regular: 55 },
