@@ -29,6 +29,7 @@ const MENU_CATEGORIES = [
       { name: 'Oreo Chocomilkshake', classic: 120, upgrade: 150 },
       { name: 'Frappe Strawberry', regular: 165 },
       { name: 'Frappe Ube Halaya', regular: 150 },
+      { name: 'Frappe Java Chip', regular: 150 },
     ]
   },
   { id: 'milktea', label: 'Milk Tea',
