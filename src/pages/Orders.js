@@ -47,6 +47,7 @@ const MENU_GROUPS = [
     { name: 'M.T. - COOKIES AND CREAM',regular: 55 },
     { name: 'M.T. - WHITE BUNNY',    regular: 60 },
     { name: 'M.T. - WINTERMELON',    regular: 60 },
+    { name: 'M.T. - MATCHA', regular: 60 },
   ]},
   { id: 'soda', label: 'Soda & tea', items: [
     { name: 'SODA - PASSION',          classic: 50 },
