@@ -30,6 +30,7 @@ const MENU_CATEGORIES = [
       { name: 'Frappe Strawberry', regular: 165 },
       { name: 'Frappe Ube Halaya', regular: 150 },
       { name: 'Frappe Java Chip', regular: 150 },
+      { name: 'Frappe Pistachio', regular: 150 },
     ]
   },
   { id: 'milktea', label: 'Milk Tea',
