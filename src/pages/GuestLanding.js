@@ -44,6 +44,7 @@ const MENU_CATEGORIES = [
       { name: 'M.T. - Cookies and Cream', regular: 55 },
       { name: 'M.T. - White Bunny', regular: 60 },
       { name: 'M.T. - Wintermelon', regular: 60 },
+      { name: 'M.T. - Matcha', regular: 60 },
     ]
   },
   { id: 'soda', label: 'Soda & Tea',
