@@ -580,6 +580,30 @@ export default function Reports({ role = 'staff', userName = '' }) {
   // Overhead share to add per item (full overhead ÷ projected items) — changes whenever overhead changes.
   // 0 only when overhead isn't synced yet.
   const flatAddPerItem = overheadKnown ? addPerItemOverhead : 0;
+  // ── Yearly — by calendar month, from REPORT_START's month to the current month ──
+  const yearlyData = (() => {
+    const months = [];
+    let y = REPORT_START.getFullYear();
+    let m = REPORT_START.getMonth();
+    const curY = now.getFullYear();
+    const curM = now.getMonth();
+    while (y < curY || (y === curY && m <= curM)) {
+      const mStart = new Date(y, m, 1);
+      const mEnd = new Date(y, m + 1, 1);
+      const effStart = mStart < REPORT_START ? REPORT_START : mStart; // clamp June to Jun 4
+      const p = profitInRange(effStart, mEnd);
+      months.push({
+        label: mStart.toLocaleString('default', { month: 'long' }),
+        year: y,
+        sales: p.sales,
+        cost: p.cost,                                  // capital cost
+        net: p.net,                                    // sales − capital
+        overhead: overheadKnown ? overheadVal : null,  // current monthly figure, applied to each month
+      });
+      m++; if (m > 11) { m = 0; y++; }
+    }
+    return months;
+  })();
   // Top 10 products
   const productMap = {};
   const productQty = {};
@@ -772,7 +796,7 @@ export default function Reports({ role = 'staff', userName = '' }) {
       </div>
       {/* Tabs */}
       <div style={s.tabRow}>
-        {['daily', 'weekly', 'monthly'].map(t => (
+        {['daily', 'weekly', 'monthly', 'yearly'].map(t => (
           <button key={t} style={s.tab(activeTab === t)} onClick={() => setActiveTab(t)}>
             {t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
@@ -964,6 +988,46 @@ export default function Reports({ role = 'staff', userName = '' }) {
               <div style={s.statBox}><div style={s.statNum('var(--green-ok)')}>{peso(monthlyRev.net)}</div><div style={s.statLabel}>Net Revenue</div></div>
               <div style={s.statBox}><div style={s.statNum('var(--gold)')}>{marginOf(monthlyRev)}%</div><div style={s.statLabel}>Gross Margin</div></div>
             </div>
+          </div>
+        </div>
+      )}
+      {/* Yearly — by month */}
+      {activeTab === 'yearly' && (
+        <div style={s.card}>
+          <div style={s.cardTitle}>Yearly — by month</div>
+          {yearlyData.map((mo) => {
+            const net = mo.net - (mo.overhead || 0); // sales − capital − overhead
+            return (
+              <div key={`${mo.label}-${mo.year}`} style={{ borderTop: '1px solid #f0e4d8', padding: '12px 0' }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--brown-dark)' }}>
+                    {mo.label}<span style={{ fontSize: 10, color: 'var(--brown-light)', fontWeight: 400, marginLeft: 6 }}>{mo.year}</span>
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: mo.overhead == null ? 'var(--brown-light)' : (net >= 0 ? 'var(--green-ok)' : '#a3402d') }}>
+                    {mo.overhead == null ? '—' : peso(net)}
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                  <div style={s.statBox}>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--brown-dark)' }}>{peso(mo.sales)}</div>
+                    <div style={s.statLabel}>Sales</div>
+                  </div>
+                  <div style={s.statBox}>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--brown-mid)' }}>{peso(mo.cost)}</div>
+                    <div style={s.statLabel}>Capital</div>
+                  </div>
+                  <div style={s.statBox}>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: mo.overhead == null ? 'var(--brown-light)' : 'var(--gold)' }}>
+                      {mo.overhead == null ? '—' : peso(mo.overhead)}
+                    </div>
+                    <div style={s.statLabel}>Overhead</div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          <div style={{ fontSize: 10, color: 'var(--brown-light)', marginTop: 10, fontStyle: 'italic', lineHeight: 1.5 }}>
+            Overhead is the current monthly figure from the sheet, applied to each month. Net = sales − capital − overhead. Sync to load overhead.
           </div>
         </div>
       )}
