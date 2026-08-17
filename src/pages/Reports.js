@@ -4,7 +4,7 @@ import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const REPORT_START = new Date('2026-06-04T00:00:00');
 const DAY_COLORS = ['#e07b39','#c8956c','#d4a853','#6b3a1f','#1a0a00','#888','#c8956c'];
-const MONTH_WEEK_COLORS = ['#e07b39','#c8956c','#d4a853','#6b3a1f','#1a0a00','#a0522d']; // stack colors for weeks within a month (yearly view)
+const YEARLY_SEG = { capital: '#993C1D', overhead: '#EDA100', profit: '#1D9E75' }; // yearly bar segment colors
 const PRODUCT_COLORS = ['#e07b39','#6b3a1f','#d4a853','#c8956c','#1a0a00','#a0522d','#888','#b8860b','#cd853f','#8b4513'];
 
 // ── Google Sheets (live sync) ──
@@ -582,9 +582,10 @@ export default function Reports({ role = 'staff', userName = '' }) {
   // 0 only when overhead isn't synced yet.
   const flatAddPerItem = overheadKnown ? addPerItemOverhead : 0;
   // ── Yearly — by calendar month, from REPORT_START's month to the current month ──
-  // Each month's bar is stacked by the weeks within that month (like the weekly bar is
-  // stacked by its days). Bar height uses order totals (o.total) to match the weekly chart;
-  // the breakdown below uses computeProfit for Sales / Capital / Net, same as "Net revenue by week".
+  // Each month's bar is split into Capital + Overhead + Profit (profit = net − overhead,
+  // drawn only when positive). Total Sales sits above the bar. The table below lists
+  // Sales / Capital / Overhead / Net profit per month. Figures use computeProfit, same
+  // as the weekly/monthly "Net revenue" views.
   const yearlyData = (() => {
     const months = [];
     let y = REPORT_START.getFullYear();
@@ -596,36 +597,25 @@ export default function Reports({ role = 'staff', userName = '' }) {
       const mEnd = new Date(y, m + 1, 1);
       const effStart = mStart < REPORT_START ? REPORT_START : mStart; // clamp June to Jun 4
       const p = profitInRange(effStart, mEnd);
-      const monthOrders = orders.filter(o => {
-        const d = o.createdAt?.toDate && o.createdAt.toDate();
-        return d && d >= effStart && d < mEnd;
-      });
-      // Bucket sales into weeks of the month (day 1-7 → 0, 8-14 → 1, …)
-      const weeks = [0, 0, 0, 0, 0, 0];
-      monthOrders.forEach(o => {
-        const d = o.createdAt.toDate();
-        const wk = Math.min(5, Math.floor((d.getDate() - 1) / 7));
-        weeks[wk] += o.total || 0;
-      });
-      const total = monthOrders.reduce((sm, o) => sm + (o.total || 0), 0);
-      const clampEnd = mEnd > now ? now : new Date(mEnd.getTime() - 1); // last day shown for the range label
-      const dateRange = `${formatDateShort(effStart)}–${formatDateShort(clampEnd)}`;
+      const overheadMo = overheadKnown ? overheadVal : null;         // current monthly figure, applied to each month
+      const profit = overheadMo != null ? p.net - overheadMo : null;  // net profit after overhead
       months.push({
         label: mStart.toLocaleString('default', { month: 'short' }),
         year: y,
-        total,                                         // month sales (bar height)
-        weeks,                                         // per-week-of-month sales (stack segments)
-        dateRange,
-        sales: p.sales,
-        cost: p.cost,                                  // capital cost
-        net: p.net,                                    // sales − capital
-        overhead: overheadKnown ? overheadVal : null,  // current monthly figure, applied to each month
+        sales: p.sales,      // total sales
+        cost: p.cost,        // capital cost
+        overhead: overheadMo,
+        net: p.net,          // sales − capital (gross)
+        profit,              // net profit after overhead (null until overhead syncs)
       });
       m++; if (m > 11) { m = 0; y++; }
     }
     return months;
   })();
-  const maxYearly = Math.max(...yearlyData.map(mo => mo.total), 1);
+  // Bar height = Capital + Overhead + Profit(if positive). Sales is a label, not the height.
+  const yearlyStack = (mo) => mo.cost + (mo.overhead || 0) + (mo.profit > 0 ? mo.profit : 0);
+  const maxYearly = Math.max(...yearlyData.map(yearlyStack), 1);
+  const showSegLabels = yearlyData.length <= 6; // hide in-bar amounts once bars get thin
   // Top 10 products
   const productMap = {};
   const productQty = {};
@@ -1013,63 +1003,66 @@ export default function Reports({ role = 'staff', userName = '' }) {
           </div>
         </div>
       )}
-      {/* Yearly — stacked bars by month (stacked by week within the month) */}
+      {/* Yearly — bars split into Capital + Overhead + Profit, with a month table below */}
       {activeTab === 'yearly' && (
         <div style={s.card}>
           <div style={s.cardTitle}>Yearly Sales - by Month</div>
-          <div style={{ position: 'relative' }}>
-            {/* Bars */}
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 120, marginBottom: 4, marginTop: 24 }}>
-              {yearlyData.map((mo, i) => {
-                const barHeight = mo.total === 0 ? 0 : Math.max((mo.total / maxYearly) * 100, 4);
-                return (
-                  <div key={`${mo.label}-${mo.year}`} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' }}>
-                    <div style={{ fontSize: 9, color: 'var(--brown-mid)', marginBottom: 2, textAlign: 'center' }}>
-                      {mo.total > 0 ? (mo.total >= 1000 ? `${(mo.total / 1000).toFixed(1)}k` : mo.total) : ''}
-                    </div>
-                    <div style={{ width: '70%', height: `${barHeight}px`, borderRadius: '4px 4px 0 0', overflow: 'hidden', display: 'flex', flexDirection: 'column-reverse' }}>
-                      {mo.weeks.map((wkVal, wi) => wkVal > 0 ? (
-                        <div key={wi} style={{ background: MONTH_WEEK_COLORS[wi % MONTH_WEEK_COLORS.length], flex: wkVal, minHeight: 2 }} />
-                      ) : null)}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            {/* Month labels with date range */}
-            <div style={{ display: 'flex', gap: 6 }}>
-              {yearlyData.map((mo, i) => (
-                <div key={`${mo.label}-${mo.year}-lbl`} style={{ flex: 1, textAlign: 'center' }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--brown-light)' }}>{mo.label}</div>
-                  <div style={{ fontSize: 8, color: '#bbb', marginTop: 1, lineHeight: 1.3 }}>{mo.dateRange}</div>
-                </div>
-              ))}
-            </div>
+          {/* Legend */}
+          <div style={{ display: 'flex', gap: 14, marginBottom: 10, fontSize: 10.5, color: 'var(--brown-light)' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: YEARLY_SEG.capital }} />Capital</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: YEARLY_SEG.overhead }} />Overhead</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: YEARLY_SEG.profit }} />Profit</span>
           </div>
-          {/* Sales · Capital · Overhead by month */}
-          <div style={{ marginTop: 14, borderTop: '1px solid #f0e4d8', paddingTop: 10 }}>
-            <div style={s.cardTitle}>Sales · Capital · Overhead by month</div>
+          {/* Bars */}
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 176, marginBottom: 4 }}>
             {yearlyData.map((mo) => {
-              const net = mo.net - (mo.overhead || 0); // sales − capital − overhead
+              const CHART_H = 150;
+              const segs = [
+                { key: 'capital', val: mo.cost, bg: YEARLY_SEG.capital, txt: '#fff' },
+                ...(mo.overhead != null && mo.overhead > 0 ? [{ key: 'overhead', val: mo.overhead, bg: YEARLY_SEG.overhead, txt: '#4a3400' }] : []),
+                ...(mo.profit != null && mo.profit > 0 ? [{ key: 'profit', val: mo.profit, bg: YEARLY_SEG.profit, txt: '#fff' }] : []),
+              ];
+              const kAbbr = (v) => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : Math.round(v);
               return (
-                <div key={`${mo.label}-${mo.year}-row`} style={s.productRow}>
-                  <div style={{ flex: 1, fontSize: 12, fontWeight: 600, color: 'var(--brown-dark)' }}>
-                    {mo.label}<span style={{ fontSize: 9, color: 'var(--brown-light)', fontWeight: 400, marginLeft: 6 }}>{mo.year}</span>
+                <div key={`${mo.label}-${mo.year}`} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--brown-dark)', marginBottom: 2 }}>{formatAmount(mo.sales)}</div>
+                  <div style={{ width: '72%', display: 'flex', flexDirection: 'column-reverse', borderRadius: '4px 4px 0 0', overflow: 'hidden' }}>
+                    {segs.map((seg) => {
+                      const h = Math.max((seg.val / maxYearly) * CHART_H, seg.val > 0 ? 2 : 0);
+                      return (
+                        <div key={seg.key} style={{ height: `${h}px`, background: seg.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          {showSegLabels && h >= 12 && (
+                            <span style={{ fontSize: 9, color: seg.txt, fontWeight: 600 }}>{kAbbr(seg.val)}</span>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                  <div style={{ fontSize: 10.5, color: 'var(--brown-light)', textAlign: 'right', marginRight: 10, lineHeight: 1.4 }}>
-                    S {peso(mo.sales)}<br />C {peso(mo.cost)}<br />O {mo.overhead == null ? '—' : peso(mo.overhead)}
-                  </div>
-                  <div style={{ textAlign: 'right', minWidth: 66 }}>
-                    <div style={{ fontSize: 12.5, fontWeight: 700, color: mo.overhead == null ? 'var(--brown-light)' : (net >= 0 ? 'var(--green-ok)' : '#a3402d') }}>
-                      {mo.overhead == null ? '—' : peso(net)}
-                    </div>
-                    <div style={{ fontSize: 10, color: 'var(--gold)' }}>{marginOf(mo)}%</div>
-                  </div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--brown-light)', marginTop: 6 }}>{mo.label}</div>
                 </div>
               );
             })}
+          </div>
+          {/* Month table — Month · Total Sales · Capital · Overhead · Net profit */}
+          <div style={{ marginTop: 12, borderTop: '1px solid #f0e4d8', paddingTop: 8, fontSize: 11 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '0.7fr 1fr 0.9fr 0.9fr 1fr', padding: '6px 4px', color: 'var(--brown-light)', fontWeight: 700 }}>
+              <span>Month</span>
+              <span style={{ textAlign: 'right' }}>Total Sales</span>
+              <span style={{ textAlign: 'right' }}>Capital</span>
+              <span style={{ textAlign: 'right' }}>Overhead</span>
+              <span style={{ textAlign: 'right' }}>Net Profit</span>
+            </div>
+            {yearlyData.map((mo) => (
+              <div key={`${mo.label}-${mo.year}-row`} style={{ display: 'grid', gridTemplateColumns: '0.7fr 1fr 0.9fr 0.9fr 1fr', padding: '8px 4px', borderTop: '1px solid #f7f0e6', alignItems: 'center' }}>
+                <span style={{ fontWeight: 600, color: 'var(--brown-dark)' }}>{mo.label}<span style={{ fontSize: 9, color: 'var(--brown-light)', fontWeight: 400, marginLeft: 4 }}>{mo.year}</span></span>
+                <span style={{ textAlign: 'right', color: 'var(--brown-dark)' }}>{peso(mo.sales)}</span>
+                <span style={{ textAlign: 'right', color: 'var(--brown-light)' }}>{peso(mo.cost)}</span>
+                <span style={{ textAlign: 'right', color: 'var(--brown-light)' }}>{mo.overhead == null ? '—' : peso(mo.overhead)}</span>
+                <span style={{ textAlign: 'right', fontWeight: 700, color: mo.profit == null ? 'var(--brown-light)' : (mo.profit >= 0 ? 'var(--green-ok)' : '#a3402d') }}>{mo.profit == null ? '—' : peso(mo.profit)}</span>
+              </div>
+            ))}
             <div style={{ fontSize: 10, color: 'var(--brown-light)', marginTop: 8, fontStyle: 'italic', lineHeight: 1.5 }}>
-              Bars show monthly sales, stacked by week. S = sales, C = capital, O = overhead. Net = sales − capital − overhead. Overhead is the current monthly figure from the sheet, applied to each month — Sync to load it.
+              Net profit = sales − capital − overhead. Overhead is the current monthly figure from the sheet, applied to each month — Sync to load it.
             </div>
           </div>
         </div>
