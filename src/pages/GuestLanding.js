@@ -104,7 +104,8 @@ const MENU_CATEGORIES = [
       { name: 'Siomai', regular: 50 },
       { name: 'Onyx Burger', regular: 150 },
       { name: 'Onyx Nachos', regular: 130 },
-      { name: 'Fries Overload', regular: 90 },
+      { name: 'Fries Overload', regular: 120 },
+      { name: 'Cheesy Fries', regular: 90 },
     ]
   },
   { id: 'addons', label: 'Add-ons',
