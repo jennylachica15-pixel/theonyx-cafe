@@ -109,6 +109,7 @@ const MENU_GROUPS = [
     { name: 'Onyx Bracelet Small Beads', regular: 25 },
     { name: 'Onyx Bracelet Medium Beads', regular: 35 },
     { name: 'Onyx Bracelet Large Beads', regular: 50 },
+    { name: 'Onyx Bracelet Xtra Small Beads', regular: 15 },
   ]},
 ];
 const C = {
