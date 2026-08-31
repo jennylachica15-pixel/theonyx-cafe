@@ -96,7 +96,8 @@ const MENU_GROUPS = [
     { name: 'SIOMAI',   regular: 50  },
     { name: 'ONYX BURGER',     regular: 150 },
     { name: 'NACHOS',          regular: 130 },
-    { name: 'FRIES OVERLOAD',     regular: 90  },
+    { name: 'FRIES OVERLOAD',     regular: 120  },
+    { name: 'CHEESY FRIES',     regular: 90  },
   ]},
   { id: 'addons', label: 'Add-ons', items: [
     { name: 'PEARL',        regular: 10 },
