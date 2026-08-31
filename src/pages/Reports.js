@@ -105,7 +105,8 @@ const MENU_PRICING = [
     { name: 'SIOMAI', regular: 50 },
     { name: 'ONYX BURGER', regular: 150 },
     { name: 'NACHOS', regular: 130 },
-    { name: 'FRIES OVERLOAD', regular: 90 },
+    { name: 'FRIES OVERLOAD', regular: 120 },
+    { name: 'CHEESY FRIES', regular: 90 },
   ]},
   { id: 'addons', label: 'Add-ons', items: [
     { name: 'PEARL', regular: 10 },
@@ -117,6 +118,7 @@ const MENU_PRICING = [
     { name: 'Onyx Bracelet Small Beads',         regular: 25 },
     { name: 'Onyx Bracelet Medium Beads',         regular: 35 },
     { name: 'Onyx Bracelet Large Beads',         regular: 50 },
+    { name: 'Onyx Bracelet Xtra Small Beads',         regular: 15 },
   ]},
 ];
 const productColorMap = {};
