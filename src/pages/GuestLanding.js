@@ -90,6 +90,8 @@ const MENU_CATEGORIES = [
   },
   { id: 'pastries', label: 'Pastries & Sweets',
     items: [
+      { name: 'CHEESECAKE-CHOCOLATE,       regular: 150 },
+      { name: 'STRAWBERRY CUP-CAKE,       regular: 100 },
       { name: 'Waffle - Mango', regular: 80 },
       { name: 'Waffle - Chocolate', regular: 80 },
       { name: 'Waffle - Blueberry', regular: 80 },
