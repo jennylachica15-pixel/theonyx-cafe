@@ -84,6 +84,8 @@ const MENU_GROUPS = [
     { name: 'RICE MEAL - SMOKED LONGANISA',  regular: 150 },
   ]},
   { id: 'pastries', label: 'Pastries & sweets', items: [
+    { name: 'CHEESECAKE-CHOCOLATE,       regular: 150 },
+    { name: 'STRAWBERRY CUP-CAKE,       regular: 100 },
     { name: 'WAFFLE - MANGO',       regular: 80 },
     { name: 'WAFFLE - CHOCOLATE',   regular: 80 },
     { name: 'WAFFLE - BLUEBERRY',   regular: 80 },
