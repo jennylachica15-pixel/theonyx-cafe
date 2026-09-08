@@ -8,7 +8,7 @@ import {
 const SHEET_ID = '15o1OUhOO17s1ifKSlYonPrmtJEAP1qQRLoMCI7_N0DM';
 const GOOGLE_CLIENT_ID = '596322682185-n5hm66hvol3nnqqllnuop995kcnefbgu.apps.googleusercontent.com';
 const SCOPES = 'https://www.googleapis.com/auth/spreadsheets';
-const STAFF_LIST = ['Kelly', 'Maryz'];
+const STAFF_LIST = ['Kelly', 'Maryz', 'Ash'];
 const DAILY_RATE = 400;
 
 // ── palette ──
