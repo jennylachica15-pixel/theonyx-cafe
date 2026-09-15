@@ -83,6 +83,10 @@ const s = {
   sumTh: { textAlign: 'left', padding: '8px 6px', fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.5, borderBottom: `1px solid ${C.border}` },
   sumTd: { padding: '9px 6px', color: C.ink, borderBottom: `1px solid ${C.border}` },
   monthRow: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 },
+  breakdown: { background: C.white, border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 12px', marginBottom: 16 },
+  breakRow: { display: 'flex', gap: 8, fontSize: 12, padding: '3px 0', alignItems: 'baseline' },
+  breakLbl: { width: 74, flexShrink: 0, color: C.muted },
+  breakVal: { flex: 1, color: C.ink },
   monthBtn: (off) => ({ background: C.white, border: `1px solid ${C.border}`, borderRadius: 9, width: 32, height: 32, fontSize: 17, color: C.ink, cursor: off ? 'not-allowed' : 'pointer', opacity: off ? 0.3 : 1, lineHeight: 1, flexShrink: 0 }),
   monthLbl: { flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 700, color: C.ink },
   monthNote: { fontSize: 10.5, color: C.muted, textAlign: 'center', marginBottom: 14 },
@@ -779,6 +783,7 @@ export default function Attendance({ role, userName }) {
   }
 
   const countBy = (st) => summaryDays.filter(d => d.status === st).length;
+  const datesFor = (st) => summaryDays.filter(d => d.status === st).map(d => d.date.slice(0, 5));
   const summaryStats = {
     worked: countBy('present'),
     half: countBy('half'),
@@ -1054,6 +1059,29 @@ export default function Attendance({ role, userName }) {
                   <div style={{ ...s.statBox, minWidth: 68 }}><div style={s.statNum}>{summaryStats.rest}</div><div style={s.statLbl}>Rest days</div></div>
                   <div style={{ ...s.statBox, minWidth: 68 }}><div style={{ ...s.statNum, color: summaryStats.absent > 0 ? C.err : C.ink }}>{summaryStats.absent}</div><div style={s.statLbl}>Absent</div></div>
                 </div>
+                {(summaryStats.half > 0 || summaryStats.rest > 0 || summaryStats.absent > 0) && (
+                  <div style={s.breakdown}>
+                    {summaryStats.half > 0 && (
+                      <div style={s.breakRow}>
+                        <span style={s.breakLbl}>Half days</span>
+                        <span style={s.breakVal}>{datesFor('half').join(', ')} — clocked in, no clock out</span>
+                      </div>
+                    )}
+                    {summaryStats.rest > 0 && (
+                      <div style={s.breakRow}>
+                        <span style={s.breakLbl}>Rest days</span>
+                        <span style={s.breakVal}>{datesFor('rest').join(', ')}</span>
+                      </div>
+                    )}
+                    {summaryStats.absent > 0 && (
+                      <div style={s.breakRow}>
+                        <span style={s.breakLbl}>Absent</span>
+                        <span style={{ ...s.breakVal, color: C.err }}>{datesFor('absent').join(', ')} — no record on the sheet</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div style={s.salaryBar}>
                   <div>
                     <div style={s.salaryLabel}>Salary</div>
