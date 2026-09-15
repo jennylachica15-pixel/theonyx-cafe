@@ -9,6 +9,9 @@ const SHEET_ID = '15o1OUhOO17s1ifKSlYonPrmtJEAP1qQRLoMCI7_N0DM';
 const GOOGLE_CLIENT_ID = '596322682185-n5hm66hvol3nnqqllnuop995kcnefbgu.apps.googleusercontent.com';
 const SCOPES = 'https://www.googleapis.com/auth/spreadsheets';
 const STAFF_LIST = ['Kelly', 'Maryz', 'Ash'];
+// Fixed weekly day off, 0 = Sunday. Staff not listed here have no automatic rest day.
+const WEEKLY_REST = { Kelly: 2, Maryz: 4 };
+const WEEKDAY = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const DAILY_RATE = 400;
 const POLL_MS = 60000;
 
@@ -149,7 +152,13 @@ const displayTime = (val) => {
   if (/^\d*\.\d+$/.test(str)) {
     const total = Math.round((parseFloat(str) % 1) * 86400);
     const h = Math.floor(total / 3600), m = Math.floor((total % 3600) / 60), sec = total % 60;
-    return `${(h % 12) || 12}:${pad2(m)}:${pad2(sec)} ${h >= 12 ? 'PM' : 'AM'}`;
+    return `${(h % 12) || 12}:${pad2(m)}:${pad2(sec)} ${h >= 12 ? 'pm' : 'am'}`;
+  }
+  // 24-hour strings like 19:07:03 → 7:07:03 pm
+  const hm = str.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (hm) {
+    const h = Number(hm[1]);
+    return `${(h % 12) || 12}:${hm[2]}:${hm[3] || '00'} ${h >= 12 ? 'pm' : 'am'}`;
   }
   return str;
 };
@@ -164,6 +173,14 @@ const monthLabel = (key) => {
   if (!key) return '';
   const [y, m] = key.split('-').map(Number);
   return new Date(y, m - 1, 1).toLocaleDateString('en-PH', { month: 'long', year: 'numeric' });
+};
+
+// YYYY-MM-DD → does this land on the staff member's fixed day off?
+const isWeeklyRest = (staff, iso) => {
+  const day = WEEKLY_REST[staff];
+  if (day === undefined || !iso) return false;
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d).getDay() === day;
 };
 
 // MM/DD/YYYY → sortable YYYYMMDD
@@ -225,6 +242,7 @@ export default function Attendance({ role, userName }) {
   const [restDate, setRestDate] = useState('');
   const [restWarning, setRestWarning] = useState('');
   const [restSaving, setRestSaving] = useState(false);
+  const [restOverride, setRestOverride] = useState(false);
 
   const visibleStaff = role === 'manager' ? STAFF_LIST : (userName ? [userName] : []);
   const today = localIso();
@@ -276,6 +294,8 @@ export default function Attendance({ role, userName }) {
     if (visibleStaff.length > 0) setActiveStaff(visibleStaff[0]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userName, role]);
+
+  useEffect(() => { setRestOverride(false); }, [activeStaff, today]);
 
   // ── Read the sheet: this is what the UI renders ──
   const loadSheet = async (tok, list = visibleStaff, { silent = false } = {}) => {
@@ -614,16 +634,20 @@ export default function Attendance({ role, userName }) {
     const rows = (loaded.rowsByStaff[activeStaff] || [])
       .filter(r => r && r[0] && !isHeaderRow(r))
       .map(r => {
-        const isRest = String(r[2] || '').trim().toUpperCase() === 'REST DAY';
+        const colC = String(r[2] || '').trim().toUpperCase();
+        const isRest = colC === 'REST DAY';
+        const isAbsent = colC === 'ABSENT' || colC === 'A';
+        const isMarker = isRest || isAbsent;
         const date = normDate(r[0]);
         return {
           isRest,
+          isAbsent,
           date,
           month: monthKey(date),
-          hasIn: !isRest && !!String(r[2] || '').trim(),
-          hasOut: !isRest && !!String(r[4] || '').trim(),
-          timeIn: isRest ? '' : displayTime(r[2] || ''),
-          timeOut: isRest ? '' : displayTime(r[4] || ''),
+          hasIn: !isMarker && !!colC,
+          hasOut: !isMarker && !!String(r[4] || '').trim(),
+          timeIn: isMarker ? '' : displayTime(r[2] || ''),
+          timeOut: isMarker ? '' : displayTime(r[4] || ''),
         };
       });
 
@@ -635,9 +659,12 @@ export default function Attendance({ role, userName }) {
   const dateCounts = {};
   restDays.forEach(r => { dateCounts[r.date] = (dateCounts[r.date] || 0) + 1; });
   const upcoming = restDays.filter(r => r.date >= today);
-  const onRestToday = activeStaff
-    ? (rec(activeStaff).isRest || restDays.some(r => r.staff === activeStaff && r.date === today))
+  const autoRestToday = activeStaff ? isWeeklyRest(activeStaff, today) : false;
+  const scheduledRestToday = activeStaff
+    ? (rec(activeStaff).isRest || autoRestToday || restDays.some(r => r.staff === activeStaff && r.date === today))
     : false;
+  // A clock-in already on the sheet always wins — someone covering a shift isn't resting.
+  const onRestToday = scheduledRestToday && !restOverride && !rec(activeStaff).timeIn;
 
   const addRestDay = async () => {
     if (!activeStaff) { setRestWarning('No staff selected.'); return; }
@@ -679,12 +706,22 @@ export default function Attendance({ role, userName }) {
   const monthIdx = summaryMonths.indexOf(summaryMonth);
   const isCurrentMonth = summaryMonth === localIso().slice(0, 7);
 
-  // One row per sheet date. A real clock-in beats a stray rest row on the same day.
+  // The sheet can hold more than one row per date. Rank them so a complete
+  // shift always beats a partial one, and a marker never overwrites real times.
+  const rank = (r) => (r.hasIn && r.hasOut ? 4 : r.hasIn ? 3 : r.isRest ? 2 : 1);
   const byDate = {};
+  const seen = {};
   summaryAll.filter(r => r.month === summaryMonth).forEach(r => {
+    (seen[r.date] = seen[r.date] || []).push(r);
     const cur = byDate[r.date];
-    if (!cur || (cur.isRest && r.hasIn) || (!cur.hasOut && r.hasOut)) byDate[r.date] = r;
+    if (!cur || rank(r) > rank(cur)) byDate[r.date] = r;
   });
+
+  // A date is in conflict when one row says worked and another says absent or rest.
+  const conflicts = Object.keys(seen).filter(date => {
+    const rows = seen[date];
+    return rows.some(r => r.hasIn) && rows.some(r => r.isAbsent || r.isRest);
+  }).sort((a, b) => (sortKey(a) < sortKey(b) ? 1 : -1));
 
   // Absent only counts from the staff's first entry onward, so the days before
   // someone started don't get flagged.
@@ -702,10 +739,10 @@ export default function Attendance({ role, userName }) {
       const restPlanned = restDays.some(r => r.staff === activeStaff && r.date === iso);
 
       let status;
-      if ((row && row.isRest) || (!row && restPlanned)) status = 'rest';
-      else if (!row || !row.hasIn) status = 'absent';
-      else if (!row.hasOut) status = 'half';
-      else status = 'present';
+      if (row && row.hasIn) status = row.hasOut ? 'present' : 'half';
+      else if (row && row.isAbsent) status = 'absent';
+      else if ((row && row.isRest) || restPlanned || isWeeklyRest(activeStaff, iso)) status = 'rest';
+      else status = 'absent';
 
       summaryDays.push({
         date,
@@ -787,7 +824,19 @@ export default function Attendance({ role, userName }) {
           </div>
 
           {onRestToday ? (
-            <div style={s.restTodayBox}>{Ic.cal} It's {activeStaff}'s rest day today — Clock In / Out is off.</div>
+            <>
+              <div style={s.restTodayBox}>
+                {Ic.cal}
+                {autoRestToday
+                  ? `${WEEKDAY[WEEKLY_REST[activeStaff]]} is ${activeStaff}'s rest day — clock in is off.`
+                  : `It's ${activeStaff}'s rest day today — clock in is off.`}
+              </div>
+              <button
+                onClick={() => setRestOverride(true)}
+                style={{ background: 'none', border: 'none', color: C.terra, fontSize: 12, fontWeight: 600, cursor: 'pointer', width: '100%', marginTop: 10, textDecoration: 'underline' }}>
+                {activeStaff} is covering a shift today — turn clock in back on
+              </button>
+            </>
           ) : !accessToken ? (
             <div style={{ ...s.restTodayBox, background: C.errBg, border: `1px solid ${C.errBorder}`, color: C.err }}>
               {Ic.lock} Connect to record log above to enable Clock In / Out.
@@ -854,7 +903,19 @@ export default function Attendance({ role, userName }) {
       {/* Rest days */}
       <div style={s.card}>
         <div style={s.restHead}>{Ic.cal}<span style={s.restTitle}>Rest Days</span></div>
-        <div style={s.restSub}>Pick your day off. On a rest day, clock in/out is disabled — and it shows in the summary and record sheet.</div>
+        <div style={s.restSub}>Pick an extra day off. On a rest day, clock in is disabled — and it shows in the summary and record sheet.</div>
+
+        {Object.keys(WEEKLY_REST).length > 0 && (
+          <div style={{ background: C.cream, border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 12px', marginBottom: 14 }}>
+            <div style={{ fontSize: 11.5, color: C.muted, marginBottom: 5 }}>Every week, automatically</div>
+            {STAFF_LIST.filter(n => WEEKLY_REST[n] !== undefined).map(n => (
+              <div key={n} style={{ fontSize: 13, color: C.ink, display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
+                <span>{n}</span>
+                <span style={{ fontWeight: 700 }}>{WEEKDAY[WEEKLY_REST[n]]}</span>
+              </div>
+            ))}
+          </div>
+        )}
 
         {activeStaff && (
           <>
@@ -952,6 +1013,15 @@ export default function Attendance({ role, userName }) {
                 <div style={s.monthNote}>
                   {isCurrentMonth ? 'This month · resets on the 1st' : 'Past month · kept for reference'}
                 </div>
+
+                {conflicts.length > 0 && (
+                  <div style={{ ...s.banner('err'), background: C.warnBg, border: `1px solid ${C.warnBorder}`, color: C.warn, alignItems: 'flex-start' }}>
+                    {Ic.warn}
+                    <span>
+                      {conflicts.length} date{conflicts.length === 1 ? ' has' : 's have'} more than one row in the sheet, with the extra row marked absent or rest: {conflicts.join(', ')}. The worked row is being used. Clean these up in the sheet.
+                    </span>
+                  </div>
+                )}
 
                 <div style={{ ...s.statStrip, flexWrap: 'wrap' }}>
                   <div style={{ ...s.statBox, minWidth: 68 }}><div style={s.statNum}>{summaryStats.worked}</div><div style={s.statLbl}>Full days</div></div>
