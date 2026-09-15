@@ -64,6 +64,8 @@ const s = {
   statNum: { fontSize: 18, fontWeight: 700, color: C.ink },
   statLbl: { fontSize: 9.5, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 3 },
   restPill: { display: 'inline-block', fontSize: 11, fontWeight: 700, color: C.warn, background: C.warnBg, border: `1px solid ${C.warnBorder}`, borderRadius: 20, padding: '2px 10px' },
+  absentPill: { display: 'inline-block', fontSize: 11, fontWeight: 700, color: C.err, background: C.errBg, border: `1px solid ${C.errBorder}`, borderRadius: 20, padding: '2px 10px' },
+  halfPill: { display: 'inline-block', fontSize: 11, fontWeight: 700, color: C.terra, background: C.soft, border: `1px solid ${C.border}`, borderRadius: 20, padding: '2px 10px' },
   salaryBar: { background: C.ink, borderRadius: 12, padding: '13px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
   salaryLabel: { fontSize: 11.5, color: '#d8b87a', textTransform: 'uppercase', letterSpacing: 0.8, fontWeight: 700 },
   salaryNum: { fontSize: 23, fontWeight: 800, color: C.gold, lineHeight: 1 },
@@ -76,6 +78,10 @@ const s = {
   sumTable: { width: '100%', borderCollapse: 'collapse', fontSize: 13 },
   sumTh: { textAlign: 'left', padding: '8px 6px', fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.5, borderBottom: `1px solid ${C.border}` },
   sumTd: { padding: '9px 6px', color: C.ink, borderBottom: `1px solid ${C.border}` },
+  monthRow: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 },
+  monthBtn: (off) => ({ background: C.white, border: `1px solid ${C.border}`, borderRadius: 9, width: 32, height: 32, fontSize: 17, color: C.ink, cursor: off ? 'not-allowed' : 'pointer', opacity: off ? 0.3 : 1, lineHeight: 1, flexShrink: 0 }),
+  monthLbl: { flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 700, color: C.ink },
+  monthNote: { fontSize: 10.5, color: C.muted, textAlign: 'center', marginBottom: 14 },
   syncRow: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 10.5, color: C.muted, marginBottom: 10 },
   refreshBtn: { background: 'transparent', border: 'none', color: C.gold, fontSize: 10.5, fontWeight: 700, cursor: 'pointer', padding: 0, textDecoration: 'underline' },
 };
@@ -148,6 +154,31 @@ const displayTime = (val) => {
   return str;
 };
 
+// MM/DD/YYYY → YYYY-MM, used to bucket the summary by month
+const monthKey = (mmddyyyy) => {
+  const m = String(mmddyyyy).match(/^(\d{2})\/\d{2}\/(\d{4})$/);
+  return m ? `${m[2]}-${m[1]}` : '';
+};
+
+const monthLabel = (key) => {
+  if (!key) return '';
+  const [y, m] = key.split('-').map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString('en-PH', { month: 'long', year: 'numeric' });
+};
+
+// MM/DD/YYYY → sortable YYYYMMDD
+const sortKey = (d) => (d ? d.slice(6) + d.slice(0, 2) + d.slice(3, 5) : '');
+
+const daysInMonth = (key) => {
+  const [y, m] = key.split('-').map(Number);
+  return new Date(y, m, 0).getDate();
+};
+
+const dateInMonth = (key, day) => {
+  const [y, m] = key.split('-').map(Number);
+  return formatDate(new Date(y, m - 1, day));
+};
+
 const isHeaderRow = (r) =>
   String(r[1] || '').trim().toLowerCase() === 'name' ||
   String(r[0] || '').trim().toLowerCase() === 'date';
@@ -179,8 +210,8 @@ export default function Attendance({ role, userName }) {
   // summary modal
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [summaryLoading, setSummaryLoading] = useState(false);
-  const [summaryRows, setSummaryRows] = useState([]);
-  const [summaryStats, setSummaryStats] = useState({ worked: 0, rest: 0, salary: 0 });
+  const [summaryAll, setSummaryAll] = useState([]);
+  const [summaryMonth, setSummaryMonth] = useState(localIso().slice(0, 7));
 
   // notifications (manager only)
   const [notifications, setNotifications] = useState([]);
@@ -568,7 +599,7 @@ export default function Attendance({ role, userName }) {
   const openSummary = async () => {
     if (!activeStaff) return;
     setSummaryOpen(true); setSummaryLoading(true);
-    setSummaryRows([]); setSummaryStats({ worked: 0, rest: 0, salary: 0 }); setError('');
+    setSummaryAll([]); setSummaryMonth(localIso().slice(0, 7)); setError('');
 
     const tok = await getToken();
     if (!tok) { setError('Connect to record log to load the summary.'); setSummaryLoading(false); return; }
@@ -584,23 +615,19 @@ export default function Attendance({ role, userName }) {
       .filter(r => r && r[0] && !isHeaderRow(r))
       .map(r => {
         const isRest = String(r[2] || '').trim().toUpperCase() === 'REST DAY';
+        const date = normDate(r[0]);
         return {
           isRest,
-          date: normDate(r[0]),
+          date,
+          month: monthKey(date),
+          hasIn: !isRest && !!String(r[2] || '').trim(),
+          hasOut: !isRest && !!String(r[4] || '').trim(),
           timeIn: isRest ? '' : displayTime(r[2] || ''),
           timeOut: isRest ? '' : displayTime(r[4] || ''),
         };
       });
 
-    const workedDates = new Set(rows.filter(r => !r.isRest && r.date).map(r => r.date));
-    const restDateSet = new Set(rows.filter(r => r.isRest && r.date).map(r => r.date));
-
-    setSummaryStats({
-      worked: workedDates.size,
-      rest: restDateSet.size,
-      salary: workedDates.size * DAILY_RATE,
-    });
-    setSummaryRows([...rows].reverse());
+    setSummaryAll(rows);
     setSummaryLoading(false);
   };
 
@@ -644,6 +671,60 @@ export default function Attendance({ role, userName }) {
   };
 
   const isActive = !!rec(activeStaff).timeIn && !rec(activeStaff).timeOut && !onRestToday;
+
+  // The summary shows one month at a time, so it starts clean on the 1st.
+  // The current month is always listed even before it has any entries.
+  const summaryMonths = [...new Set([summaryMonth, ...summaryAll.map(r => r.month).filter(Boolean)])]
+    .sort().reverse();
+  const monthIdx = summaryMonths.indexOf(summaryMonth);
+  const isCurrentMonth = summaryMonth === localIso().slice(0, 7);
+
+  // One row per sheet date. A real clock-in beats a stray rest row on the same day.
+  const byDate = {};
+  summaryAll.filter(r => r.month === summaryMonth).forEach(r => {
+    const cur = byDate[r.date];
+    if (!cur || (cur.isRest && r.hasIn) || (!cur.hasOut && r.hasOut)) byDate[r.date] = r;
+  });
+
+  // Absent only counts from the staff's first entry onward, so the days before
+  // someone started don't get flagged.
+  const firstEntry = summaryAll.map(r => r.date).filter(Boolean).sort((a, b) =>
+    sortKey(a) < sortKey(b) ? -1 : 1)[0];
+  const lastDay = isCurrentMonth ? new Date().getDate() : daysInMonth(summaryMonth);
+
+  const summaryDays = [];
+  if (firstEntry) {
+    for (let d = 1; d <= lastDay; d++) {
+      const date = dateInMonth(summaryMonth, d);
+      if (sortKey(date) < sortKey(firstEntry)) continue;
+      const row = byDate[date];
+      const iso = `${summaryMonth}-${pad2(d)}`;
+      const restPlanned = restDays.some(r => r.staff === activeStaff && r.date === iso);
+
+      let status;
+      if ((row && row.isRest) || (!row && restPlanned)) status = 'rest';
+      else if (!row || !row.hasIn) status = 'absent';
+      else if (!row.hasOut) status = 'half';
+      else status = 'present';
+
+      summaryDays.push({
+        date,
+        status,
+        timeIn: row && row.hasIn ? row.timeIn : '',
+        timeOut: row && row.hasOut ? row.timeOut : '',
+      });
+    }
+  }
+
+  const countBy = (st) => summaryDays.filter(d => d.status === st).length;
+  const summaryStats = {
+    worked: countBy('present'),
+    half: countBy('half'),
+    rest: countBy('rest'),
+    absent: countBy('absent'),
+    salary: Math.round((countBy('present') + countBy('half') * 0.5) * DAILY_RATE),
+  };
+  const summaryRows = [...summaryDays].reverse();
 
   return (
     <div style={s.page}>
@@ -855,14 +936,33 @@ export default function Attendance({ role, userName }) {
 
             {!summaryLoading && (
               <>
-                <div style={s.statStrip}>
-                  <div style={s.statBox}><div style={s.statNum}>{summaryStats.worked}</div><div style={s.statLbl}>Days Worked</div></div>
-                  <div style={s.statBox}><div style={s.statNum}>{summaryStats.rest}</div><div style={s.statLbl}>Rest Days</div></div>
+                <div style={s.monthRow}>
+                  <button
+                    style={s.monthBtn(monthIdx >= summaryMonths.length - 1)}
+                    disabled={monthIdx >= summaryMonths.length - 1}
+                    onClick={() => setSummaryMonth(summaryMonths[monthIdx + 1])}
+                    aria-label="Previous month">‹</button>
+                  <div style={s.monthLbl}>{monthLabel(summaryMonth)}</div>
+                  <button
+                    style={s.monthBtn(monthIdx <= 0)}
+                    disabled={monthIdx <= 0}
+                    onClick={() => setSummaryMonth(summaryMonths[monthIdx - 1])}
+                    aria-label="Next month">›</button>
+                </div>
+                <div style={s.monthNote}>
+                  {isCurrentMonth ? 'This month · resets on the 1st' : 'Past month · kept for reference'}
+                </div>
+
+                <div style={{ ...s.statStrip, flexWrap: 'wrap' }}>
+                  <div style={{ ...s.statBox, minWidth: 68 }}><div style={s.statNum}>{summaryStats.worked}</div><div style={s.statLbl}>Full days</div></div>
+                  <div style={{ ...s.statBox, minWidth: 68 }}><div style={s.statNum}>{summaryStats.half}</div><div style={s.statLbl}>Half days</div></div>
+                  <div style={{ ...s.statBox, minWidth: 68 }}><div style={s.statNum}>{summaryStats.rest}</div><div style={s.statLbl}>Rest days</div></div>
+                  <div style={{ ...s.statBox, minWidth: 68 }}><div style={{ ...s.statNum, color: summaryStats.absent > 0 ? C.err : C.ink }}>{summaryStats.absent}</div><div style={s.statLbl}>Absent</div></div>
                 </div>
                 <div style={s.salaryBar}>
                   <div>
                     <div style={s.salaryLabel}>Salary</div>
-                    <div style={s.salaryNote}>{summaryStats.worked} day{summaryStats.worked === 1 ? '' : 's'} × {peso(DAILY_RATE)}</div>
+                    <div style={s.salaryNote}>{summaryStats.worked} full + {summaryStats.half} half × {peso(DAILY_RATE)}</div>
                   </div>
                   <div style={s.salaryNum}>{peso(summaryStats.salary)}</div>
                 </div>
@@ -872,7 +972,7 @@ export default function Attendance({ role, userName }) {
             {summaryLoading
               ? <div style={{ fontSize: 13, color: C.muted, textAlign: 'center', padding: '20px 0' }}>Loading…</div>
               : summaryRows.length === 0
-                ? <div style={{ fontSize: 13, color: C.muted, textAlign: 'center', padding: '20px 0' }}>Nothing on the sheet yet.</div>
+                ? <div style={{ fontSize: 13, color: C.muted, textAlign: 'center', padding: '20px 0' }}>No entries for {monthLabel(summaryMonth)} yet.</div>
                 : (
                   <table style={s.sumTable}>
                     <thead>
@@ -883,21 +983,31 @@ export default function Attendance({ role, userName }) {
                       </tr>
                     </thead>
                     <tbody>
-                      {summaryRows.map((r, i) => (
-                        r.isRest
-                          ? (
-                            <tr key={i}>
-                              <td style={s.sumTd}>{r.date}</td>
-                              <td style={s.sumTd} colSpan={2}><span style={s.restPill}>Rest Day</span></td>
-                            </tr>
-                          ) : (
-                            <tr key={i}>
-                              <td style={s.sumTd}>{r.date}</td>
-                              <td style={s.sumTd}>{r.timeIn}</td>
-                              <td style={s.sumTd}>{r.timeOut}</td>
-                            </tr>
-                          )
-                      ))}
+                      {summaryRows.map((r, i) => {
+                        if (r.status === 'rest') return (
+                          <tr key={i}>
+                            <td style={s.sumTd}>{r.date}</td>
+                            <td style={s.sumTd} colSpan={2}><span style={s.restPill}>Rest day</span></td>
+                          </tr>
+                        );
+                        if (r.status === 'absent') return (
+                          <tr key={i}>
+                            <td style={s.sumTd}>{r.date}</td>
+                            <td style={s.sumTd} colSpan={2}><span style={s.absentPill}>Absent</span></td>
+                          </tr>
+                        );
+                        return (
+                          <tr key={i}>
+                            <td style={s.sumTd}>{r.date}</td>
+                            <td style={s.sumTd}>{r.timeIn || '—'}</td>
+                            <td style={s.sumTd}>
+                              {r.status === 'half'
+                                ? <span style={s.halfPill}>Half day</span>
+                                : (r.timeOut || '—')}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 )
