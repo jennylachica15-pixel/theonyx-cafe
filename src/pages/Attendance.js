@@ -69,6 +69,7 @@ const s = {
   restPill: { display: 'inline-block', fontSize: 11, fontWeight: 700, color: C.warn, background: C.warnBg, border: `1px solid ${C.warnBorder}`, borderRadius: 20, padding: '2px 10px' },
   absentPill: { display: 'inline-block', fontSize: 11, fontWeight: 700, color: C.err, background: C.errBg, border: `1px solid ${C.errBorder}`, borderRadius: 20, padding: '2px 10px' },
   halfPill: { display: 'inline-block', fontSize: 11, fontWeight: 700, color: C.terra, background: C.soft, border: `1px solid ${C.border}`, borderRadius: 20, padding: '2px 10px' },
+  activePill: { display: 'inline-block', fontSize: 11, fontWeight: 700, color: C.green, background: C.greenBg, border: `1px solid ${C.greenBorder}`, borderRadius: 20, padding: '2px 10px' },
   salaryBar: { background: C.ink, borderRadius: 12, padding: '13px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
   salaryLabel: { fontSize: 11.5, color: '#d8b87a', textTransform: 'uppercase', letterSpacing: 0.8, fontWeight: 700 },
   salaryNum: { fontSize: 23, fontWeight: 800, color: C.gold, lineHeight: 1 },
@@ -351,8 +352,8 @@ export default function Attendance({ role, userName }) {
         recs[staff] = found || { rowIndex: null, isRest: false, isAbsent: false, timeIn: null, timeOut: null };
       });
 
-      setSheetToday(recs);
-      setSheetRows(rowsByStaff);
+      setSheetToday(prev => ({ ...prev, ...recs }));
+      setSheetRows(prev => ({ ...prev, ...rowsByStaff }));
       setLastSync(new Date());
       setSyncing(false);
       return { recs, rowsByStaff };
@@ -758,11 +759,15 @@ export default function Attendance({ role, userName }) {
       const iso = `${summaryMonth}-${pad2(d)}`;
       const restPlanned = restDays.some(r => r.staff === activeStaff && r.date === iso);
 
+      // Today is still in progress: it isn't absent just because nobody has
+      // clocked in yet, and it isn't a half day until the shift is over.
+      const isToday = date === todaySheet;
+
       let status;
-      if (row && row.hasIn) status = row.hasOut ? 'present' : 'half';
+      if (row && row.hasIn) status = row.hasOut ? 'present' : (isToday ? 'active' : 'half');
       else if (row && row.isAbsent) status = 'absent';
       else if ((row && row.isRest) || restPlanned || isWeeklyRest(activeStaff, iso)) status = 'rest';
-      else status = 'absent';
+      else status = isToday ? 'pending' : 'absent';
 
       summaryDays.push({
         date,
@@ -1086,6 +1091,12 @@ export default function Attendance({ role, userName }) {
                             <td style={s.sumTd} colSpan={2}><span style={s.absentPill}>Absent</span></td>
                           </tr>
                         );
+                        if (r.status === 'pending') return (
+                          <tr key={i}>
+                            <td style={s.sumTd}>{r.date}</td>
+                            <td style={{ ...s.sumTd, color: C.muted }} colSpan={2}>Not clocked in yet</td>
+                          </tr>
+                        );
                         return (
                           <tr key={i}>
                             <td style={s.sumTd}>{r.date}</td>
@@ -1093,7 +1104,9 @@ export default function Attendance({ role, userName }) {
                             <td style={s.sumTd}>
                               {r.status === 'half'
                                 ? <span style={s.halfPill}>Half day</span>
-                                : (r.timeOut || '—')}
+                                : r.status === 'active'
+                                  ? <span style={s.activePill}>On shift</span>
+                                  : (r.timeOut || '—')}
                             </td>
                           </tr>
                         );
