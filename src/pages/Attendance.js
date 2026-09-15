@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase/config';
 import {
   collection, addDoc, deleteDoc, updateDoc, doc,
-  onSnapshot, query, orderBy, where, serverTimestamp, getDocs
+  onSnapshot, query, orderBy, where, serverTimestamp
 } from 'firebase/firestore';
 
 const SHEET_ID = '15o1OUhOO17s1ifKSlYonPrmtJEAP1qQRLoMCI7_N0DM';
@@ -10,6 +10,7 @@ const GOOGLE_CLIENT_ID = '596322682185-n5hm66hvol3nnqqllnuop995kcnefbgu.apps.goo
 const SCOPES = 'https://www.googleapis.com/auth/spreadsheets';
 const STAFF_LIST = ['Kelly', 'Maryz', 'Ash'];
 const DAILY_RATE = 400;
+const POLL_MS = 60000;
 
 // ── palette ──
 const C = {
@@ -27,7 +28,7 @@ const s = {
   actionRow: { display: 'flex', gap: 8, marginBottom: 16 },
   smallBtn: { flex: 1, padding: '9px 10px', borderRadius: 10, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 },
   connectBtn: { background: C.gold, color: C.white, border: 'none' },
-  connectedBadge: { flex: 1, padding: '9px 10px', borderRadius: 10, fontSize: 12.5, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: C.greenBg, border: `1px solid ${C.greenBorder}`, color: C.green },
+  connectedBadge: { flex: 1, padding: '9px 10px', borderRadius: 10, fontSize: 12.5, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: C.greenBg, border: `1px solid ${C.greenBorder}`, color: C.green, cursor: 'pointer' },
   summaryBtn: { background: C.white, color: C.ink, border: `1px solid ${C.border}` },
   banner: (kind) => ({
     borderRadius: 10, padding: '10px 12px', fontSize: 13, marginBottom: 12,
@@ -75,7 +76,8 @@ const s = {
   sumTable: { width: '100%', borderCollapse: 'collapse', fontSize: 13 },
   sumTh: { textAlign: 'left', padding: '8px 6px', fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.5, borderBottom: `1px solid ${C.border}` },
   sumTd: { padding: '9px 6px', color: C.ink, borderBottom: `1px solid ${C.border}` },
-  syncBadge: { fontSize: 10, color: C.green, display: 'flex', alignItems: 'center', gap: 4, marginBottom: 8 },
+  syncRow: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 10.5, color: C.muted, marginBottom: 10 },
+  refreshBtn: { background: 'transparent', border: 'none', color: C.gold, fontSize: 10.5, fontWeight: 700, cursor: 'pointer', padding: 0, textDecoration: 'underline' },
 };
 
 const Ic = {
@@ -89,14 +91,14 @@ const Ic = {
   cal: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={C.gold} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
   warn: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>,
   close: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={C.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
-  sync: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>,
+  sheet: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="9" x2="9" y2="21"/></svg>,
 };
 
 // ── Date/time helpers ──
-const localIso = (d = new Date()) => {
-  const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'), day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-};
+const pad2 = (n) => String(n).padStart(2, '0');
+
+const localIso = (d = new Date()) =>
+  `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 
 const prettyDate = (iso) => {
   if (!iso) return '';
@@ -106,11 +108,8 @@ const prettyDate = (iso) => {
 
 const peso = (n) => '\u20B1' + Number(n).toLocaleString('en-PH');
 
-// ── FIX: formatDate always returns MM/DD/YYYY ──
-const formatDate = (d) =>
-  `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`;
+const formatDate = (d) => `${pad2(d.getMonth() + 1)}/${pad2(d.getDate())}/${d.getFullYear()}`;
 
-// ── FIX: sheetDateFromIso converts YYYY-MM-DD → MM/DD/YYYY ──
 const sheetDateFromIso = (iso) => {
   const [y, m, d] = iso.split('-').map(Number);
   return formatDate(new Date(y, m - 1, d));
@@ -119,54 +118,53 @@ const sheetDateFromIso = (iso) => {
 const formatTime = (d) =>
   d.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-// ── FIX: displayDate handles both serial numbers and string dates ──
-const displayDate = (val) => {
+// Normalise whatever the sheet returns into a single canonical MM/DD/YYYY.
+// Handles serial numbers, MM/DD/YYYY, M/D/YYYY and YYYY-MM-DD.
+const normDate = (val) => {
   if (val === '' || val === null || val === undefined) return '';
   const str = String(val).trim();
+  if (!str) return '';
   if (/^\d+(\.\d+)?$/.test(str)) {
     const d = new Date(Date.UTC(1899, 11, 30) + Math.round(parseFloat(str)) * 86400000);
-    return `${String(d.getUTCMonth() + 1).padStart(2, '0')}/${String(d.getUTCDate()).padStart(2, '0')}/${d.getUTCFullYear()}`;
+    return `${pad2(d.getUTCMonth() + 1)}/${pad2(d.getUTCDate())}/${d.getUTCFullYear()}`;
   }
-  return str;
+  let m = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return `${pad2(m[2])}/${pad2(m[3])}/${m[1]}`;
+  m = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (m) return `${pad2(m[1])}/${pad2(m[2])}/${m[3]}`;
+  const parsed = new Date(str);
+  return isNaN(parsed) ? str : formatDate(parsed);
 };
 
-// ── FIX: displayTime handles fractional serial, HH:MM:SS, and 12-hr formats ──
 const displayTime = (val) => {
   if (val === '' || val === null || val === undefined) return '—';
   const str = String(val).trim();
   if (!str) return '—';
-  // Google Sheets fractional time (e.g. 0.649...)
   if (/^\d*\.\d+$/.test(str)) {
-    const frac = parseFloat(str) % 1;
-    const total = Math.round(frac * 86400);
+    const total = Math.round((parseFloat(str) % 1) * 86400);
     const h = Math.floor(total / 3600), m = Math.floor((total % 3600) / 60), sec = total % 60;
-    return `${(h % 12) || 12}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
+    return `${(h % 12) || 12}:${pad2(m)}:${pad2(sec)} ${h >= 12 ? 'PM' : 'AM'}`;
   }
-  // Already formatted (e.g. "03:46:17 PM" or "19:49:50")
   return str;
 };
 
-// ── appendRestRow — A=Date, B=Name, C=REST DAY, D=empty, E=empty ──
-async function appendRestRow(staffName, sheetDate, token) {
-  // Exactly 5 columns: A B C D E
-  const values = [[sheetDate, staffName, 'REST DAY', '', '']];
-  try {
-    const res = await fetch(
-      `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${staffName}!A:E:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
-      {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ values }),
-      }
-    );
-    return res.ok;
-  } catch { return false; }
-}
+const isHeaderRow = (r) =>
+  String(r[1] || '').trim().toLowerCase() === 'name' ||
+  String(r[0] || '').trim().toLowerCase() === 'date';
 
 export default function Attendance({ role, userName }) {
   const [accessToken, setAccessToken] = useState(null);
-  const [activeStaff, setActiveStaff] = useState(null);
+
+  // Sheet is the source of truth for what gets displayed.
+  const [sheetToday, setSheetToday] = useState({});   // { staff: { rowIndex, timeIn, timeOut, isRest } }
+  const [sheetRows, setSheetRows] = useState({});     // { staff: rawRows[] }
+  const [syncing, setSyncing] = useState(false);
+  const [lastSync, setLastSync] = useState(null);
+
+  // Firestore holds the selfies + drives manager notifications only.
   const [firestoreRecords, setFirestoreRecords] = useState({});
+
+  const [activeStaff, setActiveStaff] = useState(null);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
@@ -175,6 +173,8 @@ export default function Attendance({ role, userName }) {
   const [photoFile, setPhotoFile] = useState(null);
   const fileRef = useRef();
   const tokenClientRef = useRef(null);
+  const tokenRef = useRef({ token: null, expiresAt: 0 });
+  const pendingTokenResolve = useRef(null);
 
   // summary modal
   const [summaryOpen, setSummaryOpen] = useState(false);
@@ -197,8 +197,9 @@ export default function Attendance({ role, userName }) {
 
   const visibleStaff = role === 'manager' ? STAFF_LIST : (userName ? [userName] : []);
   const today = localIso();
+  const todaySheet = formatDate(new Date());
 
-  // ── Google Sign-in ──
+  // ── Google sign-in with a promise-based token getter ──
   useEffect(() => {
     const script = document.createElement('script');
     script.src = 'https://accounts.google.com/gsi/client';
@@ -208,18 +209,128 @@ export default function Attendance({ role, userName }) {
       tokenClientRef.current = window.google.accounts.oauth2.initTokenClient({
         client_id: GOOGLE_CLIENT_ID,
         scope: SCOPES,
-        callback: res => { if (res.access_token) setAccessToken(res.access_token); },
+        callback: (res) => {
+          const resolve = pendingTokenResolve.current;
+          pendingTokenResolve.current = null;
+          if (res && res.access_token) {
+            // renew two minutes early so a write never lands on a dead token
+            const expiresAt = Date.now() + (Number(res.expires_in || 3600) - 120) * 1000;
+            tokenRef.current = { token: res.access_token, expiresAt };
+            setAccessToken(res.access_token);
+            if (resolve) resolve(res.access_token);
+          } else if (resolve) {
+            resolve(null);
+          }
+        },
       });
     };
     document.body.appendChild(script);
-    return () => document.body.removeChild(script);
+    return () => { document.body.removeChild(script); };
   }, []);
+
+  // Returns a live token. interactive:false is used by the background poll
+  // so it never pops a Google dialog on its own.
+  const getToken = ({ interactive = true } = {}) => new Promise((resolve) => {
+    const { token, expiresAt } = tokenRef.current;
+    if (token && Date.now() < expiresAt) return resolve(token);
+    if (!interactive || !tokenClientRef.current) {
+      if (token) { tokenRef.current = { token: null, expiresAt: 0 }; setAccessToken(null); }
+      return resolve(null);
+    }
+    pendingTokenResolve.current = resolve;
+    tokenClientRef.current.requestAccessToken({ prompt: '' });
+  });
 
   useEffect(() => {
     if (visibleStaff.length > 0) setActiveStaff(visibleStaff[0]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userName, role]);
 
-  // ── Real-time Firestore listener for today's attendance ──
+  // ── Read the sheet: this is what the UI renders ──
+  const loadSheet = async (tok, list = visibleStaff, { silent = false } = {}) => {
+    if (!tok || list.length === 0) return null;
+    if (!silent) setSyncing(true);
+    try {
+      const params = list.map(n => `ranges=${encodeURIComponent(`${n}!A:E`)}`).join('&');
+      const res = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values:batchGet?${params}`,
+        { headers: { Authorization: `Bearer ${tok}` } }
+      );
+
+      if (!res.ok) {
+        if (res.status === 401 || res.status === 403) {
+          tokenRef.current = { token: null, expiresAt: 0 };
+          setAccessToken(null);
+          setError('The sheet connection expired. Tap Connect to record log again.');
+        } else if (res.status === 400) {
+          setError(`Could not read the sheet. Check that a tab exists named exactly: ${list.join(', ')}.`);
+        } else {
+          setError(`Could not read the sheet (error ${res.status}).`);
+        }
+        setSyncing(false);
+        return null;
+      }
+
+      const data = await res.json();
+      const recs = {}, rowsByStaff = {};
+
+      (data.valueRanges || []).forEach((vr, i) => {
+        const staff = list[i];
+        const values = vr.values || [];
+        rowsByStaff[staff] = values;
+
+        let found = null;
+        values.forEach((r, idx) => {
+          if (!r || !r[0] || isHeaderRow(r)) return;
+          if (normDate(r[0]) !== todaySheet) return;
+          const colC = String(r[2] || '').trim().toUpperCase();
+          const isRest = colC === 'REST DAY';
+          // last matching row wins
+          found = {
+            rowIndex: idx + 1,                                  // real 1-based sheet row
+            isRest,
+            timeIn: isRest ? null : (r[2] ? displayTime(r[2]) : null),
+            timeOut: isRest ? null : (r[4] ? displayTime(r[4]) : null),
+          };
+        });
+
+        recs[staff] = found || { rowIndex: null, isRest: false, timeIn: null, timeOut: null };
+      });
+
+      setSheetToday(recs);
+      setSheetRows(rowsByStaff);
+      setLastSync(new Date());
+      setSyncing(false);
+      return { recs, rowsByStaff };
+    } catch (e) {
+      console.error(e);
+      setError('Network error while reading the sheet.');
+      setSyncing(false);
+      return null;
+    }
+  };
+
+  // Pull as soon as we have a token, and whenever the staff list changes.
+  useEffect(() => {
+    if (accessToken) loadSheet(accessToken, visibleStaff);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accessToken, role, userName]);
+
+  // Background refresh: on focus and on a timer, silently.
+  const syncRef = useRef(() => {});
+  syncRef.current = async () => {
+    const tok = await getToken({ interactive: false });
+    if (tok) loadSheet(tok, visibleStaff, { silent: true });
+  };
+
+  useEffect(() => {
+    const id = setInterval(() => syncRef.current(), POLL_MS);
+    const onFocus = () => syncRef.current();
+    window.addEventListener('focus', onFocus);
+    return () => { clearInterval(id); window.removeEventListener('focus', onFocus); };
+  }, []);
+
+  // ── Firestore: selfies + notification feed only ──
   useEffect(() => {
     const q = query(collection(db, 'attendance'), where('date', '==', today));
     const unsub = onSnapshot(q, (snap) => {
@@ -230,8 +341,6 @@ export default function Attendance({ role, userName }) {
           timeIn: data.timeIn || null,
           timeOut: data.timeOut || null,
           docId: d.id,
-          rowIndex: data.rowIndex || null,
-          sheetDate: data.sheetDate || null,   // FIX: store sheetDate for clock-out
           photoInData: data.photoInData || null,
           photoOutData: data.photoOutData || null,
         };
@@ -241,18 +350,17 @@ export default function Attendance({ role, userName }) {
     return () => unsub();
   }, [today]);
 
-  // ── Notification: fire when new clock-in/out detected (manager only) ──
   useEffect(() => {
     if (role !== 'manager') return;
     const prev = prevRecordsRef.current;
-    Object.entries(firestoreRecords).forEach(([staff, rec]) => {
+    Object.entries(firestoreRecords).forEach(([staff, r]) => {
       const p = prev[staff] || {};
-      if (rec.timeIn && !p.timeIn) {
-        setNotifications(n => [{ id: Date.now() + staff + 'IN', staff, type: 'IN', time: rec.timeIn, photoData: rec.photoInData, read: false }, ...n]);
+      if (r.timeIn && !p.timeIn) {
+        setNotifications(n => [{ id: Date.now() + staff + 'IN', staff, type: 'IN', time: r.timeIn, photoData: r.photoInData, read: false }, ...n]);
         setNotifOpen(true);
       }
-      if (rec.timeOut && !p.timeOut) {
-        setNotifications(n => [{ id: Date.now() + staff + 'OUT', staff, type: 'OUT', time: rec.timeOut, photoData: rec.photoOutData, read: false }, ...n]);
+      if (r.timeOut && !p.timeOut) {
+        setNotifications(n => [{ id: Date.now() + staff + 'OUT', staff, type: 'OUT', time: r.timeOut, photoData: r.photoOutData, read: false }, ...n]);
         setNotifOpen(true);
       }
     });
@@ -276,12 +384,15 @@ export default function Attendance({ role, userName }) {
     reader.readAsDataURL(file);
   };
 
+  const rec = (name) => sheetToday[name] || {};
+  const photosOf = (name) => firestoreRecords[name] || {};
+
   const startAction = (staffName, type) => {
     if (!accessToken) { setError('Connect to record log first.'); return; }
-    const r = firestoreRecords[staffName] || {};
-    if (type === 'IN' && r.timeIn) { setError('Already clocked in today.'); return; }
+    const r = rec(staffName);
+    if (type === 'IN' && r.timeIn) { setError('The sheet already shows a clock in for today.'); return; }
     if (type === 'OUT' && (r.timeOut || !r.timeIn)) {
-      setError(r.timeOut ? 'Already clocked out today.' : 'Clock in first.');
+      setError(r.timeOut ? 'The sheet already shows a clock out for today.' : 'Clock in first.');
       return;
     }
     setError('');
@@ -289,7 +400,6 @@ export default function Attendance({ role, userName }) {
     setPhoto(null); setPhotoFile(null);
   };
 
-  // Compress selfie to ~200px base64
   const compressSelfie = (file) => new Promise((resolve) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
@@ -307,89 +417,111 @@ export default function Attendance({ role, userName }) {
     img.src = url;
   });
 
-  // ── CLOCK IN/OUT ──
+  const sheetError = (res) => {
+    if (res.status === 401 || res.status === 403) {
+      tokenRef.current = { token: null, expiresAt: 0 };
+      setAccessToken(null);
+      return 'The sheet connection expired. Nothing was saved — reconnect and try again.';
+    }
+    return `The sheet rejected the write (error ${res.status}). Nothing was saved.`;
+  };
+
+  // ── CLOCK IN / OUT — the sheet write must succeed before anything else ──
   const confirmAction = async () => {
-    if (!photoFile) { setError('Please take a selfie first.'); return; }
+    if (!photoFile) { setError('Take a selfie first.'); return; }
     const { staffName, type } = pendingAction;
     setLoading(true); setError('');
 
     const now = new Date();
     const timeNow = formatTime(now);
-    // FIX: sheetDate is always MM/DD/YYYY
     const sheetDate = formatDate(now);
 
     try {
+      const tok = await getToken();
+      if (!tok) {
+        setError('Could not refresh the sheet connection. Nothing was saved.');
+        setLoading(false);
+        return;
+      }
+
       const photoData = await compressSelfie(photoFile);
-      const existingDoc = firestoreRecords[staffName] || {};
 
       if (type === 'IN') {
-        // ── CLOCK IN ──
-        // A=Date  B=Name  C=TimeIn  D=empty  E=empty (TimeOut filled later)
-        const values = [[sheetDate, staffName, timeNow, '', '']];
+        // A=Date  B=Name  C=TimeIn  D=empty  E=TimeOut (filled on clock out)
         const res = await fetch(
-          `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${staffName}!A:E:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
+          `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(`${staffName}!A:E`)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
           {
             method: 'POST',
-            headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ values }),
+            headers: { Authorization: `Bearer ${tok}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ values: [[sheetDate, staffName, timeNow, '', '']] }),
           }
         );
-        const data = await res.json();
-        // Grab the exact row number that was written so clock-out can target it
-        const range = data.updates?.updatedRange || '';
-        const rowMatch = range.match(/(\d+)$/);
-        const rowIndex = rowMatch ? parseInt(rowMatch[1]) : null;
+        if (!res.ok) { setError(sheetError(res)); setLoading(false); return; }
 
-        await addDoc(collection(db, 'attendance'), {
-          staff: staffName,
-          date: today,
-          timeIn: timeNow,
-          timeOut: null,
-          rowIndex,
-          sheetDate,       // stored so clock-out rewrites the correct date string
-          photoInData: photoData || null,
-          createdAt: serverTimestamp(),
-        });
+        // Sheet is written. Firestore only carries the selfie from here.
+        try {
+          await addDoc(collection(db, 'attendance'), {
+            staff: staffName,
+            date: today,
+            timeIn: timeNow,
+            timeOut: null,
+            sheetDate,
+            photoInData: photoData || null,
+            createdAt: serverTimestamp(),
+          });
+        } catch (e) {
+          console.error(e);
+          setError('Saved to the sheet, but the selfie did not upload.');
+        }
 
       } else {
-        // ── CLOCK OUT ──
-        // Rewrite the FULL row A–E so date & name are never left blank
-        // A=Date  B=Name  C=TimeIn  D=empty  E=TimeOut
-        const rowIndex = existingDoc.rowIndex;
-        const storedSheetDate = existingDoc.sheetDate || sheetDate;
-        const storedTimeIn   = existingDoc.timeIn    || '';
-
-        if (rowIndex) {
-          await fetch(
-            `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${staffName}!A${rowIndex}:E${rowIndex}?valueInputOption=USER_ENTERED`,
-            {
-              method: 'PUT',
-              headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-              body: JSON.stringify({ values: [[storedSheetDate, staffName, storedTimeIn, '', timeNow]] }),
-            }
-          );
+        // Re-read so we target the row that actually exists right now.
+        const fresh = await loadSheet(tok, [staffName], { silent: true });
+        const rowIndex = fresh?.recs?.[staffName]?.rowIndex;
+        if (!rowIndex) {
+          setError('Could not find today\'s row in the sheet. Refresh and try again.');
+          setLoading(false);
+          return;
         }
 
-        // Update Firestore with timeOut and clock-out photo
+        // Write column E only — date, name and time in stay exactly as they are.
+        const res = await fetch(
+          `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(`${staffName}!E${rowIndex}`)}?valueInputOption=USER_ENTERED`,
+          {
+            method: 'PUT',
+            headers: { Authorization: `Bearer ${tok}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ values: [[timeNow]] }),
+          }
+        );
+        if (!res.ok) { setError(sheetError(res)); setLoading(false); return; }
+
+        const existingDoc = photosOf(staffName);
         if (existingDoc.docId) {
-          await updateDoc(doc(db, 'attendance', existingDoc.docId), {
-            timeOut: timeNow,
-            photoOutData: photoData || null,
-          });
+          try {
+            await updateDoc(doc(db, 'attendance', existingDoc.docId), {
+              timeOut: timeNow,
+              photoOutData: photoData || null,
+            });
+          } catch (e) {
+            console.error(e);
+            setError('Saved to the sheet, but the selfie did not upload.');
+          }
         }
       }
+
+      // Read back so the card shows what the sheet now holds, not what we hoped.
+      await loadSheet(tok, visibleStaff);
 
       setSuccess(`${staffName} clocked ${type} at ${timeNow}`);
       setPendingAction(null); setPhoto(null); setPhotoFile(null);
       setTimeout(() => setSuccess(''), 4000);
     } catch (e) {
       console.error(e);
-      setError('Failed to save. Please try again.');
+      setError('Could not reach the sheet. Nothing was saved — try again.');
     }
     setLoading(false);
   };
 
-  // ── Delete selfie ──
   const deletePhoto = async (docId, field) => {
     if (!docId) return;
     setDeletingPhoto(true);
@@ -402,66 +534,73 @@ export default function Attendance({ role, userName }) {
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
-  // ── Summary modal: reads from Google Sheets ──
+  // ── Rest day → sheet, with a duplicate check against what's already there ──
+  const appendRestRow = async (staffName, sheetDate, tok, existingRows) => {
+    const already = (existingRows || []).some(r =>
+      r && r[0] && normDate(r[0]) === sheetDate && String(r[2] || '').trim().toUpperCase() === 'REST DAY'
+    );
+    if (already) return true;
+    try {
+      const res = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(`${staffName}!A:E`)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${tok}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ values: [[sheetDate, staffName, 'REST DAY', '', '']] }),
+        }
+      );
+      return res.ok;
+    } catch { return false; }
+  };
+
+  const syncRestDays = async (tok, staff, rows) => {
+    const pending = restDays.filter(r => r.staff === staff && r.inSheet !== true);
+    for (const r of pending) {
+      const ok = await appendRestRow(staff, sheetDateFromIso(r.date), tok, rows);
+      if (ok) {
+        try { await updateDoc(doc(db, 'restDays', r.id), { inSheet: true }); } catch (e) { console.error(e); }
+      }
+    }
+    return pending.length > 0;
+  };
+
+  // ── Summary: built from the same sheet read as the card ──
   const openSummary = async () => {
-    if (!accessToken) { setError('Connect to record log first to view the summary.'); return; }
     if (!activeStaff) return;
     setSummaryOpen(true); setSummaryLoading(true);
     setSummaryRows([]); setSummaryStats({ worked: 0, rest: 0, salary: 0 }); setError('');
 
-    try {
-      // Sync any un-synced rest days to sheet first
-      const toSync = restDays.filter(r => r.staff === activeStaff && r.inSheet !== true);
-      for (const r of toSync) {
-        const ok = await appendRestRow(activeStaff, sheetDateFromIso(r.date), accessToken);
-        if (ok) {
-          try { await updateDoc(doc(db, 'restDays', r.id), { inSheet: true }); } catch {}
-        }
-      }
+    const tok = await getToken();
+    if (!tok) { setError('Connect to record log to load the summary.'); setSummaryLoading(false); return; }
 
-      // Fetch all rows from Google Sheets
-      const res = await fetch(
-        `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${activeStaff}!A:F`,
-        { headers: { Authorization: `Bearer ${accessToken}` } }
-      );
-      if (!res.ok) { setError('Could not load sheet. Try reconnecting.'); setSummaryLoading(false); return; }
-
-      const data = await res.json();
-      const allRows = data.values || [];
-
-      // Sheet layout: A=Date(0)  B=Name(1)  C=TimeIn or REST DAY(2)  D=empty(3)  E=TimeOut(4)
-      const rows = allRows
-        .filter(r => {
-          if (!r || !r[0]) return false;                               // must have a date in col A
-          if (String(r[1] || '').toLowerCase() === 'name') return false; // skip header row
-          return true;
-        })
-        .map(r => {
-          const colC = String(r[2] || '').trim().toUpperCase();
-          const isRest = colC === 'REST DAY';
-          return {
-            isRest,
-            date:    displayDate(r[0]),
-            timeIn:  isRest ? '' : displayTime(r[2] || ''), // col C → index 2
-            timeOut: isRest ? '' : displayTime(r[4] || ''), // col E → index 4
-          };
-        });
-
-      // Count unique worked dates and rest dates
-      const workedDates = new Set(rows.filter(r => !r.isRest && r.date).map(r => r.date));
-      const restDateSet = new Set(rows.filter(r => r.isRest && r.date).map(r => r.date));
-
-      setSummaryStats({
-        worked: workedDates.size,
-        rest: restDateSet.size,
-        salary: workedDates.size * DAILY_RATE,
-      });
-      // Show newest first
-      setSummaryRows([...rows].reverse());
-    } catch (e) {
-      console.error(e);
-      setError('Could not load summary. Try reconnecting.');
+    let loaded = await loadSheet(tok, visibleStaff, { silent: true });
+    if (loaded) {
+      const pushed = await syncRestDays(tok, activeStaff, loaded.rowsByStaff[activeStaff]);
+      if (pushed) loaded = await loadSheet(tok, visibleStaff, { silent: true });
     }
+    if (!loaded) { setSummaryLoading(false); return; }
+
+    const rows = (loaded.rowsByStaff[activeStaff] || [])
+      .filter(r => r && r[0] && !isHeaderRow(r))
+      .map(r => {
+        const isRest = String(r[2] || '').trim().toUpperCase() === 'REST DAY';
+        return {
+          isRest,
+          date: normDate(r[0]),
+          timeIn: isRest ? '' : displayTime(r[2] || ''),
+          timeOut: isRest ? '' : displayTime(r[4] || ''),
+        };
+      });
+
+    const workedDates = new Set(rows.filter(r => !r.isRest && r.date).map(r => r.date));
+    const restDateSet = new Set(rows.filter(r => r.isRest && r.date).map(r => r.date));
+
+    setSummaryStats({
+      worked: workedDates.size,
+      rest: restDateSet.size,
+      salary: workedDates.size * DAILY_RATE,
+    });
+    setSummaryRows([...rows].reverse());
     setSummaryLoading(false);
   };
 
@@ -469,7 +608,9 @@ export default function Attendance({ role, userName }) {
   const dateCounts = {};
   restDays.forEach(r => { dateCounts[r.date] = (dateCounts[r.date] || 0) + 1; });
   const upcoming = restDays.filter(r => r.date >= today);
-  const onRestToday = activeStaff ? restDays.some(r => r.staff === activeStaff && r.date === today) : false;
+  const onRestToday = activeStaff
+    ? (rec(activeStaff).isRest || restDays.some(r => r.staff === activeStaff && r.date === today))
+    : false;
 
   const addRestDay = async () => {
     if (!activeStaff) { setRestWarning('No staff selected.'); return; }
@@ -481,34 +622,38 @@ export default function Attendance({ role, userName }) {
     setRestSaving(true);
     try {
       let inSheet = false;
-      if (accessToken) inSheet = await appendRestRow(activeStaff, sheetDateFromIso(restDate), accessToken);
+      const tok = await getToken({ interactive: false });
+      if (tok) inSheet = await appendRestRow(activeStaff, sheetDateFromIso(restDate), tok, sheetRows[activeStaff]);
       await addDoc(collection(db, 'restDays'), {
         staff: activeStaff, date: restDate, inSheet, createdAt: serverTimestamp()
       });
-      setRestWarning(clash ? `Heads up — ${clash.staff} also has a rest day on ${prettyDate(restDate)}.` : '');
+      setRestWarning(
+        !inSheet
+          ? 'Saved. It will be written to the sheet the next time you open the summary.'
+          : clash ? `Heads up — ${clash.staff} also has a rest day on ${prettyDate(restDate)}.` : ''
+      );
       setRestDate('');
+      if (tok) loadSheet(tok, visibleStaff, { silent: true });
     } catch { setRestWarning('Could not save. Try again.'); }
     setRestSaving(false);
   };
 
   const removeRestDay = async (entry) => {
     if (role !== 'manager' && entry.staff !== userName) return;
-    try { await deleteDoc(doc(db, 'restDays', entry.id)); } catch {}
+    try { await deleteDoc(doc(db, 'restDays', entry.id)); } catch (e) { console.error(e); }
   };
 
-  const rec = (name) => firestoreRecords[name] || {};
-  const isActive = !!rec(activeStaff)?.timeIn && !rec(activeStaff)?.timeOut && !onRestToday;
+  const isActive = !!rec(activeStaff).timeIn && !rec(activeStaff).timeOut && !onRestToday;
 
   return (
     <div style={s.page}>
       <div style={s.title}>Attendance</div>
       <div style={s.sub}>Time In / Time Out</div>
 
-      {/* Connect + Summary row */}
       <div style={s.actionRow}>
         {!accessToken
-          ? <button style={{ ...s.smallBtn, ...s.connectBtn }} onClick={() => tokenClientRef.current?.requestAccessToken()}>{Ic.link} Connect to record log</button>
-          : <div style={s.connectedBadge}>{Ic.check} Log connected</div>
+          ? <button style={{ ...s.smallBtn, ...s.connectBtn }} onClick={() => getToken()}>{Ic.link} Connect to record log</button>
+          : <div style={s.connectedBadge} onClick={() => loadSheet(accessToken, visibleStaff)}>{Ic.check} Log connected</div>
         }
         <button style={{ ...s.smallBtn, ...s.summaryBtn }} onClick={openSummary}>{Ic.list} Summary</button>
         {role === 'manager' && (
@@ -523,13 +668,22 @@ export default function Attendance({ role, userName }) {
         )}
       </div>
 
-      {/* Real-time sync indicator */}
-      <div style={s.syncBadge}>{Ic.sync} Live sync — updates instantly on all devices</div>
+      {/* What the sheet holds is what you see below */}
+      <div style={s.syncRow}>
+        {Ic.sheet}
+        <span>
+          {syncing ? 'Reading the sheet…'
+            : lastSync ? `Showing the sheet as of ${formatTime(lastSync).toLowerCase()}`
+              : 'Connect to load the sheet'}
+        </span>
+        {accessToken && !syncing && (
+          <button style={s.refreshBtn} onClick={() => loadSheet(accessToken, visibleStaff)}>Refresh</button>
+        )}
+      </div>
 
       {error && <div style={s.banner('err')}>{Ic.warn} {error}</div>}
       {success && <div style={s.banner('ok')}>{Ic.check} {success}</div>}
 
-      {/* Staff tabs */}
       {visibleStaff.length > 1 && (
         <div style={s.tabRow}>
           {visibleStaff.map(name => (
@@ -538,7 +692,6 @@ export default function Attendance({ role, userName }) {
         </div>
       )}
 
-      {/* Clock In/Out card */}
       {activeStaff && (
         <div style={s.card}>
           <div style={s.staffName}>{activeStaff}</div>
@@ -548,7 +701,7 @@ export default function Attendance({ role, userName }) {
               ? 'Rest day today'
               : rec(activeStaff).timeIn
                 ? `In: ${rec(activeStaff).timeIn}`
-                : 'Not clocked in today'}
+                : accessToken ? 'No clock in on the sheet today' : 'Sheet not loaded'}
             {!onRestToday && rec(activeStaff).timeOut ? `  ·  Out: ${rec(activeStaff).timeOut}` : ''}
           </div>
 
@@ -575,13 +728,14 @@ export default function Attendance({ role, userName }) {
         </div>
       )}
 
-      {/* Manager: today's selfie cards */}
-      {role === 'manager' && STAFF_LIST.some(n => firestoreRecords[n]?.timeIn) && (
+      {/* Manager: today's selfies — times from the sheet, photos from Firestore */}
+      {role === 'manager' && STAFF_LIST.some(n => rec(n).timeIn) && (
         <div style={{ marginBottom: 14 }}>
           <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 700, marginBottom: 8 }}>Today's Selfies</div>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             {STAFF_LIST.map(name => {
-              const r = firestoreRecords[name] || {};
+              const r = rec(name);
+              const p = photosOf(name);
               if (!r.timeIn) return null;
               const noPhoto = { width: '100%', aspectRatio: '1/1', borderRadius: 8, background: C.soft, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28 };
               return (
@@ -589,19 +743,19 @@ export default function Attendance({ role, userName }) {
                   <div style={{ fontSize: 13, fontWeight: 700, color: C.ink, marginBottom: 8 }}>{name}</div>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <div style={{ flex: 1 }}>
-                      {r.photoInData
-                        ? <div style={{ cursor: 'pointer' }} onClick={() => setPhotoViewer({ url: r.photoInData, docId: r.docId, field: 'photoInData', staff: name, label: 'Clock In' })}>
-                            <img src={r.photoInData} alt="clock-in" style={{ width: '100%', borderRadius: 8, objectFit: 'cover', aspectRatio: '1/1' }} />
+                      {p.photoInData
+                        ? <div style={{ cursor: 'pointer' }} onClick={() => setPhotoViewer({ url: p.photoInData, docId: p.docId, field: 'photoInData', staff: name, label: 'Clock In' })}>
+                            <img src={p.photoInData} alt="clock-in" style={{ width: '100%', borderRadius: 8, objectFit: 'cover', aspectRatio: '1/1' }} />
                           </div>
                         : <div style={noPhoto}>👤</div>
                       }
-                      <div style={{ fontSize: 9.5, color: C.green, fontWeight: 700, textAlign: 'center', marginTop: 3 }}>IN {r.timeIn ? r.timeIn.slice(0, 8) : ''}</div>
+                      <div style={{ fontSize: 9.5, color: C.green, fontWeight: 700, textAlign: 'center', marginTop: 3 }}>IN {r.timeIn.slice(0, 8)}</div>
                     </div>
                     {r.timeOut && (
                       <div style={{ flex: 1 }}>
-                        {r.photoOutData
-                          ? <div style={{ cursor: 'pointer' }} onClick={() => setPhotoViewer({ url: r.photoOutData, docId: r.docId, field: 'photoOutData', staff: name, label: 'Clock Out' })}>
-                              <img src={r.photoOutData} alt="clock-out" style={{ width: '100%', borderRadius: 8, objectFit: 'cover', aspectRatio: '1/1' }} />
+                        {p.photoOutData
+                          ? <div style={{ cursor: 'pointer' }} onClick={() => setPhotoViewer({ url: p.photoOutData, docId: p.docId, field: 'photoOutData', staff: name, label: 'Clock Out' })}>
+                              <img src={p.photoOutData} alt="clock-out" style={{ width: '100%', borderRadius: 8, objectFit: 'cover', aspectRatio: '1/1' }} />
                             </div>
                           : <div style={noPhoto}>👤</div>
                         }
@@ -616,7 +770,7 @@ export default function Attendance({ role, userName }) {
         </div>
       )}
 
-      {/* Rest days card */}
+      {/* Rest days */}
       <div style={s.card}>
         <div style={s.restHead}>{Ic.cal}<span style={s.restTitle}>Rest Days</span></div>
         <div style={s.restSub}>Pick your day off. On a rest day, clock in/out is disabled — and it shows in the summary and record sheet.</div>
@@ -645,7 +799,9 @@ export default function Attendance({ role, userName }) {
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 13.5, fontWeight: 700, color: C.ink }}>{entry.staff}</div>
                     <div style={{ fontSize: 11.5, color: clash ? C.warn : C.muted, display: 'flex', alignItems: 'center', gap: 5, marginTop: 1 }}>
-                      {prettyDate(entry.date)}{clash && <><span style={{ display: 'inline-flex', color: C.warn }}>{Ic.warn}</span> overlap</>}
+                      {prettyDate(entry.date)}
+                      {entry.inSheet !== true && <span style={{ color: C.warn }}>· not in sheet yet</span>}
+                      {clash && <><span style={{ display: 'inline-flex', color: C.warn }}>{Ic.warn}</span> overlap</>}
                     </div>
                   </div>
                   {canDelete && (
@@ -675,7 +831,7 @@ export default function Attendance({ role, userName }) {
             {photo && (
               <>
                 <button style={s.confirmBtn} onClick={confirmAction} disabled={loading}>
-                  {loading ? 'Saving…' : `Confirm Clock ${pendingAction.type}`}
+                  {loading ? 'Saving to the sheet…' : `Confirm Clock ${pendingAction.type}`}
                 </button>
                 <button style={{ background: 'none', border: 'none', color: C.muted, fontSize: 12, cursor: 'pointer', width: '100%', marginTop: 8 }} onClick={() => { setPhoto(null); setPhotoFile(null); }}>Retake</button>
               </>
@@ -716,7 +872,7 @@ export default function Attendance({ role, userName }) {
             {summaryLoading
               ? <div style={{ fontSize: 13, color: C.muted, textAlign: 'center', padding: '20px 0' }}>Loading…</div>
               : summaryRows.length === 0
-                ? <div style={{ fontSize: 13, color: C.muted, textAlign: 'center', padding: '20px 0' }}>No records yet.</div>
+                ? <div style={{ fontSize: 13, color: C.muted, textAlign: 'center', padding: '20px 0' }}>Nothing on the sheet yet.</div>
                 : (
                   <table style={s.sumTable}>
                     <thead>
@@ -767,7 +923,7 @@ export default function Attendance({ role, userName }) {
                     ? (
                       <img src={n.photoData} alt="selfie"
                         style={{ width: 52, height: 52, borderRadius: 10, objectFit: 'cover', flexShrink: 0, cursor: 'pointer', border: `2px solid ${C.gold}` }}
-                        onClick={() => { setPhotoViewer({ url: n.photoData, docId: firestoreRecords[n.staff]?.docId, field: n.type === 'IN' ? 'photoInData' : 'photoOutData', staff: n.staff, label: `Clock ${n.type}` }); setNotifOpen(false); }}
+                        onClick={() => { setPhotoViewer({ url: n.photoData, docId: photosOf(n.staff).docId, field: n.type === 'IN' ? 'photoInData' : 'photoOutData', staff: n.staff, label: `Clock ${n.type}` }); setNotifOpen(false); }}
                       />
                     ) : (
                       <div style={{ width: 52, height: 52, borderRadius: 10, background: C.soft, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>👤</div>
