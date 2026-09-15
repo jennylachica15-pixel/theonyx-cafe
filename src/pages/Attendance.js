@@ -336,16 +336,19 @@ export default function Attendance({ role, userName }) {
           if (normDate(r[0]) !== todaySheet) return;
           const colC = String(r[2] || '').trim().toUpperCase();
           const isRest = colC === 'REST DAY';
+          const isAbsent = colC === 'ABSENT' || colC === 'A';
+          const isMarker = isRest || isAbsent;
           // last matching row wins
           found = {
             rowIndex: idx + 1,                                  // real 1-based sheet row
             isRest,
-            timeIn: isRest ? null : (r[2] ? displayTime(r[2]) : null),
-            timeOut: isRest ? null : (r[4] ? displayTime(r[4]) : null),
+            isAbsent,
+            timeIn: isMarker ? null : (r[2] ? displayTime(r[2]) : null),
+            timeOut: isMarker ? null : (r[4] ? displayTime(r[4]) : null),
           };
         });
 
-        recs[staff] = found || { rowIndex: null, isRest: false, timeIn: null, timeOut: null };
+        recs[staff] = found || { rowIndex: null, isRest: false, isAbsent: false, timeIn: null, timeOut: null };
       });
 
       setSheetToday(recs);
@@ -498,15 +501,32 @@ export default function Attendance({ role, userName }) {
       const photoData = await compressSelfie(photoFile);
 
       if (type === 'IN') {
-        // A=Date  B=Name  C=TimeIn  D=empty  E=TimeOut (filled on clock out)
-        const res = await fetch(
-          `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(`${staffName}!A:E`)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
-          {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${tok}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ values: [[sheetDate, staffName, timeNow, '', '']] }),
-          }
-        );
+        // If the sheet already has a row for today — a pre-filled template row,
+        // or one marked ABSENT — write the time into its column C. Appending
+        // would create a second row for the same date. Only column C is touched,
+        // so a formula or manual entry in the date and name columns survives.
+        // A REST DAY row is left alone and gets its own row instead.
+        const cur = rec(staffName);
+        const reuseRow = cur.rowIndex && !cur.isRest ? cur.rowIndex : null;
+
+        const res = reuseRow
+          ? await fetch(
+              `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(`${staffName}!C${reuseRow}`)}?valueInputOption=USER_ENTERED`,
+              {
+                method: 'PUT',
+                headers: { Authorization: `Bearer ${tok}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ values: [[timeNow]] }),
+              }
+            )
+          // A=Date  B=Name  C=TimeIn  D=empty  E=TimeOut (filled on clock out)
+          : await fetch(
+              `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(`${staffName}!A:E`)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
+              {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${tok}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ values: [[sheetDate, staffName, timeNow, '', '']] }),
+              }
+            );
         if (!res.ok) { setError(sheetError(res)); setLoading(false); return; }
 
         // Sheet is written. Firestore only carries the selfie from here.
