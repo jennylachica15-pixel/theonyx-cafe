@@ -15,6 +15,22 @@ const WEEKDAY = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday
 const DAILY_RATE = 400;
 const POLL_MS = 60000;
 
+// Weekly shift schedule shown at the bottom of the page
+const SHIFT_SCHEDULE = [
+  { day: 'Monday',    opening: 'Maryz', closing: 'Kelly' },
+  { day: 'Tuesday',   opening: 'Ash',   closing: 'Maryz' },
+  { day: 'Wednesday', opening: 'Maryz', closing: 'Kelly' },
+  { day: 'Thursday',  opening: 'Ash',   closing: 'Kelly' },
+  { day: 'Friday',    opening: 'Kelly', closing: 'Maryz' },
+  { day: 'Saturday',  opening: 'Kelly', closing: 'Maryz' },
+  { day: 'Sunday',    opening: 'Kelly', closing: 'Maryz' },
+];
+const STAFF_TINT = {
+  Kelly: { bg: '#f4cccc', fg: '#7a2e2e' },
+  Maryz: { bg: '#fff2cc', fg: '#7a5c10' },
+  Ash:   { bg: '#cfe2f3', fg: '#1f4466' },
+};
+
 // ── palette ──
 const C = {
   ink: '#2a1000', gold: '#c8943a', muted: '#a07850', cream: '#fff8f0',
@@ -106,6 +122,7 @@ const Ic = {
   warn: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>,
   close: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={C.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
   sheet: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="9" x2="9" y2="21"/></svg>,
+  clock: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={C.gold} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>,
 };
 
 // ── Date/time helpers ──
@@ -983,6 +1000,45 @@ export default function Attendance({ role, userName }) {
               );
             })
         }
+      </div>
+
+      {/* Weekly shift schedule */}
+      <div style={s.card}>
+        <div style={s.restHead}>{Ic.clock}<span style={s.restTitle}>Onyx Babies Schedule</span></div>
+        <div style={s.restSub}>Weekly opening and closing shifts. Today is highlighted.</div>
+        <table style={s.sumTable}>
+          <thead>
+            <tr>
+              <th style={s.sumTh}>Day</th>
+              <th style={{ ...s.sumTh, textAlign: 'center' }}>Opening</th>
+              <th style={{ ...s.sumTh, textAlign: 'center' }}>Closing</th>
+            </tr>
+          </thead>
+          <tbody>
+            {SHIFT_SCHEDULE.map(row => {
+              const isToday = row.day === WEEKDAY[new Date().getDay()];
+              const chip = (name) => {
+                const t = STAFF_TINT[name] || { bg: C.soft, fg: C.ink };
+                return (
+                  <span style={{
+                    display: 'inline-block', minWidth: 62, padding: '4px 10px', borderRadius: 20,
+                    fontSize: 12.5, fontWeight: 700, background: t.bg, color: t.fg,
+                  }}>{name}</span>
+                );
+              };
+              return (
+                <tr key={row.day} style={{ background: isToday ? C.cream : 'transparent' }}>
+                  <td style={{ ...s.sumTd, fontWeight: isToday ? 700 : 500, borderLeft: `3px solid ${isToday ? C.gold : 'transparent'}` }}>
+                    {row.day}
+                    {isToday && <span style={{ marginLeft: 6, fontSize: 9.5, fontWeight: 800, color: C.gold, letterSpacing: 0.5 }}>TODAY</span>}
+                  </td>
+                  <td style={{ ...s.sumTd, textAlign: 'center' }}>{chip(row.opening)}</td>
+                  <td style={{ ...s.sumTd, textAlign: 'center' }}>{chip(row.closing)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
 
       {/* Selfie modal */}
