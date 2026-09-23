@@ -314,7 +314,6 @@ export default function Attendance({ role, userName }) {
 
   useEffect(() => {
     if (visibleStaff.length > 0) setActiveStaff(visibleStaff[0]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userName, role]);
 
   useEffect(() => { setRestOverride(false); }, [activeStaff, today]);
@@ -389,7 +388,6 @@ export default function Attendance({ role, userName }) {
   // Pull as soon as we have a token, and whenever the staff list changes.
   useEffect(() => {
     if (accessToken) loadSheet(accessToken, visibleStaff);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessToken, role, userName]);
 
   // Background refresh: on focus and on a timer, silently.
